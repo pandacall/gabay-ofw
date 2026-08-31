@@ -17,21 +17,20 @@ def _project_id() -> str | None:
 
 @lru_cache(maxsize=1)
 def get_gemini_api_key() -> str | None:
-    env_key = os.environ.get("GEMINI_API_KEY")
-    if env_key:
-        return env_key
+    """Secret Manager is the source of truth; env var only when no project is set
+    (local dev without cloud access). Never read from committed files."""
     project = _project_id()
-    if not project:
-        return None
-    try:
-        from google.cloud import secretmanager
+    if project:
+        try:
+            from google.cloud import secretmanager
 
-        client = secretmanager.SecretManagerServiceClient()
-        name = f"projects/{project}/secrets/{SECRET_ID}/versions/latest"
-        response = client.access_secret_version(request={"name": name})
-        return response.payload.data.decode("utf-8")
-    except Exception:
-        return None
+            client = secretmanager.SecretManagerServiceClient()
+            name = f"projects/{project}/secrets/{SECRET_ID}/versions/latest"
+            response = client.access_secret_version(request={"name": name})
+            return response.payload.data.decode("utf-8")
+        except Exception:
+            return None
+    return os.environ.get("GEMINI_API_KEY")
 
 
 def get_firebase_web_config() -> dict | None:

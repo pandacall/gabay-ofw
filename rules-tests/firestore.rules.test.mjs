@@ -28,22 +28,45 @@ const alice = () => env.authenticatedContext("alice").firestore();
 const bob = () => env.authenticatedContext("bob").firestore();
 const anon = () => env.unauthenticatedContext().firestore();
 
-// Every user-scoped path family from the PRD data model.
-const paths = (uid) => [
-  `users/${uid}`,
-  `users/${uid}/notes/n1`,
-  `users/${uid}/contractChecks/c1`,
-  `users/${uid}/contractChecks/c1/messages/m1`,
-  `users/${uid}/crisisSessions/s1`,
-  `users/${uid}/crisisSessions/s1/messages/m1`,
+// Every user-scoped path family from the PRD data model, with a payload
+// valid for that path (crisisSessions requires an expireAt timestamp).
+const writes = (uid) => [
+  [`users/${uid}`, { ok: true }],
+  [`users/${uid}/notes/n1`, { ok: true }],
+  [`users/${uid}/contractChecks/c1`, { ok: true }],
+  [`users/${uid}/contractChecks/c1/messages/m1`, { ok: true }],
+  [`users/${uid}/crisisSessions/s1`, { expireAt: new Date(Date.now() + 48 * 3600 * 1000) }],
+  [`users/${uid}/crisisSessions/s1/messages/m1`, { ok: true }],
 ];
+const paths = (uid) => writes(uid).map(([p]) => p);
 
 describe("owner access", () => {
   it("allows the owner to write and read every user-scoped path", async () => {
-    for (const p of paths("alice")) {
-      await assertSucceeds(alice().doc(p).set({ ok: true }));
+    for (const [p, data] of writes("alice")) {
+      await assertSucceeds(alice().doc(p).set(data));
       await assertSucceeds(alice().doc(p).get());
     }
+  });
+});
+
+describe("crisis session TTL invariant", () => {
+  it("denies creating a crisis session without expireAt, even for the owner", async () => {
+    await assertFails(alice().doc("users/alice/crisisSessions/s2").set({ country: "SA" }));
+  });
+
+  it("denies updating a crisis session to drop expireAt", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("users/alice/crisisSessions/s3").set({ expireAt: new Date() });
+    });
+    await assertFails(
+      alice().doc("users/alice/crisisSessions/s3").set({ country: "SA" })
+    );
+  });
+
+  it("denies a non-timestamp expireAt", async () => {
+    await assertFails(
+      alice().doc("users/alice/crisisSessions/s4").set({ expireAt: "never" })
+    );
   });
 });
 
@@ -85,5 +108,9 @@ describe("outside user tree", () => {
   it("denies access to non-user collections by default", async () => {
     await assertFails(alice().doc("admin/config").get());
     await assertFails(alice().doc("admin/config").set({ x: 1 }));
+  });
+
+  it("denies user-scoped paths outside the data model, even for the owner", async () => {
+    await assertFails(alice().doc("users/alice/random/x1").set({ x: 1 }));
   });
 });

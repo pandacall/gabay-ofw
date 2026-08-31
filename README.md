@@ -97,10 +97,14 @@ One-time project setup:
 
 5. Deploy Firestore rules (see above).
 
-## Privacy & security design
+## Privacy & security design (target architecture; enforced pieces noted)
 
-- Per-user isolation enforced by Firestore security rules, not client filtering.
-- Crisis sessions carry an `expireAt` field with a Firestore TTL policy
-  (48–72 h auto-delete); users can also delete any session manually.
-- The Gemini key lives only in Secret Manager.
-- All model output is schema-validated before being trusted or rendered.
+- Per-user isolation enforced by Firestore security rules, not client filtering
+  (enforced now — see `firestore.rules` and its emulator tests).
+- Crisis sessions must carry an `expireAt` timestamp (enforced in rules now);
+  the Firestore TTL policy (48–72 h auto-delete) and manual session deletion
+  land with the Crisis Help slice.
+- The Gemini key lives only in Secret Manager (enforced now — the app reads the
+  env var only when no cloud project is configured, i.e. local dev).
+- All model output will be schema-validated before being trusted or rendered
+  (upcoming slices).

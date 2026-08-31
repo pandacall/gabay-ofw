@@ -11,6 +11,7 @@
   .muted { color: #667; font-size: .9rem; }
   button { font-size: 1rem; padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid #ccd; background: #fff; cursor: pointer; margin: .25rem .4rem .25rem 0; }
   button.primary { background: #1a56db; color: #fff; border-color: #1a56db; }
+  #lang-toggle { float: right; font-size: .85rem; padding: .3rem .7rem; }
   #status { margin: 1rem 0; padding: .6rem .8rem; background: #f3f5f9; border-radius: 8px; }
   textarea { width: 100%; min-height: 70px; margin-top: .5rem; }
   ul#notes { padding-left: 1.2rem; }
@@ -18,22 +19,23 @@
 </style>
 </head>
 <body>
-<h1>Gabay OFW — walking skeleton</h1>
-<p class="muted">Guidance for OFWs. Not legal advice, not an emergency service. This page proves auth + user-isolated storage end to end.</p>
+<button id="lang-toggle"></button>
+<h1 data-copy="title"></h1>
+<p class="muted" data-copy="disclaimer"></p>
 
-<div id="status">Loading…</div>
+<div id="status"></div>
 
 <div id="signed-out" class="hidden">
-  <button class="primary" id="signin">Sign in with Google</button>
+  <button class="primary" id="signin" data-copy="signIn"></button>
 </div>
 
 <div id="signed-in" class="hidden">
-  <button id="signout">Sign out</button>
-  <h2>Your private notes</h2>
-  <textarea id="note-text" placeholder="Write a test note…"></textarea>
+  <button id="signout" data-copy="signOut"></button>
+  <h2 data-copy="notesHeading"></h2>
+  <textarea id="note-text"></textarea>
   <br>
-  <button class="primary" id="save">Save note</button>
-  <button id="refresh">Refresh</button>
+  <button class="primary" id="save" data-copy="save"></button>
+  <button id="refresh" data-copy="refresh"></button>
   <ul id="notes"></ul>
 </div>
 
@@ -42,12 +44,77 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
+// UI copy keyed by language (prototype pattern) — no hardcoded English-only strings.
+const copy = {
+  en: {
+    title: "Gabay OFW — walking skeleton",
+    disclaimer: "Guidance for OFWs. Not legal advice, not an emergency service. This page proves auth + user-isolated storage end to end.",
+    signIn: "Sign in with Google",
+    signOut: "Sign out",
+    notesHeading: "Your private notes",
+    notePlaceholder: "Write a test note…",
+    save: "Save note",
+    refresh: "Refresh",
+    loading: "Loading…",
+    signedOut: "Signed out.",
+    signedInAs: (name) => `Signed in as ${name}`,
+    signInFailed: (msg) => `Sign-in failed: ${msg}`,
+    notConfigured: "Server is not configured with a Firebase web config yet.",
+    langToggle: "Tagalog",
+  },
+  tl: {
+    title: "Gabay OFW — panimulang balangkas",
+    disclaimer: "Gabay para sa mga OFW. Hindi ito legal na payo at hindi serbisyong pang-emergency. Pinapatunayan ng pahinang ito ang sign-in at pribadong imbakan.",
+    signIn: "Mag-sign in gamit ang Google",
+    signOut: "Mag-sign out",
+    notesHeading: "Ang iyong mga pribadong tala",
+    notePlaceholder: "Sumulat ng pansubok na tala…",
+    save: "I-save ang tala",
+    refresh: "I-refresh",
+    loading: "Naglo-load…",
+    signedOut: "Naka-sign out.",
+    signedInAs: (name) => `Naka-sign in bilang ${name}`,
+    signInFailed: (msg) => `Hindi nagtagumpay ang pag-sign in: ${msg}`,
+    notConfigured: "Hindi pa naka-configure ang server ng Firebase web config.",
+    langToggle: "English",
+  },
+};
+
+let lang = localStorage.getItem("gabay-lang") || "en";
+const t = (key, ...args) => {
+  const entry = copy[lang][key];
+  return typeof entry === "function" ? entry(...args) : entry;
+};
+
 const statusEl = document.getElementById("status");
 const show = (id, on) => document.getElementById(id).classList.toggle("hidden", !on);
+let statusKey = ["loading"];
+
+function render() {
+  document.documentElement.lang = lang;
+  for (const el of document.querySelectorAll("[data-copy]")) {
+    el.textContent = t(el.dataset.copy);
+  }
+  document.getElementById("note-text").placeholder = t("notePlaceholder");
+  document.getElementById("lang-toggle").textContent = t("langToggle");
+  statusEl.textContent = t(...statusKey);
+}
+
+function setStatus(...keyAndArgs) {
+  statusKey = keyAndArgs;
+  statusEl.textContent = t(...statusKey);
+}
+
+document.getElementById("lang-toggle").onclick = () => {
+  lang = lang === "en" ? "tl" : "en";
+  localStorage.setItem("gabay-lang", lang);
+  render();
+};
+render();
 
 const cfgResp = await fetch("/api/firebase-config");
 if (!cfgResp.ok) {
-  statusEl.textContent = "Server is not configured with a Firebase web config yet.";
+  setStatus("notConfigured");
   throw new Error("no firebase config");
 }
 const auth = getAuth(initializeApp(await cfgResp.json()));
@@ -69,7 +136,7 @@ async function refreshNotes() {
 }
 
 document.getElementById("signin").onclick = () =>
-  signInWithPopup(auth, new GoogleAuthProvider()).catch(e => { statusEl.textContent = `Sign-in failed: ${e.message}`; });
+  signInWithPopup(auth, new GoogleAuthProvider()).catch(e => setStatus("signInFailed", e.message));
 document.getElementById("signout").onclick = () => signOut(auth);
 document.getElementById("save").onclick = async () => {
   const text = document.getElementById("note-text").value.trim();
@@ -84,10 +151,10 @@ onAuthStateChanged(auth, async (user) => {
   show("signed-in", !!user);
   show("signed-out", !user);
   if (user) {
-    statusEl.textContent = `Signed in as ${user.displayName || user.email}`;
+    setStatus("signedInAs", user.displayName || user.email);
     await refreshNotes().catch(() => {});
   } else {
-    statusEl.textContent = "Signed out.";
+    setStatus("signedOut");
   }
 });
 </script>
