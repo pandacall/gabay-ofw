@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gabay OFW</title>
+<style>
+  :root { color-scheme: light; }
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1rem; color: #1a2233; }
+  h1 { font-size: 1.6rem; }
+  .muted { color: #667; font-size: .9rem; }
+  button { font-size: 1rem; padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid #ccd; background: #fff; cursor: pointer; margin: .25rem .4rem .25rem 0; }
+  button.primary { background: #1a56db; color: #fff; border-color: #1a56db; }
+  #status { margin: 1rem 0; padding: .6rem .8rem; background: #f3f5f9; border-radius: 8px; }
+  textarea { width: 100%; min-height: 70px; margin-top: .5rem; }
+  ul#notes { padding-left: 1.2rem; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<h1>Gabay OFW — walking skeleton</h1>
+<p class="muted">Guidance for OFWs. Not legal advice, not an emergency service. This page proves auth + user-isolated storage end to end.</p>
+
+<div id="status">Loading…</div>
+
+<div id="signed-out" class="hidden">
+  <button class="primary" id="signin">Sign in with Google</button>
+</div>
+
+<div id="signed-in" class="hidden">
+  <button id="signout">Sign out</button>
+  <h2>Your private notes</h2>
+  <textarea id="note-text" placeholder="Write a test note…"></textarea>
+  <br>
+  <button class="primary" id="save">Save note</button>
+  <button id="refresh">Refresh</button>
+  <ul id="notes"></ul>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const statusEl = document.getElementById("status");
+const show = (id, on) => document.getElementById(id).classList.toggle("hidden", !on);
+
+const cfgResp = await fetch("/api/firebase-config");
+if (!cfgResp.ok) {
+  statusEl.textContent = "Server is not configured with a Firebase web config yet.";
+  throw new Error("no firebase config");
+}
+const auth = getAuth(initializeApp(await cfgResp.json()));
+
+async function api(path, options = {}) {
+  const token = await auth.currentUser.getIdToken();
+  const resp = await fetch(path, {
+    ...options,
+    headers: { ...options.headers, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+  });
+  if (!resp.ok) throw new Error(`API ${path} failed: ${resp.status}`);
+  return resp.json();
+}
+
+async function refreshNotes() {
+  const { notes } = await api("/api/notes");
+  const ul = document.getElementById("notes");
+  ul.replaceChildren(...notes.map(n => Object.assign(document.createElement("li"), { textContent: n.text })));
+}
+
+document.getElementById("signin").onclick = () =>
+  signInWithPopup(auth, new GoogleAuthProvider()).catch(e => { statusEl.textContent = `Sign-in failed: ${e.message}`; });
+document.getElementById("signout").onclick = () => signOut(auth);
+document.getElementById("save").onclick = async () => {
+  const text = document.getElementById("note-text").value.trim();
+  if (!text) return;
+  await api("/api/notes", { method: "POST", body: JSON.stringify({ text }) });
+  document.getElementById("note-text").value = "";
+  await refreshNotes();
+};
+document.getElementById("refresh").onclick = refreshNotes;
+
+onAuthStateChanged(auth, async (user) => {
+  show("signed-in", !!user);
+  show("signed-out", !user);
+  if (user) {
+    statusEl.textContent = `Signed in as ${user.displayName || user.email}`;
+    await refreshNotes().catch(() => {});
+  } else {
+    statusEl.textContent = "Signed out.";
+  }
+});
+</script>
+</body>
+</html>

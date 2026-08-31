@@ -1,0 +1,13 @@
+{
+  "name": "gabay-ofw-rules-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project gabay-ofw-rules-test \"node node_modules/mocha/bin/mocha.js --timeout 20000 firestore.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^3.0.4",
+    "firebase-tools": "^13.35.1",
+    "mocha": "^10.7.3"
+  }
+}

@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Secrets & local config — never commit
+.env
+*.env
+serviceAccount*.json
+*-service-account.json
+
+# Node
+node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
