@@ -18,6 +18,7 @@ from app.contract_check import (
     ContractCheckService,
     ContractCheckStart,
 )
+from app.firestore_session_service import FirestoreSessionService
 from app.notes import NotesStore, get_notes_store
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -129,7 +130,20 @@ def create_app(
 
 def production_app() -> FastAPI:
     import firebase_admin
+    from google.adk.models.google_llm import Gemini
+    from google.cloud import firestore
+    from google.genai import Client
 
     if not firebase_admin._apps:
         firebase_admin.initialize_app()
-    return create_app()
+    api_key = get_gemini_api_key()
+    if not api_key:
+        raise RuntimeError("Gemini API key is not configured")
+    model_client = Client(api_key=api_key)
+    model = Gemini(model="gemini-2.5-flash", client=model_client)
+    service = ContractCheckService(
+        session_service=FirestoreSessionService(firestore.client()),
+        interviewer_model=model,
+        rule_matcher_model=model,
+    )
+    return create_app(contract_checks=service)

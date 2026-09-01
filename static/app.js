@@ -56,7 +56,7 @@ const copy = {
     privacyTitle: "Built for privacy",
     privacyBody: "This preview does not save conversations. Stored Crisis Sessions are designed to expire automatically.",
     backDashboard: "Back to dashboard",
-    contractIntroBody: "Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya.",
+    contractIntroBody: "Talk to us about what is happening. You can use English, Filipino, or Bisaya.",
     contractPrompt: "Talk to us about what your contract says and what is actually happening.",
     contractPlaceholder: "Example: My contract says one rest day each week, but I have worked every day this month.",
     continue: "Continue",
@@ -68,9 +68,12 @@ const copy = {
     voicePrototype: "Voice input is a prototype for now. Nothing is being recorded.",
     photoPrototype: "Contract photography is a prototype for now. Nothing was opened or uploaded.",
     sampleAssistant: "Salamat. Tell us whether your contract says overtime or work on your rest day should be paid.",
-    viewReport: "View sample Findings Report",
-    findingsTitle: "Two of these are serious.",
+    viewReport: "View Findings Report",
+    findingsTitle: "Your Findings Report",
     findingsIntro: "These findings appear to conflict with standard POEA/DMW contract rules. Verify them with DMW, OWWA, or a licensed lawyer.",
+    salaryGuidance: "For current salary minimums, visit dmw.gov.ph.",
+    contractFailed: "Contract Check could not continue. Please try again.",
+    contractEscalated: "This may need Crisis Help. Use “I Need Help Now” for official contacts.",
     urgent: "Urgent",
     concerning: "Concerning",
     informational: "Informational",
@@ -119,7 +122,7 @@ const copy = {
     notConfigured: "Firebase sign-in is not configured yet.",
   },
   tl: {
-    languageName: "Tagalog",
+    languageName: "Filipino",
     loading: "Binubuksan ang iyong pribadong espasyo...",
     welcomeEyebrow: "Praktikal na suporta para sa Pilipinong manggagawa sa abroad",
     welcomeTitle: "Sinusunod ba ng trabaho mo ang kontrata?",
@@ -166,7 +169,7 @@ const copy = {
     privacyTitle: "Dinisenyo para sa privacy",
     privacyBody: "Hindi sine-save ng preview na ito ang usapan. Dinisenyong awtomatikong mabura ang stored Crisis Sessions.",
     backDashboard: "Bumalik sa dashboard",
-    contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Tagalog, Taglish, o Bisaya.",
+    contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Filipino, o Bisaya.",
     contractPrompt: "Kuwento mo kung ano ang nasa kontrata at kung ano ang aktuwal na nangyayari.",
     contractPlaceholder: "Halimbawa: May isang rest day bawat linggo sa kontrata, pero araw-araw akong nagtatrabaho ngayong buwan.",
     continue: "Magpatuloy",
@@ -178,9 +181,10 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walang nire-record.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera o upload na binuksan.",
     sampleAssistant: "Salamat. Kuwento mo kung nakasaad sa kontrata na dapat bayaran ang overtime o trabaho sa rest day.",
-    viewReport: "Tingnan ang sample Findings Report",
-    findingsTitle: "Dalawa rito ay seryoso.",
+    viewReport: "Tingnan ang Findings Report",
+    findingsTitle: "Iyong Findings Report",
     findingsIntro: "Ang findings ay posibleng salungat sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
+    salaryGuidance: "Para sa kasalukuyang minimum na sahod, bisitahin ang dmw.gov.ph.",
     urgent: "Agarang pansin",
     concerning: "Nakababahala",
     informational: "Impormasyon",
@@ -227,116 +231,6 @@ const copy = {
     otherCountry: "Ibang bansa",
     signInFailed: (message) => `Hindi nagtagumpay ang sign-in: ${message}`,
     notConfigured: "Hindi pa naka-configure ang Firebase sign-in.",
-  },
-  taglish: {
-    languageName: "Taglish",
-    loading: "Binubuksan ang private space mo...",
-    welcomeEyebrow: "Practical support para sa Filipino workers abroad",
-    welcomeTitle: "Following ba ng work mo ang contract?",
-    welcomeBody: "Tell us what's happening. Tutulungan ka naming makita ang hindi match at kung sino ang puwedeng tawagan.",
-    welcomeStepOne: "Tell us in your own words",
-    welcomeStepTwo: "See what may not match",
-    welcomeStepThree: "Find the right person to call",
-    signIn: "Continue with Google",
-    privacyNote: "Private sa account mo ang records. Never nagse-save ng password ang Gabay OFW.",
-    owwaAlways: "Free at open 24/7 ang OWWA hotline para sa OFWs at families.",
-    languageLabel: "Language",
-    accountControls: "Account controls",
-    serviceOverview: "Service overview",
-    homeLabel: "Gabay OFW home",
-    countries: ["Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman"],
-    profile: "Profile",
-    signOut: "Sign out",
-    needHelp: "I Need Help Now",
-    modeNavigation: "Choose a service",
-    contractTab: "My contract",
-    helpTab: "Help now",
-    disclaimerTitle: "Bago tayo magsimula",
-    disclaimerBody: "Practical guidance at official support links ang binibigay ng Gabay OFW.",
-    notLegalTitle: "Hindi legal advice.",
-    notLegalBody: "Possible conflicts lang ang findings. I-verify sa DMW, OWWA, or lawyer.",
-    notEmergencyTitle: "Hindi emergency service.",
-    notEmergencyBody: "Kung immediate danger, contact local emergency services or nearest Philippine Embassy.",
-    understand: "Gets ko",
-    greeting: (name) => `Welcome, ${name}.`,
-    dashboardTitle: "What do you need?",
-    dashboardBody: "Pumili ng service. Hindi huhulaan ng Gabay OFW kung anong help ang kailangan mo.",
-    contractKicker: "Understand your working conditions",
-    contractTitle: "Contract Check",
-    contractBody: "Sabihin ang nasa contract at actual na nangyayari. Get a clear Findings Report.",
-    contractCta: "Start Contract Check",
-    crisisKicker: "Short, calm, and direct",
-    crisisTitle: "Crisis Help",
-    crisisBody: "Tell us what's happening para ma-connect ka sa tamang official support.",
-    crisisCta: "Get help now",
-    contractTime: "About five minutes",
-    crisisTime: "Straight to the right number",
-    recentTitle: "Your Contract Checks",
-    recentEmpty: "Wala pang saved checks. Start when ready.",
-    privacyTitle: "Built for privacy",
-    privacyBody: "Hindi nagsa-save ng conversations ang preview. Designed to expire automatically ang stored Crisis Sessions.",
-    backDashboard: "Back to dashboard",
-    contractIntroBody: "Tell us what's happening. Puwede ang English, Tagalog, Taglish, or Bisaya.",
-    contractPrompt: "Tell us what your contract says and what's actually happening.",
-    contractPlaceholder: "Example: One rest day weekly ang contract, pero everyday akong working this month.",
-    continue: "Continue",
-    contractStep: "Contract Check",
-    conversationHint: "Take your time. Tell us in your own words.",
-    typeAnswer: "Type your message",
-    voiceInput: "Use voice",
-    photoContract: "Photograph my contract",
-    voicePrototype: "Prototype pa ang voice input. Nothing is being recorded.",
-    photoPrototype: "Prototype pa ang contract photo. Walang camera or upload na binuksan.",
-    sampleAssistant: "Salamat. Tell us kung nakalagay sa contract na paid ang overtime or work on rest day.",
-    viewReport: "View sample Findings Report",
-    findingsTitle: "Two of these are serious.",
-    findingsIntro: "These findings may conflict with standard POEA/DMW contract rules. I-verify sa DMW, OWWA, or licensed lawyer.",
-    urgent: "Urgent",
-    concerning: "Concerning",
-    informational: "Informational",
-    restDayFinding: "Missing weekly rest day",
-    restDayRule: "Standard OFW contracts require one rest day weekly, with premium pay if worked.",
-    overtimeFinding: "Unpaid overtime",
-    overtimeRule: "Overtime should use the higher of the POEA SEC rate or host-country rate.",
-    reportInfoTitle: "Keep your records",
-    reportInfoRule: "Save copies of your verified contract, payslips, schedules, and messages if safe.",
-    done: "Done",
-    crisisStep: "Crisis Help",
-    crisisQuestionTitle: "Nasa physical danger ka ba ngayon?",
-    crisisQuestionBody: "Choose what feels closest sa situation mo. Ibibigay agad ang contact details without asking for details we do not need.",
-    dangerYes: "Yes, or hindi ako safe na makaalis",
-    dangerNo: "No, safe kong magagamit ang phone",
-    countryTitle: "Which country are you in?",
-    countryLabel: "Country",
-    chooseCountry: "Choose a country",
-    situationTitle: "What kind of help do you need?",
-    situationBody: "Short description lang. Huwag mag-share ng passport number, address, or sensitive details.",
-    situationLabel: "One-line description",
-    situationPlaceholder: "Example: Hawak ng employer ko ang passport ko.",
-    showHelp: "Show official help",
-    routeTitle: "Call one of these now. All are free.",
-    routeBody: "For safety threats, confinement, or trafficking concerns, these free services can help.",
-    mwoRouteTitle: "Contact your Migrant Workers Office",
-    mwoRouteBody: (country) => `For a concern without immediate danger in ${country}, contact the official MWO or OWWA.`,
-    actionline: "Actionline Against Human Trafficking",
-    owwa: "OWWA 24/7 Hotline",
-    embassy: "Find the nearest Philippine Embassy or MWO",
-    officialDirectory: "Open official DMW directory",
-    reassurance: "Hindi ka nag-iisa. These offices exist to help OFWs in your situation, at free ang pag-reach out.",
-    call: (number) => `Call ${number}`,
-    profileTitle: "Your profile",
-    profileBody: "Optional details help future conversations. Any destination country is accepted.",
-    countryOptional: "Destination country (optional)",
-    occupationOptional: "Occupation (optional)",
-    countryPlaceholder: "Any country",
-    occupationPlaceholder: "Example: Domestic worker",
-    saveProfile: "Save profile",
-    profileSaved: "Saved ang profile sa device na ito.",
-    deleteData: "Delete local profile",
-    localProfileDeleted: "Deleted ang local profile.",
-    otherCountry: "Other",
-    signInFailed: (message) => `Sign-in failed: ${message}`,
-    notConfigured: "Hindi pa configured ang Firebase sign-in.",
   },
   ceb: {
     languageName: "Bisaya",
@@ -386,7 +280,7 @@ const copy = {
     privacyTitle: "Gidisenyo para sa privacy",
     privacyBody: "Dili i-save sa preview ang panag-istorya. Gidisenyo nga awtomatikong mapapas ang stored Crisis Sessions.",
     backDashboard: "Balik sa dashboard",
-    contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Tagalog, Taglish, o Bisaya.",
+    contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Filipino, o Bisaya.",
     contractPrompt: "Isulti kanamo unsay giingon sa kontrata ug unsay aktuwal nga nahitabo.",
     contractPlaceholder: "Pananglitan: Usa ka rest day kada semana ang kontrata, pero adlaw-adlaw ko nagtrabaho karong buwana.",
     continue: "Padayon",
@@ -398,9 +292,10 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walay gi-record.",
     photoPrototype: "Prototype pa ang contract photo. Walay camera o upload nga giablihan.",
     sampleAssistant: "Salamat. Isulti kung naa sa kontrata nga bayran ang overtime o trabaho sa rest day.",
-    viewReport: "Tan-awa ang sample Findings Report",
-    findingsTitle: "Duha niini seryoso.",
+    viewReport: "Tan-awa ang Findings Report",
+    findingsTitle: "Imong Findings Report",
     findingsIntro: "Posibleng supak ang findings sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
+    salaryGuidance: "Para sa kasamtangang minimum nga suweldo, bisitaha ang dmw.gov.ph.",
     urgent: "Dinalian",
     concerning: "Makapabalaka",
     informational: "Impormasyon",
@@ -461,11 +356,15 @@ const modeSwitcher = document.querySelector(".mode-switcher");
 const globalHelp = document.getElementById("global-help");
 const status = document.getElementById("status");
 
-let language = localStorage.getItem("gabay-language") || "en";
+const supportedLanguages = Object.keys(copy);
+const savedLanguage = localStorage.getItem("gabay-language");
+let language = supportedLanguages.includes(savedLanguage) ? savedLanguage : "en";
 let currentScreen = "dashboard";
 let userName = "";
 let userId = "";
-let contractDraft = "";
+let contractCheck = null;
+let contractMessages = [];
+let findingsReport = null;
 let crisisDanger = false;
 let crisisCountry = "";
 
@@ -484,7 +383,7 @@ function escapeHtml(value) {
 }
 
 function applyCopy(root = document) {
-  document.documentElement.lang = language === "tl" || language === "taglish" ? "tl" : language;
+  document.documentElement.lang = language;
   root.querySelectorAll("[data-copy]").forEach((element) => {
     element.textContent = t(element.dataset.copy);
   });
@@ -496,7 +395,7 @@ function applyCopy(root = document) {
 function renderLanguageOptions() {
   languageSelects.forEach((select) => {
     select.replaceChildren(
-      ...Object.keys(copy).map((key) => {
+      ...supportedLanguages.map((key) => {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = copy[key].languageName;
@@ -554,15 +453,16 @@ function flowNav(label) {
 }
 
 function contractChatTemplate() {
-  const hasStarted = Boolean(contractDraft);
+  const hasStarted = contractMessages.length > 0;
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
     <div class="conversation-layout">
       <div class="conversation-main">
         <div class="chat-thread" aria-live="polite">
           ${hasStarted
-            ? `<div class="message user">${escapeHtml(contractDraft)}</div>
-               <div class="message assistant">${t("sampleAssistant")}</div>`
+            ? contractMessages.map((message) =>
+                `<div class="message ${message.role}">${escapeHtml(message.text)}</div>`,
+              ).join("")
             : `<div class="message assistant">
                  <p>${t("contractIntroBody")}</p>
                  <p><strong>${t("contractPrompt")}</strong></p>
@@ -585,28 +485,22 @@ function contractChatTemplate() {
 }
 
 function findingsTemplate() {
+  const report = findingsReport;
+  if (!report) return contractChatTemplate();
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
     <article class="report">
       <h1>${t("findingsTitle")}</h1>
-      <p class="report-intro">${t("findingsIntro")}</p>
+      <p class="report-intro">${escapeHtml(t("findingsIntro"))}</p>
       <div class="finding-list">
-        <section class="finding urgent">
-          <span class="severity">${t("urgent")}</span>
-          <h3>${t("restDayFinding")}</h3>
-          <p>${t("restDayRule")}</p>
-        </section>
-        <section class="finding concerning">
-          <span class="severity">${t("concerning")}</span>
-          <h3>${t("overtimeFinding")}</h3>
-          <p>${t("overtimeRule")}</p>
-        </section>
-        <section class="finding informational">
-          <span class="severity">${t("informational")}</span>
-          <h3>${t("reportInfoTitle")}</h3>
-          <p>${t("reportInfoRule")}</p>
-        </section>
+        ${report.findings.map((finding) => `
+          <section class="finding ${escapeHtml(finding.severity)}">
+            <span class="severity">${escapeHtml(t(finding.severity))}</span>
+            <h3>${escapeHtml(finding.issue)}</h3>
+            <p>${escapeHtml(finding.rule)}</p>
+          </section>`).join("")}
       </div>
+      <p class="reassurance"><a href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("salaryGuidance"))}</a></p>
       <div class="button-row" style="margin-top: 1.5rem">
         <button class="button ink-button" type="button" data-action="dashboard">${t("done")}</button>
       </div>
@@ -755,10 +649,66 @@ function showStatus(message) {
   window.setTimeout(() => status.classList.add("hidden"), 2600);
 }
 
+async function contractRequest(message) {
+  const token = await auth.currentUser.getIdToken();
+  const isResume = Boolean(contractCheck);
+  const response = await fetch(
+    isResume
+      ? `/api/contract-checks/${encodeURIComponent(contractCheck.id)}/messages`
+      : "/api/contract-checks",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(isResume
+        ? { message, interrupt_id: contractCheck.interruptId }
+        : { message }),
+    },
+  );
+  if (!response.ok) throw new Error(t("contractFailed"));
+  return response.json();
+}
+
+async function submitContractMessage(form) {
+  const input = document.getElementById("contract-message");
+  const message = input.value.trim();
+  if (!message) return;
+  contractMessages.push({ role: "user", text: message });
+  renderScreen("contract-chat");
+  try {
+    const result = await contractRequest(message);
+    if (result.status === "in_progress") {
+      contractCheck = {
+        id: result.id,
+        interruptId: result.interrupt_id,
+      };
+      contractMessages.push({ role: "assistant", text: result.prompt });
+      renderScreen("contract-chat");
+      return;
+    }
+    if (result.status === "complete") {
+      findingsReport = result.report;
+      renderScreen("findings");
+      return;
+    }
+    showStatus(t("contractEscalated"));
+  } catch (error) {
+    showStatus(error.message || t("contractFailed"));
+    renderScreen("contract-chat");
+  }
+}
+
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
+  if (action === "contract-chat" && currentScreen === "dashboard") {
+    contractCheck = null;
+    contractMessages = [];
+    findingsReport = null;
+  }
   if (action === "crisis-country") {
     crisisDanger = button.dataset.danger === "true";
   }
@@ -779,17 +729,12 @@ document.addEventListener("click", (event) => {
   navigate(action);
 });
 
-document.addEventListener("submit", (event) => {
+document.addEventListener("submit", async (event) => {
   const form = event.target;
   if (!form.dataset.form) return;
   event.preventDefault();
   if (form.dataset.form === "contract-chat") {
-    if (contractDraft) {
-      navigate("findings");
-    } else {
-      contractDraft = document.getElementById("contract-message").value.trim();
-      renderScreen("contract-chat");
-    }
+    await submitContractMessage(form);
   } else if (form.dataset.form === "crisis-country") {
     crisisCountry = document.getElementById("crisis-country").value;
     navigate("crisis-situation");

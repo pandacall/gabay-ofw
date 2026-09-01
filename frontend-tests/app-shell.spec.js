@@ -34,6 +34,39 @@ async function openApp(
   await page.route("**/api/notes", (route) =>
     route.fulfill({ json: { notes: [] } }),
   );
+  let contractTurn = 0;
+  await page.route("**/api/contract-checks", (route) => {
+    contractTurn += 1;
+    return route.fulfill({
+      status: 201,
+      json: {
+        id: "check-1",
+        status: "in_progress",
+        prompt: "Does your contract promise overtime pay?",
+        interrupt_id: "interrupt-1",
+      },
+    });
+  });
+  await page.route("**/api/contract-checks/check-1/messages", (route) => {
+    contractTurn += 1;
+    return route.fulfill({
+      json: {
+        id: "check-1",
+        status: "complete",
+        report: {
+          disclaimer:
+            "These findings appear to conflict with standard POEA/DMW rules. Verify them with DMW, OWWA, or a licensed lawyer.",
+          findings: [
+            {
+              issue: "Unpaid overtime",
+              rule: "Overtime must be compensated under the verified employment contract.",
+              severity: "concerning",
+            },
+          ],
+        },
+      },
+    });
+  });
   await page.goto("/");
 }
 
@@ -54,6 +87,11 @@ test("signed-in user explicitly chooses either mode from the dashboard", async (
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
   await openApp(page, { signedIn: false });
 
+  await expect(page.locator("#signed-out .language-select option")).toHaveText([
+    "English",
+    "Filipino",
+    "Bisaya",
+  ]);
   await page.locator("#signed-out").getByLabel("Language").selectOption("tl");
   await expect(
     page.getByRole("heading", { name: "Sinusunod ba ng trabaho mo ang kontrata?" }),
@@ -74,12 +112,12 @@ test("first-time user sees the service limits before using the app", async ({
   await expect(dialog).not.toBeVisible();
 });
 
-test("user can click through the static Contract Check flow", async ({ page }) => {
+test("user completes a genuine multi-turn Contract Check", async ({ page }) => {
   await openAsSignedInUser(page);
 
   await page.getByRole("button", { name: /Start Contract Check/ }).click();
   await expect(
-    page.getByText("Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya."),
+    page.getByText("Talk to us about what is happening. You can use English, Filipino, or Bisaya."),
   ).toBeVisible();
   await expect(
     page.getByText("Talk to us about what your contract says and what is actually happening."),
@@ -91,6 +129,7 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await expect(
     page.getByText("My contract promises a weekly rest day, but I work every day."),
   ).toBeVisible();
+  await expect(page.getByText("Does your contract promise overtime pay?")).toBeVisible();
   await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
 
@@ -102,10 +141,10 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
     "It says overtime should be paid, but I have not received overtime pay.",
   );
-  await page.getByRole("button", { name: "View sample Findings Report" }).click();
-  await expect(page.getByRole("heading", { name: "Two of these are serious." })).toBeVisible();
-  await expect(page.getByText("Missing weekly rest day")).toBeVisible();
+  await page.getByRole("button", { name: "View Findings Report" }).click();
+  await expect(page.getByRole("heading", { name: "Your Findings Report" })).toBeVisible();
   await expect(page.getByText("Unpaid overtime")).toBeVisible();
+  await expect(page.getByText(/Verify them with DMW, OWWA, or a licensed lawyer/)).toBeVisible();
 });
 
 test("user can click through Crisis Help to code-owned contact cards", async ({
