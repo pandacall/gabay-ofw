@@ -142,7 +142,7 @@ def production_app() -> FastAPI:
     model_client = Client(api_key=api_key)
     model = Gemini(model="gemini-2.5-flash", client=model_client)
     service = ContractCheckService(
-        session_service=FirestoreSessionService(firestore.client()),
+        session_service=FirestoreSessionService(firestore.Client()),
         interviewer_model=model,
         rule_matcher_model=model,
     )
