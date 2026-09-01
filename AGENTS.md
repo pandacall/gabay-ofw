@@ -7,6 +7,9 @@ Project handoff and full context: `initial-plan-nogrilling-v0/PROJECT_HANDOFF.md
 ### Issue tracker
 
 Issues are tracked in this repo's GitHub Issues via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Before any tracker write, follow that guide's credential preflight: Copilot
+sessions may inject a pull-only `GH_TOKEN` that overrides the writable keyring
+login.
 
 ### Domain docs
 
