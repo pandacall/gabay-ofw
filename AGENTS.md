@@ -1,6 +1,9 @@
 # Gabay OFW — Agent Instructions
 
-Project handoff and full context: `initial-plan-nogrilling-v0/PROJECT_HANDOFF.md` and `initial-plan-nogrilling-v0/copilot-instructions.md`.
+Current requirements, priorities, and implementation scope are tracked in this
+repository's GitHub issues. Accepted architectural decisions live in
+`docs/adr/`. Archived planning documents are historical only and must not be
+used as implementation guidance.
 
 ## Agent skills
 
@@ -11,6 +14,7 @@ Before any tracker write, follow that guide's credential preflight: Copilot
 sessions may inject a pull-only `GH_TOKEN` that overrides the writable keyring
 login.
 
-### Domain docs
+### Architecture and terminology
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Accepted ADRs in `docs/adr/` are authoritative for architecture. `CONTEXT.md`
+is a terminology glossary only. See `docs/agents/domain.md`.

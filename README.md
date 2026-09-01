@@ -23,6 +23,10 @@ strict Claims/Findings schemas, deterministic routing, and a custom
 Firestore-backed SessionService proven through canned-model HTTP tests. Real
 Gemini and UI wiring land in issue #5.
 
+App shell (issue #4): responsive signed-in dashboard, four-language copy,
+static click-throughs for both Modes, Findings Report styles, first-run service
+limits, optional profile, and a globally available Crisis Help entry.
+
 Live: https://gabay-ofw-417534361115.asia-southeast1.run.app
 
 ## Stack
@@ -76,6 +80,18 @@ firebase deploy --only firestore:rules --project <project-id>
 ```
 
 ## Deploy to Cloud Run
+
+Pushes to `master` automatically run the backend and browser test suites, then
+deploy to the production `gabay-ofw` Cloud Run service. The workflow uses
+GitHub OIDC and Google Workload Identity Federation, so no service-account key
+is stored in GitHub. It can also be run manually from **Actions → Test and
+deploy Cloud Run → Run workflow**.
+
+The deployment preserves the service's existing runtime environment and secret
+bindings. Repository variables identify the GCP project, region, service, Workload
+Identity provider, and deployer service account.
+
+For an intentional one-off deployment:
 
 ```bash
 gcloud run deploy gabay-ofw \
