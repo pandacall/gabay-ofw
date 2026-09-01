@@ -147,6 +147,26 @@ test("user completes a genuine multi-turn Contract Check", async ({ page }) => {
   await expect(page.getByText(/Verify them with DMW, OWWA, or a licensed lawyer/)).toBeVisible();
 });
 
+test("Contract Check shows the backend failure reason", async ({ page }) => {
+  await openAsSignedInUser(page);
+  await page.route("**/api/contract-checks", (route) =>
+    route.fulfill({
+      status: 502,
+      json: { detail: "Gemini returned an invalid response" },
+    }),
+  );
+
+  await page.getByRole("button", { name: /Start Contract Check/ }).click();
+  await page.getByLabel(
+    "Talk to us about what your contract says and what is actually happening.",
+  ).fill("Please check my contract.");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(page.getByRole("status")).toContainText(
+    "Gemini returned an invalid response (502)",
+  );
+});
+
 test("user can click through Crisis Help to code-owned contact cards", async ({
   page,
 }) => {

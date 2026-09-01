@@ -667,7 +667,16 @@ async function contractRequest(message) {
         : { message }),
     },
   );
-  if (!response.ok) throw new Error(t("contractFailed"));
+  if (!response.ok) {
+    let detail = "";
+    if (response.headers.get("content-type")?.includes("application/json")) {
+      const error = await response.json();
+      detail = typeof error.detail === "string" ? error.detail : "";
+    }
+    throw new Error(
+      detail ? `${detail} (${response.status})` : `${t("contractFailed")} (${response.status})`,
+    );
+  }
   return response.json();
 }
 
