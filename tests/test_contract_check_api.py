@@ -358,6 +358,33 @@ def test_salary_figure_in_rule_matcher_output_is_rejected():
     assert response.status_code == 502
 
 
+def test_salary_figure_in_interviewer_question_is_rejected():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=[
+                (
+                    '{"status":"in_progress","claims":[],"country":"SA",'
+                    '"next_question":"Does your contract promise 1500 SAR?"}'
+                )
+            ]
+        ),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my salary."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 502
+
+
 def test_non_iso_country_code_is_rejected():
     service = ContractCheckService(
         session_service=InMemorySessionService(),

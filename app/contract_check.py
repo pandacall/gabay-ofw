@@ -94,6 +94,8 @@ class Claims(StrictModel):
             raise ValueError("in-progress Claims require one next question")
         if self.status != "in_progress" and self.next_question is not None:
             raise ValueError("only in-progress Claims may include a next question")
+        if self.next_question and _SALARY_FIGURE.search(self.next_question):
+            raise ValueError("salary figures are not allowed in Interviewer questions")
         return self
 
 
@@ -105,12 +107,8 @@ class Finding(StrictModel):
 
 class FindingsReport(StrictModel):
     findings: list[Finding]
-    disclaimer: Literal[
-        "These findings appear to conflict with standard POEA/DMW rules. Verify them with DMW, OWWA, or a licensed lawyer."
-    ] = REPORT_DISCLAIMER
-    salary_guidance: Literal[
-        "For current salary minimums, visit https://dmw.gov.ph/."
-    ] = SALARY_GUIDANCE
+    disclaimer: Literal[REPORT_DISCLAIMER] = REPORT_DISCLAIMER
+    salary_guidance: Literal[SALARY_GUIDANCE] = SALARY_GUIDANCE
 
     @model_validator(mode="after")
     def reject_salary_figures(self) -> "FindingsReport":
