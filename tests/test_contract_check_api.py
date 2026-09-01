@@ -13,7 +13,10 @@ from tests.contract_check_fakes import CannedModel, FakeVerifier, auth
 def interviewer():
     return CannedModel(
         responses=[
-            '{"status":"in_progress","claims":[],"country":null}',
+            (
+                '{"status":"in_progress","claims":[],"country":null,'
+                '"next_question":"What is actually happening at work?"}'
+            ),
             (
                 '{"status":"complete","claims":[{"topic":"rest_days",'
                 '"contract_says":"One day off each week",'
@@ -30,7 +33,7 @@ def rule_matcher():
         responses=[
             (
                 '{"findings":[{"issue":"No weekly rest day",'
-                '"rule":"Minimum 1 rest day per week; premium pay if worked.",'
+                '"rule":"At least one rest day per week, with premium compensation if worked.",'
                 '"severity":"concerning"}]}'
             )
         ]
@@ -57,7 +60,7 @@ def test_start_contract_check_pauses_for_more_input(client, rule_matcher):
     assert response.status_code == 201
     body = response.json()
     assert body["status"] == "in_progress"
-    assert body["prompt"] == "Please tell me what is actually happening."
+    assert body["prompt"] == "What is actually happening at work?"
     assert body["interrupt_id"].startswith("contract-check-")
     assert body["id"]
     assert rule_matcher.call_count == 0
@@ -86,10 +89,20 @@ def test_resume_contract_check_completes_and_runs_rule_matcher_once(
         "id": started["id"],
         "status": "complete",
         "report": {
+            "disclaimer": (
+                "These findings appear to conflict with standard POEA/DMW rules. "
+                "Verify them with DMW, OWWA, or a licensed lawyer."
+            ),
+            "salary_guidance": (
+                "For current salary minimums, visit https://dmw.gov.ph/."
+            ),
             "findings": [
                 {
                     "issue": "No weekly rest day",
-                    "rule": "Minimum 1 rest day per week; premium pay if worked.",
+                    "rule": (
+                        "At least one rest day per week, with premium "
+                        "compensation if worked."
+                    ),
                     "severity": "concerning",
                 }
             ]
@@ -112,8 +125,14 @@ def test_resume_contract_check_completes_and_runs_rule_matcher_once(
 def test_in_progress_resume_loops_with_a_new_interrupt_id():
     interviewer = CannedModel(
         responses=[
-            '{"status":"in_progress","claims":[],"country":null}',
-            '{"status":"in_progress","claims":[],"country":"AE"}',
+            (
+                '{"status":"in_progress","claims":[],"country":null,'
+                '"next_question":"What does your contract say?"}'
+            ),
+            (
+                '{"status":"in_progress","claims":[],"country":"AE",'
+                '"next_question":"What happens in practice?"}'
+            ),
             '{"status":"complete","claims":[],"country":"AE"}',
         ]
     )
@@ -277,6 +296,66 @@ def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():
     assert session is not None
     assert "findings_report" not in session.state
     assert '"severity":"unknown"' not in session.model_dump_json()
+
+
+def test_ungrounded_rule_matcher_output_is_rejected():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=['{"status":"complete","claims":[],"country":"SA"}']
+        ),
+        rule_matcher_model=CannedModel(
+            responses=[
+                (
+                    '{"findings":[{"issue":"Low pay",'
+                    '"rule":"Saudi law requires a monthly salary of 1500 SAR.",'
+                    '"severity":"urgent"}]}'
+                )
+            ]
+        ),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my salary."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 502
+
+
+def test_salary_figure_in_rule_matcher_output_is_rejected():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=['{"status":"complete","claims":[],"country":"SA"}']
+        ),
+        rule_matcher_model=CannedModel(
+            responses=[
+                (
+                    '{"findings":[{"issue":"Salary is only 1500 SAR",'
+                    '"rule":"Overtime must be compensated under the verified employment contract.",'
+                    '"severity":"concerning"}]}'
+                )
+            ]
+        ),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my salary."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 502
 
 
 def test_non_iso_country_code_is_rejected():

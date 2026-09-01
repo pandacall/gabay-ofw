@@ -21,7 +21,7 @@ Firestore round-trip, Secret Manager key retrieval, Cloud Run deploy.
 Contract Check architecture spike (issue #3): resumable ADK 2.0 Workflow,
 strict Claims/Findings schemas, deterministic routing, and a custom
 Firestore-backed SessionService proven through canned-model HTTP tests. Real
-Gemini and UI wiring land in issue #5.
+Gemini and UI wiring are implemented in issue #5.
 
 App shell (issue #4): responsive signed-in dashboard, four-language copy,
 static click-throughs for both Modes, Findings Report styles, first-run service

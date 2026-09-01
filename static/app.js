@@ -56,7 +56,7 @@ const copy = {
     privacyTitle: "Built for privacy",
     privacyBody: "This preview does not save conversations. Stored Crisis Sessions are designed to expire automatically.",
     backDashboard: "Back to dashboard",
-    contractIntroBody: "Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya.",
+    contractIntroBody: "Talk to us about what is happening. You can use English, Filipino, or Bisaya.",
     contractPrompt: "Talk to us about what your contract says and what is actually happening.",
     contractPlaceholder: "Example: My contract says one rest day each week, but I have worked every day this month.",
     continue: "Continue",
@@ -68,9 +68,12 @@ const copy = {
     voicePrototype: "Voice input is a prototype for now. Nothing is being recorded.",
     photoPrototype: "Contract photography is a prototype for now. Nothing was opened or uploaded.",
     sampleAssistant: "Salamat. Tell us whether your contract says overtime or work on your rest day should be paid.",
-    viewReport: "View sample Findings Report",
-    findingsTitle: "Two of these are serious.",
+    viewReport: "View Findings Report",
+    findingsTitle: "Your Findings Report",
     findingsIntro: "These findings appear to conflict with standard POEA/DMW contract rules. Verify them with DMW, OWWA, or a licensed lawyer.",
+    salaryGuidance: "For current salary minimums, visit dmw.gov.ph.",
+    contractFailed: "Contract Check could not continue. Please try again.",
+    contractEscalated: "This may need Crisis Help. Use “I Need Help Now” for official contacts.",
     urgent: "Urgent",
     concerning: "Concerning",
     informational: "Informational",
@@ -119,7 +122,7 @@ const copy = {
     notConfigured: "Firebase sign-in is not configured yet.",
   },
   tl: {
-    languageName: "Tagalog",
+    languageName: "Filipino",
     loading: "Binubuksan ang iyong pribadong espasyo...",
     welcomeEyebrow: "Praktikal na suporta para sa Pilipinong manggagawa sa abroad",
     welcomeTitle: "Sinusunod ba ng trabaho mo ang kontrata?",
@@ -166,7 +169,7 @@ const copy = {
     privacyTitle: "Dinisenyo para sa privacy",
     privacyBody: "Hindi sine-save ng preview na ito ang usapan. Dinisenyong awtomatikong mabura ang stored Crisis Sessions.",
     backDashboard: "Bumalik sa dashboard",
-    contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Tagalog, Taglish, o Bisaya.",
+    contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Filipino, o Bisaya.",
     contractPrompt: "Kuwento mo kung ano ang nasa kontrata at kung ano ang aktuwal na nangyayari.",
     contractPlaceholder: "Halimbawa: May isang rest day bawat linggo sa kontrata, pero araw-araw akong nagtatrabaho ngayong buwan.",
     continue: "Magpatuloy",
@@ -178,9 +181,10 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walang nire-record.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera o upload na binuksan.",
     sampleAssistant: "Salamat. Kuwento mo kung nakasaad sa kontrata na dapat bayaran ang overtime o trabaho sa rest day.",
-    viewReport: "Tingnan ang sample Findings Report",
-    findingsTitle: "Dalawa rito ay seryoso.",
+    viewReport: "Tingnan ang Findings Report",
+    findingsTitle: "Iyong Findings Report",
     findingsIntro: "Ang findings ay posibleng salungat sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
+    salaryGuidance: "Para sa kasalukuyang minimum na sahod, bisitahin ang dmw.gov.ph.",
     urgent: "Agarang pansin",
     concerning: "Nakababahala",
     informational: "Impormasyon",
@@ -386,7 +390,7 @@ const copy = {
     privacyTitle: "Gidisenyo para sa privacy",
     privacyBody: "Dili i-save sa preview ang panag-istorya. Gidisenyo nga awtomatikong mapapas ang stored Crisis Sessions.",
     backDashboard: "Balik sa dashboard",
-    contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Tagalog, Taglish, o Bisaya.",
+    contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Filipino, o Bisaya.",
     contractPrompt: "Isulti kanamo unsay giingon sa kontrata ug unsay aktuwal nga nahitabo.",
     contractPlaceholder: "Pananglitan: Usa ka rest day kada semana ang kontrata, pero adlaw-adlaw ko nagtrabaho karong buwana.",
     continue: "Padayon",
@@ -398,9 +402,10 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walay gi-record.",
     photoPrototype: "Prototype pa ang contract photo. Walay camera o upload nga giablihan.",
     sampleAssistant: "Salamat. Isulti kung naa sa kontrata nga bayran ang overtime o trabaho sa rest day.",
-    viewReport: "Tan-awa ang sample Findings Report",
-    findingsTitle: "Duha niini seryoso.",
+    viewReport: "Tan-awa ang Findings Report",
+    findingsTitle: "Imong Findings Report",
     findingsIntro: "Posibleng supak ang findings sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
+    salaryGuidance: "Para sa kasamtangang minimum nga suweldo, bisitaha ang dmw.gov.ph.",
     urgent: "Dinalian",
     concerning: "Makapabalaka",
     informational: "Impormasyon",
@@ -461,11 +466,15 @@ const modeSwitcher = document.querySelector(".mode-switcher");
 const globalHelp = document.getElementById("global-help");
 const status = document.getElementById("status");
 
-let language = localStorage.getItem("gabay-language") || "en";
+const supportedLanguages = ["en", "tl", "ceb"];
+const savedLanguage = localStorage.getItem("gabay-language");
+let language = supportedLanguages.includes(savedLanguage) ? savedLanguage : "en";
 let currentScreen = "dashboard";
 let userName = "";
 let userId = "";
-let contractDraft = "";
+let contractCheck = null;
+let contractMessages = [];
+let findingsReport = null;
 let crisisDanger = false;
 let crisisCountry = "";
 
@@ -484,7 +493,7 @@ function escapeHtml(value) {
 }
 
 function applyCopy(root = document) {
-  document.documentElement.lang = language === "tl" || language === "taglish" ? "tl" : language;
+  document.documentElement.lang = language;
   root.querySelectorAll("[data-copy]").forEach((element) => {
     element.textContent = t(element.dataset.copy);
   });
@@ -496,7 +505,7 @@ function applyCopy(root = document) {
 function renderLanguageOptions() {
   languageSelects.forEach((select) => {
     select.replaceChildren(
-      ...Object.keys(copy).map((key) => {
+      ...supportedLanguages.map((key) => {
         const option = document.createElement("option");
         option.value = key;
         option.textContent = copy[key].languageName;
@@ -554,15 +563,16 @@ function flowNav(label) {
 }
 
 function contractChatTemplate() {
-  const hasStarted = Boolean(contractDraft);
+  const hasStarted = contractMessages.length > 0;
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
     <div class="conversation-layout">
       <div class="conversation-main">
         <div class="chat-thread" aria-live="polite">
           ${hasStarted
-            ? `<div class="message user">${escapeHtml(contractDraft)}</div>
-               <div class="message assistant">${t("sampleAssistant")}</div>`
+            ? contractMessages.map((message) =>
+                `<div class="message ${message.role}">${escapeHtml(message.text)}</div>`,
+              ).join("")
             : `<div class="message assistant">
                  <p>${t("contractIntroBody")}</p>
                  <p><strong>${t("contractPrompt")}</strong></p>
@@ -585,28 +595,22 @@ function contractChatTemplate() {
 }
 
 function findingsTemplate() {
+  const report = findingsReport;
+  if (!report) return contractChatTemplate();
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
     <article class="report">
       <h1>${t("findingsTitle")}</h1>
-      <p class="report-intro">${t("findingsIntro")}</p>
+      <p class="report-intro">${escapeHtml(t("findingsIntro"))}</p>
       <div class="finding-list">
-        <section class="finding urgent">
-          <span class="severity">${t("urgent")}</span>
-          <h3>${t("restDayFinding")}</h3>
-          <p>${t("restDayRule")}</p>
-        </section>
-        <section class="finding concerning">
-          <span class="severity">${t("concerning")}</span>
-          <h3>${t("overtimeFinding")}</h3>
-          <p>${t("overtimeRule")}</p>
-        </section>
-        <section class="finding informational">
-          <span class="severity">${t("informational")}</span>
-          <h3>${t("reportInfoTitle")}</h3>
-          <p>${t("reportInfoRule")}</p>
-        </section>
+        ${report.findings.map((finding) => `
+          <section class="finding ${escapeHtml(finding.severity)}">
+            <span class="severity">${escapeHtml(t(finding.severity))}</span>
+            <h3>${escapeHtml(finding.issue)}</h3>
+            <p>${escapeHtml(finding.rule)}</p>
+          </section>`).join("")}
       </div>
+      <p class="reassurance"><a href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("salaryGuidance"))}</a></p>
       <div class="button-row" style="margin-top: 1.5rem">
         <button class="button ink-button" type="button" data-action="dashboard">${t("done")}</button>
       </div>
@@ -755,10 +759,66 @@ function showStatus(message) {
   window.setTimeout(() => status.classList.add("hidden"), 2600);
 }
 
+async function contractRequest(message) {
+  const token = await auth.currentUser.getIdToken();
+  const isResume = Boolean(contractCheck);
+  const response = await fetch(
+    isResume
+      ? `/api/contract-checks/${encodeURIComponent(contractCheck.id)}/messages`
+      : "/api/contract-checks",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(isResume
+        ? { message, interrupt_id: contractCheck.interruptId }
+        : { message }),
+    },
+  );
+  if (!response.ok) throw new Error(t("contractFailed"));
+  return response.json();
+}
+
+async function submitContractMessage(form) {
+  const input = document.getElementById("contract-message");
+  const message = input.value.trim();
+  if (!message) return;
+  contractMessages.push({ role: "user", text: message });
+  renderScreen("contract-chat");
+  try {
+    const result = await contractRequest(message);
+    if (result.status === "in_progress") {
+      contractCheck = {
+        id: result.id,
+        interruptId: result.interrupt_id,
+      };
+      contractMessages.push({ role: "assistant", text: result.prompt });
+      renderScreen("contract-chat");
+      return;
+    }
+    if (result.status === "complete") {
+      findingsReport = result.report;
+      renderScreen("findings");
+      return;
+    }
+    showStatus(t("contractEscalated"));
+  } catch (error) {
+    showStatus(error.message || t("contractFailed"));
+    renderScreen("contract-chat");
+  }
+}
+
 document.addEventListener("click", (event) => {
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
+  if (action === "contract-chat" && currentScreen === "dashboard") {
+    contractCheck = null;
+    contractMessages = [];
+    findingsReport = null;
+  }
   if (action === "crisis-country") {
     crisisDanger = button.dataset.danger === "true";
   }
@@ -779,17 +839,12 @@ document.addEventListener("click", (event) => {
   navigate(action);
 });
 
-document.addEventListener("submit", (event) => {
+document.addEventListener("submit", async (event) => {
   const form = event.target;
   if (!form.dataset.form) return;
   event.preventDefault();
   if (form.dataset.form === "contract-chat") {
-    if (contractDraft) {
-      navigate("findings");
-    } else {
-      contractDraft = document.getElementById("contract-message").value.trim();
-      renderScreen("contract-chat");
-    }
+    await submitContractMessage(form);
   } else if (form.dataset.form === "crisis-country") {
     crisisCountry = document.getElementById("crisis-country").value;
     navigate("crisis-situation");
