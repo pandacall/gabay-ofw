@@ -365,7 +365,7 @@ def test_salary_figure_in_interviewer_question_is_rejected():
             responses=[
                 (
                     '{"status":"in_progress","claims":[],"country":"SA",'
-                    '"next_question":"Does your contract promise 1500 SAR?"}'
+                    '"next_question":"Does your contract promise a salary of 1500 per month?"}'
                 )
             ]
         ),
@@ -383,6 +383,33 @@ def test_salary_figure_in_interviewer_question_is_rejected():
     )
 
     assert response.status_code == 502
+
+
+def test_non_salary_figure_in_interviewer_question_is_allowed():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=[
+                (
+                    '{"status":"in_progress","claims":[],"country":"SA",'
+                    '"next_question":"Do you usually work 12 hours each day?"}'
+                )
+            ]
+        ),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my overtime."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["prompt"] == "Do you usually work 12 hours each day?"
 
 
 def test_non_iso_country_code_is_rejected():

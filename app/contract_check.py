@@ -27,6 +27,10 @@ SALARY_GUIDANCE = "For current salary minimums, visit https://dmw.gov.ph/."
 _SALARY_FIGURE = re.compile(
     r"(?i)(?:[$€£₱]|\b(?:PHP|SAR|AED|QAR|KWD|USD)\b)\s*\d"
     r"|\d[\d,.]*\s*(?:[$€£₱]|\b(?:PHP|SAR|AED|QAR|KWD|USD)\b)"
+    r"|\b(?:salary|wages?|earn(?:ing|s)?|minimum\s+(?:pay|compensation))\b"
+    r".{0,40}?\b\d[\d,.]*\b"
+    r"|\b\d[\d,.]*\b.{0,40}?\b(?:monthly|per\s+month|"
+    r"riyals?|pesos?|dirhams?|dinars?|dollars?)\b"
 )
 GroundedRule = Literal[
     "Workers keep possession of their passports and personal documents.",
