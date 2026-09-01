@@ -78,19 +78,32 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await openAsSignedInUser(page);
 
   await page.getByRole("button", { name: /Start Contract Check/ }).click();
-  await page.getByLabel("What does your contract say, and what is actually happening?").fill(
+  await expect(
+    page.getByText("Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya."),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Talk to us about what your contract says and what is actually happening."),
+  ).toBeVisible();
+  await expect(page.getByText("1 of 9")).toBeVisible();
+  await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
     "My contract promises a weekly rest day, but I work every day.",
   );
   await page.getByRole("button", { name: "Continue" }).click();
+  await expect(
+    page.getByText("My contract promises a weekly rest day, but I work every day."),
+  ).toBeVisible();
   await expect(page.getByText("4 of 9")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Answer by voice" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Answer by voice" }).click();
+  await page.getByRole("button", { name: "Use voice" }).click();
   await expect(page.getByRole("status")).toContainText("Nothing is being recorded");
   await page.getByRole("button", { name: "Photograph my contract" }).click();
   await expect(page.getByRole("status")).toContainText("Nothing was opened or uploaded");
 
+  await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
+    "It says overtime should be paid, but I have not received overtime pay.",
+  );
   await page.getByRole("button", { name: "View sample Findings Report" }).click();
   await expect(page.getByRole("heading", { name: "Two of these are serious." })).toBeVisible();
   await expect(page.getByText("Missing weekly rest day")).toBeVisible();

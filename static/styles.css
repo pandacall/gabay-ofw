@@ -307,15 +307,19 @@ h3 { font-size: 1.5rem; line-height: 1.18; }
 
 .conversation-layout { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 2rem; align-items: start; }
 .conversation-main { min-width: 0; }
-.chat-thread { display: grid; gap: 0.9rem; min-height: 360px; margin-bottom: 1.2rem; }
+.chat-thread { display: grid; min-height: 360px; align-content: start; gap: 0.9rem; margin-bottom: 1.2rem; }
 .message { max-width: min(78%, 560px); padding: 1rem 1.15rem; color: var(--ink); background: var(--raised); border-radius: 22px 22px 22px 8px; box-shadow: 0 2px 10px rgba(70,38,22,0.05); font-size: 1.02rem; line-height: 1.5; }
 .message.user { justify-self: end; border-radius: 22px 22px 8px 22px; background: var(--soft-sand); box-shadow: none; }
+.message p { margin: 0; }
+.message p + p { margin-top: 0.8rem; }
 .conversation-aside { padding: 1.25rem; border-radius: 20px; background: var(--soft-sand-2); color: var(--body); line-height: 1.5; }
 .composer { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 0.75rem; align-items: center; }
 .voice-button { display: grid; width: 72px; height: 72px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: var(--dawn-base); background: var(--ink); box-shadow: 0 6px 16px rgba(63,41,23,0.25); font-size: 1.6rem; }
 .composer-stack { display: grid; gap: 0.55rem; }
 .composer-input { display: flex; min-height: 54px; padding: 0.35rem 0.45rem 0.35rem 1.1rem; align-items: center; border: 1.5px solid var(--sand-border); border-radius: var(--control-radius); background: var(--raised); }
-.composer-input span { flex: 1; color: #9b846f; }
+.composer-input:focus-within { outline: 3px solid rgba(168, 67, 31, 0.2); border-color: var(--ink); }
+.composer-input input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; }
+.composer-input input::placeholder { color: #9b846f; opacity: 1; }
 .send-button { display: grid; width: 42px; height: 42px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: var(--ink); background: var(--soft-sand); font-size: 1.25rem; font-weight: 700; }
 .photo-button { width: fit-content; min-height: 36px; padding: 0; border: 0; color: var(--muted); background: transparent; font-weight: 700; }
 
