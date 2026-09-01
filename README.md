@@ -18,6 +18,11 @@ Built for the Hack2skill GenAI Academy APAC **Cloud Run AI Challenge**.
 Walking skeleton (issue #2): Firebase Auth (Google Sign-In), user-isolated
 Firestore round-trip, Secret Manager key retrieval, Cloud Run deploy.
 
+Contract Check architecture spike (issue #3): resumable ADK 2.0 Workflow,
+strict Claims/Findings schemas, deterministic routing, and a custom
+Firestore-backed SessionService proven through canned-model HTTP tests. Real
+Gemini and UI wiring land in issue #5.
+
 Live: https://gabay-ofw-417534361115.asia-southeast1.run.app
 
 ## Stack
@@ -42,13 +47,14 @@ uvicorn --factory app.main:production_app --port 8000
 
 ### Firestore security-rules tests
 
-Rules are tested directly against the Firestore emulator (requires Node 18+
-and Java 11+ on PATH):
+Rules and resumable Contract Check persistence are tested directly against the
+Firestore emulator (requires Node 18+ and Java 21+ on PATH):
 
 ```bash
 cd rules-tests
 npm install
 npm test
+npm run test:contract-check
 ```
 
 ## Configuration
@@ -111,5 +117,5 @@ Firestore rules, and authorizes the Cloud Run domain):
   land with the Crisis Help slice.
 - The Gemini key lives only in Secret Manager (enforced now — the app reads the
   env var only when no cloud project is configured, i.e. local dev).
-- All model output will be schema-validated before being trusted or rendered
-  (upcoming slices).
+- Contract Check model output is schema-validated before being persisted or
+  returned by the API (implemented in the issue #3 architecture spike).
