@@ -18,6 +18,9 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
+# Local artifacts
+web-config.json
+
 # Editor / OS
 .vscode/
 .idea/

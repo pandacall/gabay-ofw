@@ -18,6 +18,8 @@ Built for the Hack2skill GenAI Academy APAC **Cloud Run AI Challenge**.
 Walking skeleton (issue #2): Firebase Auth (Google Sign-In), user-isolated
 Firestore round-trip, Secret Manager key retrieval, Cloud Run deploy.
 
+Live: https://gabay-ofw-417534361115.asia-southeast1.run.app
+
 ## Stack
 
 Python 3.11 · FastAPI · `google-adk >= 2.0` · Firebase Authentication ·
@@ -80,12 +82,15 @@ gcloud run deploy gabay-ofw \
   --set-env-vars ^@^FIREBASE_WEB_CONFIG={"apiKey":"..."}
 ```
 
-One-time project setup:
+One-time project setup (most steps are automated by `python cloud_setup.py`,
+which registers the web app, initializes Identity Platform, releases the
+Firestore rules, and authorizes the Cloud Run domain):
 
 1. Enable APIs: `run`, `firestore`, `secretmanager`, `identitytoolkit`,
    `cloudbuild`, `artifactregistry`, `firebase`, `firebaserules`.
-2. Add Firebase to the GCP project; enable the **Google** sign-in provider and
-   add the Cloud Run domain to Authentication → Authorized domains.
+2. Add Firebase to the GCP project; enable the **Google** sign-in provider in
+   the Firebase console (Authentication → Sign-in method — the one step that
+   cannot be done via API because it provisions an OAuth client).
 3. Create the Firestore database (native mode).
 4. Create the secret and grant the runtime service account access:
 

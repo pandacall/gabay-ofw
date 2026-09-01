@@ -22,8 +22,8 @@ def create_app(verifier: TokenVerifier | None = None) -> FastAPI:
     app = FastAPI(title="Gabay OFW", docs_url=None, redoc_url=None)
     app.state.verifier = verifier or FirebaseTokenVerifier()
 
-    @app.get("/healthz")
-    def healthz():
+    @app.get("/api/health")
+    def health():
         return {"status": "ok"}
 
     @app.get("/api/firebase-config")

@@ -53,8 +53,8 @@ def auth(uid: str) -> dict:
 
 
 class TestHealth:
-    def test_healthz_is_public(self, client):
-        r = client.get("/healthz")
+    def test_health_is_public(self, client):
+        r = client.get("/api/health")
         assert r.status_code == 200
         assert r.json() == {"status": "ok"}
 
