@@ -81,6 +81,18 @@ firebase deploy --only firestore:rules --project <project-id>
 
 ## Deploy to Cloud Run
 
+Pushes to `master` automatically run the backend and browser test suites, then
+deploy to the production `gabay-ofw` Cloud Run service. The workflow uses
+GitHub OIDC and Google Workload Identity Federation, so no service-account key
+is stored in GitHub. It can also be run manually from **Actions → Test and
+deploy Cloud Run → Run workflow**.
+
+The deployment preserves the service's existing runtime environment and secret
+bindings. Repository variables identify the GCP project, region, service, Workload
+Identity provider, and deployer service account.
+
+For an intentional one-off deployment:
+
 ```bash
 gcloud run deploy gabay-ofw \
   --source . \
