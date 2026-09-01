@@ -56,16 +56,11 @@ const copy = {
     privacyTitle: "Built for privacy",
     privacyBody: "This preview does not save conversations. Stored Crisis Sessions are designed to expire automatically.",
     backDashboard: "Back to dashboard",
-    contractIntroTitle: "Start with what changed",
     contractIntroBody: "Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya.",
     contractPrompt: "Talk to us about what your contract says and what is actually happening.",
     contractPlaceholder: "Example: My contract says one rest day each week, but I have worked every day this month.",
     continue: "Continue",
     contractStep: "Contract Check",
-    interviewerName: "Gabay Interviewer",
-    initialProgress: "1 of 9",
-    progress: "4 of 9",
-    savedProgress: "Saved. You can close and come back.",
     conversationHint: "Take your time. Talk to us in your own words.",
     typeAnswer: "Type your message",
     voiceInput: "Use voice",
@@ -73,7 +68,6 @@ const copy = {
     voicePrototype: "Voice input is a prototype for now. Nothing is being recorded.",
     photoPrototype: "Contract photography is a prototype for now. Nothing was opened or uploaded.",
     sampleAssistant: "Salamat. Tell us whether your contract says overtime or work on your rest day should be paid.",
-    sampleUser: "Yes, it says overtime should be paid, but I have not received overtime pay.",
     viewReport: "View sample Findings Report",
     findingsTitle: "Two of these are serious.",
     findingsIntro: "These findings appear to conflict with standard POEA/DMW contract rules. Verify them with DMW, OWWA, or a licensed lawyer.",
@@ -172,16 +166,11 @@ const copy = {
     privacyTitle: "Dinisenyo para sa privacy",
     privacyBody: "Hindi sine-save ng preview na ito ang usapan. Dinisenyong awtomatikong mabura ang stored Crisis Sessions.",
     backDashboard: "Bumalik sa dashboard",
-    contractIntroTitle: "Magsimula sa nagbago",
     contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Tagalog, Taglish, o Bisaya.",
     contractPrompt: "Kuwento mo kung ano ang nasa kontrata at kung ano ang aktuwal na nangyayari.",
     contractPlaceholder: "Halimbawa: May isang rest day bawat linggo sa kontrata, pero araw-araw akong nagtatrabaho ngayong buwan.",
     continue: "Magpatuloy",
     contractStep: "Contract Check",
-    interviewerName: "Gabay Interviewer",
-    initialProgress: "1 sa 9",
-    progress: "4 sa 9",
-    savedProgress: "Naka-save. Puwede kang bumalik mamaya.",
     conversationHint: "Dahan-dahan lang. Magkuwento sa sarili mong salita.",
     typeAnswer: "I-type ang mensahe",
     voiceInput: "Gamitin ang boses",
@@ -189,7 +178,6 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walang nire-record.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera o upload na binuksan.",
     sampleAssistant: "Salamat. Kuwento mo kung nakasaad sa kontrata na dapat bayaran ang overtime o trabaho sa rest day.",
-    sampleUser: "Oo, dapat bayad ang overtime, pero wala akong natatanggap na overtime pay.",
     viewReport: "Tingnan ang sample Findings Report",
     findingsTitle: "Dalawa rito ay seryoso.",
     findingsIntro: "Ang findings ay posibleng salungat sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
@@ -288,16 +276,11 @@ const copy = {
     privacyTitle: "Built for privacy",
     privacyBody: "Hindi nagsa-save ng conversations ang preview. Designed to expire automatically ang stored Crisis Sessions.",
     backDashboard: "Back to dashboard",
-    contractIntroTitle: "Start with what changed",
     contractIntroBody: "Tell us what's happening. Puwede ang English, Tagalog, Taglish, or Bisaya.",
     contractPrompt: "Tell us what your contract says and what's actually happening.",
     contractPlaceholder: "Example: One rest day weekly ang contract, pero everyday akong working this month.",
     continue: "Continue",
     contractStep: "Contract Check",
-    interviewerName: "Gabay Interviewer",
-    initialProgress: "1 of 9",
-    progress: "4 of 9",
-    savedProgress: "Saved. Puwede kang bumalik mamaya.",
     conversationHint: "Take your time. Tell us in your own words.",
     typeAnswer: "Type your message",
     voiceInput: "Use voice",
@@ -305,7 +288,6 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Nothing is being recorded.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera or upload na binuksan.",
     sampleAssistant: "Salamat. Tell us kung nakalagay sa contract na paid ang overtime or work on rest day.",
-    sampleUser: "Yes, paid dapat ang overtime, pero wala akong overtime pay.",
     viewReport: "View sample Findings Report",
     findingsTitle: "Two of these are serious.",
     findingsIntro: "These findings may conflict with standard POEA/DMW contract rules. I-verify sa DMW, OWWA, or licensed lawyer.",
@@ -404,16 +386,11 @@ const copy = {
     privacyTitle: "Gidisenyo para sa privacy",
     privacyBody: "Dili i-save sa preview ang panag-istorya. Gidisenyo nga awtomatikong mapapas ang stored Crisis Sessions.",
     backDashboard: "Balik sa dashboard",
-    contractIntroTitle: "Sugdi sa nausab",
     contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Tagalog, Taglish, o Bisaya.",
     contractPrompt: "Isulti kanamo unsay giingon sa kontrata ug unsay aktuwal nga nahitabo.",
     contractPlaceholder: "Pananglitan: Usa ka rest day kada semana ang kontrata, pero adlaw-adlaw ko nagtrabaho karong buwana.",
     continue: "Padayon",
     contractStep: "Contract Check",
-    interviewerName: "Gabay Interviewer",
-    initialProgress: "1 sa 9",
-    progress: "4 sa 9",
-    savedProgress: "Na-save. Makabalik ka unya.",
     conversationHint: "Ayaw pagdali. Isulti sa imong kaugalingong mga pulong.",
     typeAnswer: "I-type ang mensahe",
     voiceInput: "Gamita ang tingog",
@@ -421,7 +398,6 @@ const copy = {
     voicePrototype: "Prototype pa ang voice input. Walay gi-record.",
     photoPrototype: "Prototype pa ang contract photo. Walay camera o upload nga giablihan.",
     sampleAssistant: "Salamat. Isulti kung naa sa kontrata nga bayran ang overtime o trabaho sa rest day.",
-    sampleUser: "Oo, bayran unta ang overtime, pero wala koy nadawat nga overtime pay.",
     viewReport: "Tan-awa ang sample Findings Report",
     findingsTitle: "Duha niini seryoso.",
     findingsIntro: "Posibleng supak ang findings sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
@@ -577,22 +553,10 @@ function flowNav(label) {
   </nav>`;
 }
 
-function progressTemplate() {
-  const completed = contractDraft ? 4 : 1;
-  const label = t(contractDraft ? "progress" : "initialProgress");
-  return `<div class="progress-wrap" aria-label="${escapeHtml(label)}">
-    <div class="progress-track" aria-hidden="true">
-      ${Array.from({ length: 9 }, (_, index) => `<span${index < completed ? ' class="complete"' : ""}></span>`).join("")}
-    </div>
-    <span class="progress-text">${label}</span>
-  </div>`;
-}
-
 function contractChatTemplate() {
   const hasStarted = Boolean(contractDraft);
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
-    ${progressTemplate()}
     <div class="conversation-layout">
       <div class="conversation-main">
         <div class="chat-thread" aria-live="polite">

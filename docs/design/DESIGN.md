@@ -11,7 +11,7 @@ and easy to operate under stress.
 Clay means **act now**. Nothing else uses clay.
 
 Urgent controls, the Crisis Help mode, urgent findings, and immediate contact
-actions use clay. Contract Check, profile, navigation, progress, ordinary
+actions use clay. Contract Check, profile, navigation, ordinary
 controls, and informational content use warm ink and neutral dawn surfaces.
 
 ## Tokens
@@ -67,7 +67,7 @@ Desktop is an adaptation, not a phone frame:
 
 - Content sits in a centered workspace with generous dawn gutters.
 - The dashboard presents the two modes side by side.
-- Conversation content uses a readable central column with supporting progress
+- Conversation content uses a readable central column with supporting guidance
   alongside it when space allows.
 - Findings and contact cards can use two columns, while preserving answer-first
   reading order.

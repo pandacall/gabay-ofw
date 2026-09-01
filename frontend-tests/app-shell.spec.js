@@ -84,7 +84,6 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await expect(
     page.getByText("Talk to us about what your contract says and what is actually happening."),
   ).toBeVisible();
-  await expect(page.getByText("1 of 9")).toBeVisible();
   await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
     "My contract promises a weekly rest day, but I work every day.",
   );
@@ -92,7 +91,6 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await expect(
     page.getByText("My contract promises a weekly rest day, but I work every day."),
   ).toBeVisible();
-  await expect(page.getByText("4 of 9")).toBeVisible();
   await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
 

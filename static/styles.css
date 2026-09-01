@@ -251,13 +251,6 @@ h3 { font-size: 1.5rem; line-height: 1.18; }
 .flow-nav { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 2.3rem; }
 .back-button { min-height: 48px; padding: 0.65rem 1rem; border: 1px solid var(--sand-border); border-radius: var(--control-radius); color: var(--ink); background: rgba(255,255,255,0.6); font-weight: 700; }
 .step-label { color: var(--muted); font-size: 0.9rem; font-weight: 700; }
-.progress-wrap { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.4rem; }
-.progress-track { display: grid; grid-template-columns: repeat(9, 1fr); flex: 1; gap: 4px; }
-.progress-track span { height: 6px; border-radius: 4px; background: #e4d5c2; }
-.progress-track span.complete { background: var(--ink); }
-.progress-text { color: var(--muted); font-size: 0.85rem; font-weight: 700; }
-.saved-note { width: fit-content; padding: 0.55rem 0.9rem; margin: 0 auto 1.2rem; border-radius: var(--control-radius); color: var(--muted); background: var(--soft-sand); font-size: 0.86rem; font-weight: 600; }
-
 .question-card, .report, .profile-form { padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid rgba(217, 196, 174, 0.65); border-radius: var(--card-radius); background: rgba(255,255,255,0.74); box-shadow: var(--soft-shadow); }
 .question-card { max-width: 760px; margin: 0 auto; }
 .question-card h1, .profile-form h1 { max-width: 13ch; margin-bottom: 1rem; }
