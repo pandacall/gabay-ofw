@@ -1,50 +1,18 @@
-from collections.abc import AsyncGenerator
 import os
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from google.adk.models import BaseLlm, LlmRequest, LlmResponse
 from google.cloud import firestore
-from google.genai import types
 
 from app.contract_check import ContractCheckService
 from app.firestore_session_service import FirestoreSessionService
 from app.main import create_app
+from tests.contract_check_fakes import CannedModel, FakeVerifier, auth
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FIRESTORE_EMULATOR_HOST"),
     reason="requires the Firestore emulator",
 )
-
-
-class FakeVerifier:
-    def verify(self, token: str) -> str:
-        if not token.startswith("valid-"):
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return token.removeprefix("valid-")
-
-
-class CannedModel(BaseLlm):
-    model: str = "canned"
-    responses: list[str]
-    call_count: int = 0
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        response = self.responses[self.call_count]
-        self.call_count += 1
-        yield LlmResponse(
-            content=types.Content(
-                role="model",
-                parts=[types.Part.from_text(text=response)],
-            )
-        )
-
-
-def auth(uid: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer valid-{uid}"}
 
 
 def test_new_app_instance_resumes_contract_check_from_firestore():

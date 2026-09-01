@@ -1,40 +1,12 @@
-from collections.abc import AsyncGenerator
 import asyncio
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from google.adk.models import BaseLlm, LlmRequest, LlmResponse
 from google.adk.sessions import InMemorySessionService
-from google.genai import types
 
 from app.contract_check import ContractCheckService
 from app.main import create_app
-
-
-class FakeVerifier:
-    def verify(self, token: str) -> str:
-        if not token.startswith("valid-"):
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return token.removeprefix("valid-")
-
-
-class CannedModel(BaseLlm):
-    model: str = "canned"
-    responses: list[str]
-    call_count: int = 0
-
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        response = self.responses[self.call_count]
-        self.call_count += 1
-        yield LlmResponse(
-            content=types.Content(
-                role="model",
-                parts=[types.Part.from_text(text=response)],
-            )
-        )
+from tests.contract_check_fakes import CannedModel, FakeVerifier, auth
 
 
 @pytest.fixture()
@@ -73,10 +45,6 @@ def client(interviewer, rule_matcher):
         rule_matcher_model=rule_matcher,
     )
     return TestClient(create_app(verifier=FakeVerifier(), contract_checks=service))
-
-
-def auth(uid: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer valid-{uid}"}
 
 
 def test_start_contract_check_pauses_for_more_input(client, rule_matcher):
@@ -309,3 +277,25 @@ def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():
     assert session is not None
     assert "findings_report" not in session.state
     assert '"severity":"unknown"' not in session.model_dump_json()
+
+
+def test_non_iso_country_code_is_rejected():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=['{"status":"in_progress","claims":[],"country":"Saudi Arabia"}']
+        ),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my contract."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 502

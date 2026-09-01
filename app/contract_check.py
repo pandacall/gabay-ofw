@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 APP_NAME = "gabay_ofw_contract_check"
 MORE_INPUT_PROMPT = "Please tell me what is actually happening."
+CountryCode = Annotated[str, Field(pattern=r"^[A-Z]{2}$")]
 
 
 class StrictModel(BaseModel):
@@ -43,7 +44,7 @@ class Claim(StrictModel):
 class Claims(StrictModel):
     status: Literal["complete", "in_progress", "escalate_to_crisis"]
     claims: list[Claim]
-    country: str | None = None
+    country: CountryCode | None = None
 
 
 class Finding(StrictModel):
@@ -80,7 +81,7 @@ class ContractCheckComplete(StrictModel):
 class ContractCheckEscalation(StrictModel):
     id: str
     status: Literal["escalate_to_crisis"]
-    country: str | None = None
+    country: CountryCode | None = None
 
 
 ContractCheckResponse = Annotated[
