@@ -3,61 +3,80 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0b5d4b">
+  <meta name="theme-color" content="#FCF5ED">
   <title>Gabay OFW</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <div id="auth-loading" class="centered-state" aria-live="polite">
-    <div class="shell-skeleton" aria-hidden="true">
-      <span></span><span></span><span></span>
-    </div>
+    <div class="dawn-loader" aria-hidden="true"><span></span><span></span><span></span></div>
     <p data-copy="loading"></p>
   </div>
 
   <main id="signed-out" class="auth-page hidden">
-    <section class="welcome-panel">
-      <div class="welcome-nav">
-        <a class="brand" href="/" data-copy-aria="homeLabel">
-          <span class="brand-mark">G</span>
-          <span>Gabay OFW</span>
-        </a>
-        <label class="language-control">
-          <span class="sr-only" data-copy="languageLabel"></span>
-          <select class="language-select" data-copy-aria="languageLabel"></select>
-        </label>
-      </div>
-      <div class="welcome-copy">
-        <p class="eyebrow" data-copy="welcomeEyebrow"></p>
-        <h1 data-copy="welcomeTitle"></h1>
-        <p class="lead" data-copy="welcomeBody"></p>
-        <button class="button primary" id="signin" type="button" data-copy="signIn"></button>
-        <p class="fine-print" data-copy="privacyNote"></p>
-      </div>
+    <div class="dawn-glow" aria-hidden="true"></div>
+    <nav class="welcome-nav">
+      <a class="brand" href="/" data-copy-aria="homeLabel">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span>Gabay OFW</span>
+      </a>
+      <label class="language-control">
+        <span class="sr-only" data-copy="languageLabel"></span>
+        <select class="language-select" data-copy-aria="languageLabel"></select>
+      </label>
+    </nav>
+
+    <section class="welcome-copy">
+      <h1 data-copy="welcomeTitle"></h1>
+      <p class="lead" data-copy="welcomeBody"></p>
+      <ol class="welcome-steps">
+        <li><span>1</span><p data-copy="welcomeStepOne"></p></li>
+        <li><span>2</span><p data-copy="welcomeStepTwo"></p></li>
+        <li><span>3</span><p data-copy="welcomeStepThree"></p></li>
+      </ol>
     </section>
-    <aside class="welcome-context" data-copy-aria="serviceOverview">
-      <div>
-        <p class="context-number">1348</p>
-        <p data-copy="owwaAlways"></p>
-      </div>
-    </aside>
+
+    <section class="welcome-actions">
+      <button class="google-button" id="signin" type="button">
+        <span class="google-mark" aria-hidden="true">G</span>
+        <span data-copy="signIn"></span>
+      </button>
+      <p class="privacy-line" data-copy="privacyNote"></p>
+      <a class="urgent-strip" href="tel:1348">
+        <strong>1348</strong>
+        <span data-copy="owwaAlways"></span>
+      </a>
+    </section>
   </main>
 
   <div id="signed-in" class="app hidden">
     <header class="topbar">
       <button class="brand brand-button" type="button" data-action="dashboard">
-        <span class="brand-mark">G</span>
+        <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </button>
       <nav class="topbar-actions" data-copy-aria="accountControls">
-        <label class="language-control">
+        <label class="language-control compact-control">
           <span class="sr-only" data-copy="languageLabel"></span>
           <select class="language-select" data-copy-aria="languageLabel"></select>
         </label>
-        <button class="button quiet" type="button" data-action="profile" data-copy="profile"></button>
-        <button class="button quiet" id="signout" type="button" data-copy="signOut"></button>
+        <button class="avatar-button" type="button" data-action="profile" data-copy-aria="profile">
+          <span id="avatar-initial" aria-hidden="true">M</span>
+        </button>
+        <button class="text-button" id="signout" type="button" data-copy="signOut"></button>
       </nav>
     </header>
+
+    <nav class="mode-switcher" data-copy-aria="modeNavigation">
+      <button type="button" data-mode-link="contract" data-action="contract-intro" data-copy="contractTab"></button>
+      <button class="urgent-mode" type="button" data-mode-link="crisis" data-action="crisis">
+        <span class="urgent-dot" aria-hidden="true"></span>
+        <span data-copy="helpTab"></span>
+      </button>
+    </nav>
 
     <div id="screen-loading" class="screen-loading hidden" aria-live="polite">
       <div class="content-skeleton" aria-hidden="true">
@@ -68,12 +87,15 @@
 
     <main id="screen" tabindex="-1"></main>
 
-    <button id="global-help" class="global-help" type="button" data-action="crisis" data-copy="needHelp"></button>
+    <button id="global-help" class="global-help" type="button" data-action="crisis">
+      <span class="urgent-dot" aria-hidden="true"></span>
+      <span data-copy="needHelp"></span>
+    </button>
   </div>
 
   <dialog id="first-run-dialog" class="disclaimer-dialog">
     <form method="dialog">
-      <div class="dialog-mark">G</div>
+      <span class="dialog-symbol" aria-hidden="true">G</span>
       <h2 data-copy="disclaimerTitle"></h2>
       <p data-copy="disclaimerBody"></p>
       <div class="notice-list">
@@ -81,8 +103,8 @@
         <p><strong data-copy="notEmergencyTitle"></strong> <span data-copy="notEmergencyBody"></span></p>
       </div>
       <div class="dialog-actions">
-        <button class="button primary full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
-        <button class="button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
+        <button class="button ink-button full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
+        <button class="button urgent-button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
       </div>
     </form>
   </dialog>

@@ -44,9 +44,11 @@ test("signed-in user explicitly chooses either mode from the dashboard", async (
 }) => {
   await openAsSignedInUser(page);
 
-  await expect(page.getByRole("heading", { name: "How can we help?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What do you need?" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Start Contract Check" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
+  await expect(page.locator(".crisis-card")).toBeVisible();
+  await expect(page.locator(".crisis-card")).toHaveCSS("background-color", "rgb(168, 67, 31)");
+  await expect(page.locator(".mode-card").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
 });
 
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
@@ -54,7 +56,7 @@ test("signed-out user can choose a language before sign-in", async ({ page }) =>
 
   await page.locator("#signed-out").getByLabel("Language").selectOption("tl");
   await expect(
-    page.getByRole("heading", { name: "Alamin ang karapatan. Hanapin ang tamang tulong." }),
+    page.getByRole("heading", { name: "Sinusunod ba ng trabaho mo ang kontrata?" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Magpatuloy gamit ang Google" })).toBeVisible();
 });
@@ -80,11 +82,17 @@ test("user can click through the static Contract Check flow", async ({ page }) =
     "My contract promises a weekly rest day, but I work every day.",
   );
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByRole("heading", { name: "Gabay Interviewer" })).toBeVisible();
+  await expect(page.getByText("4 of 9")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Answer by voice" })).toBeVisible();
   await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
 
+  await page.getByRole("button", { name: "Answer by voice" }).click();
+  await expect(page.getByRole("status")).toContainText("Nothing is being recorded");
+  await page.getByRole("button", { name: "Photograph my contract" }).click();
+  await expect(page.getByRole("status")).toContainText("Nothing was opened or uploaded");
+
   await page.getByRole("button", { name: "View sample Findings Report" }).click();
-  await expect(page.getByRole("heading", { name: "Your Findings Report" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Two of these are serious." })).toBeVisible();
   await expect(page.getByText("Missing weekly rest day")).toBeVisible();
   await expect(page.getByText("Unpaid overtime")).toBeVisible();
 });
@@ -94,14 +102,14 @@ test("user can click through Crisis Help to code-owned contact cards", async ({
 }) => {
   await openAsSignedInUser(page);
 
-  await page.getByRole("button", { name: "I Need Help Now" }).click();
+  await page.locator(".crisis-card").click();
   await page.getByRole("button", { name: "Yes, or I cannot leave safely" }).click();
   await page.getByLabel("Country").selectOption("Qatar");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("One-line description").fill("My employer will not let me leave.");
   await page.getByRole("button", { name: "Show official help" }).click();
 
-  await expect(page.getByRole("heading", { name: "Contact trained support now" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Call one of these now. All are free." })).toBeVisible();
   await expect(page.getByRole("link", { name: "Call 1343" })).toHaveAttribute("href", "tel:1343");
   await expect(page.getByRole("link", { name: "Call 1348" })).toHaveAttribute("href", "tel:1348");
   await expect(page.getByRole("link", { name: "Open the official DMW directory" })).toHaveAttribute(
@@ -114,11 +122,11 @@ test("language choice updates every flow and persists", async ({ page }) => {
   await openAsSignedInUser(page);
 
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
-  await expect(page.getByRole("heading", { name: "Unsaon namo pagtabang?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Kinahanglan Ko og Tabang Karon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Unsay imong kinahanglan?" })).toBeVisible();
+  await expect(page.locator(".crisis-card")).toContainText("Pangayo og tabang");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Unsaon namo pagtabang?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Unsay imong kinahanglan?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ceb");
 });
 
@@ -143,7 +151,7 @@ test("non-danger Crisis Help path omits the trafficking hotline", async ({
 }) => {
   await openAsSignedInUser(page);
 
-  await page.getByRole("button", { name: "I Need Help Now" }).click();
+  await page.locator(".crisis-card").click();
   await page.getByRole("button", { name: "No, I can safely use my phone" }).click();
   await page.getByLabel("Country").selectOption("Kuwait");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -162,5 +170,5 @@ test("profile and crisis entry remain available on a small screen", async ({
   await openAsSignedInUser(page);
 
   await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
+  await expect(page.locator(".crisis-card")).toBeVisible();
 });

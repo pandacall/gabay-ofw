@@ -12,8 +12,11 @@ const copy = {
     languageName: "English",
     loading: "Loading your private space...",
     welcomeEyebrow: "Practical support for Filipino workers abroad",
-    welcomeTitle: "Know your rights. Find the right help.",
-    welcomeBody: "Compare your working conditions with standard OFW contract rules, or get routed to trusted help when you need it.",
+    welcomeTitle: "Is your work following your contract?",
+    welcomeBody: "Answer a few questions. We show you what does not match, and who to call.",
+    welcomeStepOne: "Answer one question at a time",
+    welcomeStepTwo: "See what may not match",
+    welcomeStepThree: "Find the right person to call",
     signIn: "Continue with Google",
     privacyNote: "Your records are private to your account. Gabay OFW never stores passwords.",
     owwaAlways: "OWWA's free 24/7 hotline is available to OFWs and their families.",
@@ -25,6 +28,9 @@ const copy = {
     profile: "Profile",
     signOut: "Sign out",
     needHelp: "I Need Help Now",
+    modeNavigation: "Choose a service",
+    contractTab: "My contract",
+    helpTab: "Help now",
     disclaimerTitle: "Before you begin",
     disclaimerBody: "Gabay OFW offers practical guidance and connects you with official support.",
     notLegalTitle: "Not legal advice.",
@@ -33,7 +39,7 @@ const copy = {
     notEmergencyBody: "If you are in immediate danger, contact local emergency services or the nearest Philippine Embassy.",
     understand: "I understand",
     greeting: (name) => `Welcome, ${name}.`,
-    dashboardTitle: "How can we help?",
+    dashboardTitle: "What do you need?",
     dashboardBody: "Choose a service. Gabay OFW will never guess which kind of help you need.",
     contractKicker: "Understand your working conditions",
     contractTitle: "Contract Check",
@@ -43,6 +49,8 @@ const copy = {
     crisisTitle: "Crisis Help",
     crisisBody: "Answer a few questions and get routed to the right official support.",
     crisisCta: "Get help now",
+    contractTime: "About five minutes",
+    crisisTime: "Straight to the right number",
     recentTitle: "Your Contract Checks",
     recentEmpty: "No saved checks yet. Start a Contract Check when you are ready.",
     privacyTitle: "Built for privacy",
@@ -55,10 +63,18 @@ const copy = {
     continue: "Continue",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    progress: "4 of 9",
+    savedProgress: "Saved. You can close and come back.",
+    conversationHint: "One question at a time. You can answer in your own words.",
+    typeAnswer: "Or type it",
+    voiceInput: "Answer by voice",
+    photoContract: "Photograph my contract",
+    voicePrototype: "Voice input is a prototype for now. Nothing is being recorded.",
+    photoPrototype: "Contract photography is a prototype for now. Nothing was opened or uploaded.",
     sampleAssistant: "Salamat. To understand clearly, does your contract state that overtime or work on your rest day should be paid?",
     sampleUser: "Yes, it says overtime should be paid, but I have not received overtime pay.",
     viewReport: "View sample Findings Report",
-    findingsTitle: "Your Findings Report",
+    findingsTitle: "Two of these are serious.",
     findingsIntro: "These findings appear to conflict with standard POEA/DMW contract rules. Verify them with DMW, OWWA, or a licensed lawyer.",
     urgent: "Urgent",
     concerning: "Concerning",
@@ -83,7 +99,7 @@ const copy = {
     situationLabel: "One-line description",
     situationPlaceholder: "Example: My employer is keeping my passport.",
     showHelp: "Show official help",
-    routeTitle: "Contact trained support now",
+    routeTitle: "Call one of these now. All are free.",
     routeBody: "For a safety threat, confinement, or trafficking concern, these free services can help.",
     mwoRouteTitle: "Contact your Migrant Workers Office",
     mwoRouteBody: (country) => `For a concern without immediate danger in ${country}, contact the official MWO or OWWA.`,
@@ -111,8 +127,11 @@ const copy = {
     languageName: "Tagalog",
     loading: "Binubuksan ang iyong pribadong espasyo...",
     welcomeEyebrow: "Praktikal na suporta para sa Pilipinong manggagawa sa abroad",
-    welcomeTitle: "Alamin ang karapatan. Hanapin ang tamang tulong.",
-    welcomeBody: "Ihambing ang aktuwal na trabaho sa standard OFW contract rules, o magpaturo sa mapagkakatiwalaang tulong.",
+    welcomeTitle: "Sinusunod ba ng trabaho mo ang kontrata?",
+    welcomeBody: "Sagutin ang ilang tanong. Ipapakita namin ang hindi tugma at kung sino ang tatawagan.",
+    welcomeStepOne: "Sagutin ang isang tanong bawat pagkakataon",
+    welcomeStepTwo: "Tingnan ang posibleng hindi tugma",
+    welcomeStepThree: "Hanapin ang tamang taong tatawagan",
     signIn: "Magpatuloy gamit ang Google",
     privacyNote: "Pribado sa account mo ang mga record. Hindi nag-iimbak ng password ang Gabay OFW.",
     owwaAlways: "Laging bukas at libre ang OWWA 24/7 hotline para sa OFW at pamilya.",
@@ -124,6 +143,9 @@ const copy = {
     profile: "Profile",
     signOut: "Mag-sign out",
     needHelp: "Kailangan Ko ng Tulong Ngayon",
+    modeNavigation: "Pumili ng serbisyo",
+    contractTab: "Kontrata ko",
+    helpTab: "Tulong ngayon",
     disclaimerTitle: "Bago magsimula",
     disclaimerBody: "Nagbibigay ang Gabay OFW ng praktikal na gabay at koneksiyon sa opisyal na suporta.",
     notLegalTitle: "Hindi legal na payo.",
@@ -132,7 +154,7 @@ const copy = {
     notEmergencyBody: "Kung may agarang panganib, tumawag sa local emergency services o pinakamalapit na Philippine Embassy.",
     understand: "Naiintindihan ko",
     greeting: (name) => `Maligayang pagdating, ${name}.`,
-    dashboardTitle: "Paano kami makakatulong?",
+    dashboardTitle: "Ano ang kailangan mo?",
     dashboardBody: "Pumili ng serbisyo. Hindi huhulaan ng Gabay OFW kung anong tulong ang kailangan mo.",
     contractKicker: "Unawain ang iyong working conditions",
     contractTitle: "Contract Check",
@@ -142,6 +164,8 @@ const copy = {
     crisisTitle: "Crisis Help",
     crisisBody: "Sagutin ang ilang tanong at ituturo ka sa tamang opisyal na suporta.",
     crisisCta: "Humingi ng tulong",
+    contractTime: "Mga limang minuto",
+    crisisTime: "Diretso sa tamang numero",
     recentTitle: "Iyong mga Contract Check",
     recentEmpty: "Wala pang naka-save na check. Magsimula kapag handa ka na.",
     privacyTitle: "Dinisenyo para sa privacy",
@@ -154,10 +178,18 @@ const copy = {
     continue: "Magpatuloy",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    progress: "4 sa 9",
+    savedProgress: "Naka-save. Puwede kang bumalik mamaya.",
+    conversationHint: "Isang tanong bawat pagkakataon. Sumagot sa sarili mong salita.",
+    typeAnswer: "O i-type ito",
+    voiceInput: "Sumagot gamit ang boses",
+    photoContract: "Kunan ng litrato ang kontrata",
+    voicePrototype: "Prototype pa ang voice input. Walang nire-record.",
+    photoPrototype: "Prototype pa ang contract photo. Walang camera o upload na binuksan.",
     sampleAssistant: "Salamat. Nakasaad ba sa kontrata na dapat bayaran ang overtime o trabaho sa rest day?",
     sampleUser: "Oo, dapat bayad ang overtime, pero wala akong natatanggap na overtime pay.",
     viewReport: "Tingnan ang sample Findings Report",
-    findingsTitle: "Iyong Findings Report",
+    findingsTitle: "Dalawa rito ay seryoso.",
     findingsIntro: "Ang findings ay posibleng salungat sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
     urgent: "Agarang pansin",
     concerning: "Nakababahala",
@@ -182,7 +214,7 @@ const copy = {
     situationLabel: "Isang linyang paglalarawan",
     situationPlaceholder: "Halimbawa: Hawak ng employer ko ang passport ko.",
     showHelp: "Ipakita ang opisyal na tulong",
-    routeTitle: "Makipag-ugnayan sa trained support ngayon",
+    routeTitle: "Tumawag sa isa sa mga ito ngayon. Libre lahat.",
     routeBody: "Para sa banta sa kaligtasan, pagkakulong, o trafficking concern, makakatulong ang libreng serbisyong ito.",
     mwoRouteTitle: "Makipag-ugnayan sa Migrant Workers Office",
     mwoRouteBody: (country) => `Para sa concern na walang agarang panganib sa ${country}, kontakin ang opisyal na MWO o OWWA.`,
@@ -210,8 +242,11 @@ const copy = {
     languageName: "Taglish",
     loading: "Binubuksan ang private space mo...",
     welcomeEyebrow: "Practical support para sa Filipino workers abroad",
-    welcomeTitle: "Know your rights. Hanapin ang tamang help.",
-    welcomeBody: "I-compare ang actual work sa standard OFW contract rules, o magpa-route sa trusted help.",
+    welcomeTitle: "Following ba ng work mo ang contract?",
+    welcomeBody: "Answer a few questions. Ipapakita namin ang hindi match at kung sino ang tatawagan.",
+    welcomeStepOne: "Answer one question at a time",
+    welcomeStepTwo: "See what may not match",
+    welcomeStepThree: "Find the right person to call",
     signIn: "Continue with Google",
     privacyNote: "Private sa account mo ang records. Never nagse-save ng password ang Gabay OFW.",
     owwaAlways: "Free at open 24/7 ang OWWA hotline para sa OFWs at families.",
@@ -223,6 +258,9 @@ const copy = {
     profile: "Profile",
     signOut: "Sign out",
     needHelp: "I Need Help Now",
+    modeNavigation: "Choose a service",
+    contractTab: "My contract",
+    helpTab: "Help now",
     disclaimerTitle: "Bago tayo magsimula",
     disclaimerBody: "Practical guidance at official support links ang binibigay ng Gabay OFW.",
     notLegalTitle: "Hindi legal advice.",
@@ -231,7 +269,7 @@ const copy = {
     notEmergencyBody: "Kung immediate danger, contact local emergency services or nearest Philippine Embassy.",
     understand: "Gets ko",
     greeting: (name) => `Welcome, ${name}.`,
-    dashboardTitle: "How can we help?",
+    dashboardTitle: "What do you need?",
     dashboardBody: "Pumili ng service. Hindi huhulaan ng Gabay OFW kung anong help ang kailangan mo.",
     contractKicker: "Understand your working conditions",
     contractTitle: "Contract Check",
@@ -241,6 +279,8 @@ const copy = {
     crisisTitle: "Crisis Help",
     crisisBody: "Answer a few questions para ma-route sa tamang official support.",
     crisisCta: "Get help now",
+    contractTime: "About five minutes",
+    crisisTime: "Straight to the right number",
     recentTitle: "Your Contract Checks",
     recentEmpty: "Wala pang saved checks. Start when ready.",
     privacyTitle: "Built for privacy",
@@ -253,10 +293,18 @@ const copy = {
     continue: "Continue",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    progress: "4 of 9",
+    savedProgress: "Saved. Puwede kang bumalik mamaya.",
+    conversationHint: "One question at a time. Answer in your own words.",
+    typeAnswer: "Or type it",
+    voiceInput: "Answer by voice",
+    photoContract: "Photograph my contract",
+    voicePrototype: "Prototype pa ang voice input. Nothing is being recorded.",
+    photoPrototype: "Prototype pa ang contract photo. Walang camera or upload na binuksan.",
     sampleAssistant: "Salamat. Nakalagay ba sa contract na paid ang overtime or work on rest day?",
     sampleUser: "Yes, paid dapat ang overtime, pero wala akong overtime pay.",
     viewReport: "View sample Findings Report",
-    findingsTitle: "Your Findings Report",
+    findingsTitle: "Two of these are serious.",
     findingsIntro: "These findings may conflict with standard POEA/DMW contract rules. I-verify sa DMW, OWWA, or licensed lawyer.",
     urgent: "Urgent",
     concerning: "Concerning",
@@ -281,7 +329,7 @@ const copy = {
     situationLabel: "One-line description",
     situationPlaceholder: "Example: Hawak ng employer ko ang passport ko.",
     showHelp: "Show official help",
-    routeTitle: "Contact trained support now",
+    routeTitle: "Call one of these now. All are free.",
     routeBody: "For safety threats, confinement, or trafficking concerns, these free services can help.",
     mwoRouteTitle: "Contact your Migrant Workers Office",
     mwoRouteBody: (country) => `For a concern without immediate danger in ${country}, contact the official MWO or OWWA.`,
@@ -309,8 +357,11 @@ const copy = {
     languageName: "Bisaya",
     loading: "Giablihan ang imong pribadong luna...",
     welcomeEyebrow: "Praktikal nga suporta para sa Pilipinong trabahante sa abroad",
-    welcomeTitle: "Hibaloa ang katungod. Pangitaa ang hustong tabang.",
-    welcomeBody: "Itandi ang aktuwal nga trabaho sa standard OFW contract rules, o magpatudlo sa kasaligan nga tabang.",
+    welcomeTitle: "Nagsunod ba ang imong trabaho sa kontrata?",
+    welcomeBody: "Tubaga ang pipila ka pangutana. Ipakita namo ang dili motakdo ug kinsa ang tawagan.",
+    welcomeStepOne: "Tubaga ang usa ka pangutana matag higayon",
+    welcomeStepTwo: "Tan-awa ang posibleng dili motakdo",
+    welcomeStepThree: "Pangitaa ang hustong tawagan",
     signIn: "Padayon gamit ang Google",
     privacyNote: "Pribado sa imong account ang records. Dili magtipig og password ang Gabay OFW.",
     owwaAlways: "Libre ug abli 24/7 ang OWWA hotline para sa OFW ug pamilya.",
@@ -322,6 +373,9 @@ const copy = {
     profile: "Profile",
     signOut: "Sign out",
     needHelp: "Kinahanglan Ko og Tabang Karon",
+    modeNavigation: "Pilia ang serbisyo",
+    contractTab: "Akong kontrata",
+    helpTab: "Tabang karon",
     disclaimerTitle: "Sa dili pa magsugod",
     disclaimerBody: "Naghatag ang Gabay OFW og praktikal nga giya ug koneksiyon sa opisyal nga suporta.",
     notLegalTitle: "Dili legal nga tambag.",
@@ -330,7 +384,7 @@ const copy = {
     notEmergencyBody: "Kung naa sa diha-diha nga peligro, kontaka ang local emergency services o duol nga Philippine Embassy.",
     understand: "Nasabtan nako",
     greeting: (name) => `Maayong pag-abot, ${name}.`,
-    dashboardTitle: "Unsaon namo pagtabang?",
+    dashboardTitle: "Unsay imong kinahanglan?",
     dashboardBody: "Pilia ang serbisyo. Dili tag-anon sa Gabay OFW ang tabang nga imong kinahanglan.",
     contractKicker: "Sabta ang imong working conditions",
     contractTitle: "Contract Check",
@@ -340,6 +394,8 @@ const copy = {
     crisisTitle: "Crisis Help",
     crisisBody: "Tubaga ang pipila ka pangutana ug itudlo ka sa hustong opisyal nga suporta.",
     crisisCta: "Pangayo og tabang",
+    contractTime: "Mga lima ka minuto",
+    crisisTime: "Diretso sa hustong numero",
     recentTitle: "Imong mga Contract Check",
     recentEmpty: "Wala pay na-save nga check. Sugdi kung andam na.",
     privacyTitle: "Gidisenyo para sa privacy",
@@ -352,10 +408,18 @@ const copy = {
     continue: "Padayon",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    progress: "4 sa 9",
+    savedProgress: "Na-save. Makabalik ka unya.",
+    conversationHint: "Usa ka pangutana matag higayon. Tubag sa imong kaugalingong pulong.",
+    typeAnswer: "O i-type kini",
+    voiceInput: "Tubag gamit ang tingog",
+    photoContract: "Litrati ang akong kontrata",
+    voicePrototype: "Prototype pa ang voice input. Walay gi-record.",
+    photoPrototype: "Prototype pa ang contract photo. Walay camera o upload nga giablihan.",
     sampleAssistant: "Salamat. Naa ba sa kontrata nga bayran ang overtime o trabaho sa rest day?",
     sampleUser: "Oo, bayran unta ang overtime, pero wala koy nadawat nga overtime pay.",
     viewReport: "Tan-awa ang sample Findings Report",
-    findingsTitle: "Imong Findings Report",
+    findingsTitle: "Duha niini seryoso.",
     findingsIntro: "Posibleng supak ang findings sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
     urgent: "Dinalian",
     concerning: "Makapabalaka",
@@ -380,7 +444,7 @@ const copy = {
     situationLabel: "Usa ka linya nga paghulagway",
     situationPlaceholder: "Pananglitan: Gikuptan sa employer ang akong passport.",
     showHelp: "Ipakita ang opisyal nga tabang",
-    routeTitle: "Kontaka ang trained support karon",
+    routeTitle: "Tawag sa usa niini karon. Libre ang tanan.",
     routeBody: "Para sa hulga sa kaluwasan, pagkabilanggo, o trafficking concern, makatabang kining libre nga serbisyo.",
     mwoRouteTitle: "Kontaka ang Migrant Workers Office",
     mwoRouteBody: (country) => `Para sa concern nga walay diha-diha nga peligro sa ${country}, kontaka ang opisyal nga MWO o OWWA.`,
@@ -413,6 +477,8 @@ const signedOut = document.getElementById("signed-out");
 const authLoading = document.getElementById("auth-loading");
 const dialog = document.getElementById("first-run-dialog");
 const languageSelects = document.querySelectorAll(".language-select");
+const modeSwitcher = document.querySelector(".mode-switcher");
+const globalHelp = document.getElementById("global-help");
 const status = document.getElementById("status");
 
 let language = localStorage.getItem("gabay-language") || "en";
@@ -465,26 +531,24 @@ function dashboardTemplate() {
   return `
     <section>
       <header class="screen-header">
-        <div>
-          <p class="user-greeting">${escapeHtml(t("greeting", userName))}</p>
-          <h1>${t("dashboardTitle")}</h1>
-          <p>${t("dashboardBody")}</p>
-        </div>
+        <p class="user-greeting">${escapeHtml(t("greeting", userName))}</p>
+        <h1>${t("dashboardTitle")}</h1>
+        <p>${t("dashboardBody")}</p>
       </header>
       <div class="mode-grid">
         <button class="mode-card" type="button" data-action="contract-intro">
-          <span class="mode-kicker">${t("contractKicker")}</span>
+          <span class="mode-icon" aria-hidden="true"></span>
           <span>
             <h2>${t("contractTitle")}</h2>
-            <p>${t("contractBody")}</p>
+            <p>${t("contractTime")}</p>
             <span class="mode-cta">${t("contractCta")}</span>
           </span>
         </button>
         <button class="mode-card crisis-card" type="button" data-action="crisis">
-          <span class="mode-kicker">${t("crisisKicker")}</span>
+          <span class="mode-icon" aria-hidden="true"></span>
           <span>
             <h2>${t("crisisTitle")}</h2>
-            <p>${t("crisisBody")}</p>
+            <p>${t("crisisTime")}</p>
             <span class="mode-cta">${t("crisisCta")}</span>
           </span>
         </button>
@@ -504,14 +568,24 @@ function dashboardTemplate() {
 
 function flowNav(label) {
   return `<nav class="flow-nav" aria-label="${escapeHtml(label)}">
-    <button class="button quiet" type="button" data-action="dashboard">${t("backDashboard")}</button>
+    <button class="back-button" type="button" data-action="dashboard">${t("backDashboard")}</button>
     <span class="step-label">${label}</span>
   </nav>`;
+}
+
+function progressTemplate() {
+  return `<div class="progress-wrap" aria-label="${escapeHtml(t("progress"))}">
+    <div class="progress-track" aria-hidden="true">
+      ${Array.from({ length: 9 }, (_, index) => `<span${index < 4 ? ' class="complete"' : ""}></span>`).join("")}
+    </div>
+    <span class="progress-text">${t("progress")}</span>
+  </div>`;
 }
 
 function contractIntroTemplate() {
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
+    ${progressTemplate()}
     <form class="question-card" data-form="contract-intro">
       <h1>${t("contractIntroTitle")}</h1>
       <p>${t("contractIntroBody")}</p>
@@ -519,7 +593,7 @@ function contractIntroTemplate() {
         <label for="contract-message">${t("contractPrompt")}</label>
         <textarea id="contract-message" required maxlength="4000" placeholder="${escapeHtml(t("contractPlaceholder"))}">${escapeHtml(contractDraft)}</textarea>
       </div>
-      <button class="button primary" type="submit">${t("continue")}</button>
+      <button class="button ink-button" type="submit">${t("continue")}</button>
     </form>
   </section>`;
 }
@@ -527,13 +601,28 @@ function contractIntroTemplate() {
 function contractChatTemplate() {
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
-    <h1>${t("interviewerName")}</h1>
-    <div class="chat-thread" aria-live="polite">
-      <div class="message user">${escapeHtml(contractDraft || t("contractPlaceholder"))}</div>
-      <div class="message assistant">${t("sampleAssistant")}</div>
-      <div class="message user">${t("sampleUser")}</div>
+    ${progressTemplate()}
+    <p class="saved-note">${t("savedProgress")}</p>
+    <div class="conversation-layout">
+      <div class="conversation-main">
+        <div class="chat-thread" aria-live="polite">
+          <div class="message user">${escapeHtml(contractDraft || t("contractPlaceholder"))}</div>
+          <div class="message assistant">${t("sampleAssistant")}</div>
+          <div class="message user">${t("sampleUser")}</div>
+        </div>
+        <div class="composer">
+          <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">●</button>
+          <div class="composer-stack">
+            <div class="composer-input">
+              <span>${t("typeAnswer")}</span>
+              <button class="send-button" type="button" data-action="findings" aria-label="${escapeHtml(t("viewReport"))}">↑</button>
+            </div>
+            <button class="photo-button" type="button" data-action="prototype-photo">${t("photoContract")}</button>
+          </div>
+        </div>
+      </div>
+      <aside class="conversation-aside">${t("conversationHint")}</aside>
     </div>
-    <button class="button primary" type="button" data-action="findings">${t("viewReport")}</button>
   </section>`;
 }
 
@@ -561,7 +650,7 @@ function findingsTemplate() {
         </section>
       </div>
       <div class="button-row" style="margin-top: 1.5rem">
-        <button class="button primary" type="button" data-action="dashboard">${t("done")}</button>
+        <button class="button ink-button" type="button" data-action="dashboard">${t("done")}</button>
       </div>
     </article>
   </section>`;
@@ -594,7 +683,7 @@ function crisisCountryTemplate() {
           <option value="Other"${crisisCountry === "Other" ? " selected" : ""}>${t("otherCountry")}</option>
         </select>
       </div>
-      <button class="button primary" type="submit">${t("continue")}</button>
+      <button class="button ink-button" type="submit">${t("continue")}</button>
     </form>
   </section>`;
 }
@@ -609,7 +698,7 @@ function crisisSituationTemplate() {
         <label for="crisis-situation">${t("situationLabel")}</label>
         <textarea id="crisis-situation" required maxlength="500" placeholder="${escapeHtml(t("situationPlaceholder"))}"></textarea>
       </div>
-      <button class="button primary" type="submit">${t("showHelp")}</button>
+      <button class="button ink-button" type="submit">${t("showHelp")}</button>
     </form>
   </section>`;
 }
@@ -624,12 +713,13 @@ function crisisRouteTemplate() {
     <article class="report">
       <h1>${routeTitle}</h1>
       <p class="report-intro">${routeBody}</p>
+      <div class="route-grid">
       ${crisisDanger ? `<section class="route-card">
         <h3>${t("actionline")}</h3>
         <p class="route-number">1343</p>
         <a href="tel:1343">${t("call", "1343")}</a>
       </section>` : ""}
-      <section class="route-card">
+      <section class="route-card${crisisDanger ? " primary-route" : ""}">
         <h3>${t("owwa")}</h3>
         <p class="route-number">1348</p>
         <a href="tel:1348">${t("call", "1348")}</a>
@@ -638,6 +728,7 @@ function crisisRouteTemplate() {
         <h3>${t("embassy")}</h3>
         <a href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${t("officialDirectory")}</a>
       </section>
+      </div>
       <p class="reassurance">${t("reassurance")}</p>
       <button class="button" type="button" data-action="dashboard">${t("done")}</button>
     </article>
@@ -660,8 +751,8 @@ function profileTemplate() {
         <input id="profile-occupation" name="occupation" value="${escapeHtml(profile.occupation || "")}" placeholder="${escapeHtml(t("occupationPlaceholder"))}">
       </div>
       <div class="button-row">
-        <button class="button primary" type="submit">${t("saveProfile")}</button>
-        <button class="button danger" type="button" data-action="delete-profile">${t("deleteData")}</button>
+        <button class="button ink-button" type="submit">${t("saveProfile")}</button>
+        <button class="button" type="button" data-action="delete-profile">${t("deleteData")}</button>
       </div>
     </form>
   </section>`;
@@ -682,6 +773,12 @@ const templates = {
 function renderScreen(name = currentScreen) {
   currentScreen = name;
   screen.innerHTML = templates[name]();
+  const isContract = name.startsWith("contract") || name === "findings";
+  const isCrisis = name.startsWith("crisis");
+  modeSwitcher.classList.toggle("hidden", name === "dashboard" || name === "profile");
+  globalHelp.classList.toggle("hidden", name === "dashboard" || isCrisis);
+  modeSwitcher.querySelector('[data-mode-link="contract"]').classList.toggle("active", isContract);
+  modeSwitcher.querySelector('[data-mode-link="crisis"]').classList.toggle("active", isCrisis);
   screen.focus({ preventScroll: true });
 }
 
@@ -712,6 +809,14 @@ document.addEventListener("click", (event) => {
     localStorage.removeItem(`gabay-profile:${userId}`);
     renderScreen("profile");
     showStatus(t("localProfileDeleted"));
+    return;
+  }
+  if (action === "prototype-voice") {
+    showStatus(t("voicePrototype"));
+    return;
+  }
+  if (action === "prototype-photo") {
+    showStatus(t("photoPrototype"));
     return;
   }
   navigate(action);
@@ -783,6 +888,7 @@ if (auth) {
     if (!user) return;
     userName = user.displayName || user.email || "";
     userId = user.uid || user.email || "signed-in-user";
+    document.getElementById("avatar-initial").textContent = userName.trim().charAt(0).toUpperCase() || "G";
     renderScreen("dashboard");
     if (!localStorage.getItem(`gabay-disclaimer-accepted:${userId}`)) {
       dialog.showModal();
