@@ -13,8 +13,8 @@ const copy = {
     loading: "Loading your private space...",
     welcomeEyebrow: "Practical support for Filipino workers abroad",
     welcomeTitle: "Is your work following your contract?",
-    welcomeBody: "Answer a few questions. We show you what does not match, and who to call.",
-    welcomeStepOne: "Answer one question at a time",
+    welcomeBody: "Talk to us about what is happening. We will help you see what may not match and who you can call.",
+    welcomeStepOne: "Talk to us in your own words",
     welcomeStepTwo: "See what may not match",
     welcomeStepThree: "Find the right person to call",
     signIn: "Continue with Google",
@@ -47,7 +47,7 @@ const copy = {
     contractCta: "Start Contract Check",
     crisisKicker: "Short, calm, and direct",
     crisisTitle: "Crisis Help",
-    crisisBody: "Answer a few questions and get routed to the right official support.",
+    crisisBody: "Tell us what is happening and we will connect you with the right official support.",
     crisisCta: "Get help now",
     contractTime: "About five minutes",
     crisisTime: "Straight to the right number",
@@ -57,21 +57,22 @@ const copy = {
     privacyBody: "This preview does not save conversations. Stored Crisis Sessions are designed to expire automatically.",
     backDashboard: "Back to dashboard",
     contractIntroTitle: "Start with what changed",
-    contractIntroBody: "Describe one concern at a time. You can use English, Tagalog, Taglish, or Bisaya.",
-    contractPrompt: "What does your contract say, and what is actually happening?",
+    contractIntroBody: "Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya.",
+    contractPrompt: "Talk to us about what your contract says and what is actually happening.",
     contractPlaceholder: "Example: My contract says one rest day each week, but I have worked every day this month.",
     continue: "Continue",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    initialProgress: "1 of 9",
     progress: "4 of 9",
     savedProgress: "Saved. You can close and come back.",
-    conversationHint: "One question at a time. You can answer in your own words.",
-    typeAnswer: "Or type it",
-    voiceInput: "Answer by voice",
+    conversationHint: "Take your time. Talk to us in your own words.",
+    typeAnswer: "Type your message",
+    voiceInput: "Use voice",
     photoContract: "Photograph my contract",
     voicePrototype: "Voice input is a prototype for now. Nothing is being recorded.",
     photoPrototype: "Contract photography is a prototype for now. Nothing was opened or uploaded.",
-    sampleAssistant: "Salamat. To understand clearly, does your contract state that overtime or work on your rest day should be paid?",
+    sampleAssistant: "Salamat. Tell us whether your contract says overtime or work on your rest day should be paid.",
     sampleUser: "Yes, it says overtime should be paid, but I have not received overtime pay.",
     viewReport: "View sample Findings Report",
     findingsTitle: "Two of these are serious.",
@@ -88,7 +89,7 @@ const copy = {
     done: "Done",
     crisisStep: "Crisis Help",
     crisisQuestionTitle: "Are you in physical danger right now?",
-    crisisQuestionBody: "Choose the closest answer. We will give contact information without asking for unnecessary details.",
+    crisisQuestionBody: "Choose what feels closest to your situation. We will give contact information without asking for details we do not need.",
     dangerYes: "Yes, or I cannot leave safely",
     dangerNo: "No, I can safely use my phone",
     countryTitle: "Which country are you in?",
@@ -128,8 +129,8 @@ const copy = {
     loading: "Binubuksan ang iyong pribadong espasyo...",
     welcomeEyebrow: "Praktikal na suporta para sa Pilipinong manggagawa sa abroad",
     welcomeTitle: "Sinusunod ba ng trabaho mo ang kontrata?",
-    welcomeBody: "Sagutin ang ilang tanong. Ipapakita namin ang hindi tugma at kung sino ang tatawagan.",
-    welcomeStepOne: "Sagutin ang isang tanong bawat pagkakataon",
+    welcomeBody: "Kuwento mo sa amin ang nangyayari. Tutulungan ka naming makita ang posibleng hindi tugma at kung sino ang puwedeng tawagan.",
+    welcomeStepOne: "Magkuwento sa sarili mong salita",
     welcomeStepTwo: "Tingnan ang posibleng hindi tugma",
     welcomeStepThree: "Hanapin ang tamang taong tatawagan",
     signIn: "Magpatuloy gamit ang Google",
@@ -162,7 +163,7 @@ const copy = {
     contractCta: "Simulan ang Contract Check",
     crisisKicker: "Maikli, kalmado, at direkta",
     crisisTitle: "Crisis Help",
-    crisisBody: "Sagutin ang ilang tanong at ituturo ka sa tamang opisyal na suporta.",
+    crisisBody: "Kuwento mo ang nangyayari at ituturo ka namin sa tamang opisyal na suporta.",
     crisisCta: "Humingi ng tulong",
     contractTime: "Mga limang minuto",
     crisisTime: "Diretso sa tamang numero",
@@ -172,21 +173,22 @@ const copy = {
     privacyBody: "Hindi sine-save ng preview na ito ang usapan. Dinisenyong awtomatikong mabura ang stored Crisis Sessions.",
     backDashboard: "Bumalik sa dashboard",
     contractIntroTitle: "Magsimula sa nagbago",
-    contractIntroBody: "Isang concern muna. Puwede ang English, Tagalog, Taglish, o Bisaya.",
-    contractPrompt: "Ano ang nasa kontrata, at ano ang aktuwal na nangyayari?",
+    contractIntroBody: "Kuwento mo sa amin ang nangyayari. Puwede ang English, Tagalog, Taglish, o Bisaya.",
+    contractPrompt: "Kuwento mo kung ano ang nasa kontrata at kung ano ang aktuwal na nangyayari.",
     contractPlaceholder: "Halimbawa: May isang rest day bawat linggo sa kontrata, pero araw-araw akong nagtatrabaho ngayong buwan.",
     continue: "Magpatuloy",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    initialProgress: "1 sa 9",
     progress: "4 sa 9",
     savedProgress: "Naka-save. Puwede kang bumalik mamaya.",
-    conversationHint: "Isang tanong bawat pagkakataon. Sumagot sa sarili mong salita.",
-    typeAnswer: "O i-type ito",
-    voiceInput: "Sumagot gamit ang boses",
+    conversationHint: "Dahan-dahan lang. Magkuwento sa sarili mong salita.",
+    typeAnswer: "I-type ang mensahe",
+    voiceInput: "Gamitin ang boses",
     photoContract: "Kunan ng litrato ang kontrata",
     voicePrototype: "Prototype pa ang voice input. Walang nire-record.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera o upload na binuksan.",
-    sampleAssistant: "Salamat. Nakasaad ba sa kontrata na dapat bayaran ang overtime o trabaho sa rest day?",
+    sampleAssistant: "Salamat. Kuwento mo kung nakasaad sa kontrata na dapat bayaran ang overtime o trabaho sa rest day.",
     sampleUser: "Oo, dapat bayad ang overtime, pero wala akong natatanggap na overtime pay.",
     viewReport: "Tingnan ang sample Findings Report",
     findingsTitle: "Dalawa rito ay seryoso.",
@@ -203,7 +205,7 @@ const copy = {
     done: "Tapos",
     crisisStep: "Crisis Help",
     crisisQuestionTitle: "Nasa pisikal na panganib ka ba ngayon?",
-    crisisQuestionBody: "Piliin ang pinakamalapit na sagot. Ibibigay agad ang contact information nang hindi humihingi ng di-kailangang detalye.",
+    crisisQuestionBody: "Piliin ang pinakamalapit sa sitwasyon mo. Ibibigay agad ang contact information nang hindi humihingi ng detalyeng hindi kailangan.",
     dangerYes: "Oo, o hindi ako ligtas na makaalis",
     dangerNo: "Hindi, ligtas kong magagamit ang phone",
     countryTitle: "Saang bansa ka naroon?",
@@ -243,8 +245,8 @@ const copy = {
     loading: "Binubuksan ang private space mo...",
     welcomeEyebrow: "Practical support para sa Filipino workers abroad",
     welcomeTitle: "Following ba ng work mo ang contract?",
-    welcomeBody: "Answer a few questions. Ipapakita namin ang hindi match at kung sino ang tatawagan.",
-    welcomeStepOne: "Answer one question at a time",
+    welcomeBody: "Tell us what's happening. Tutulungan ka naming makita ang hindi match at kung sino ang puwedeng tawagan.",
+    welcomeStepOne: "Tell us in your own words",
     welcomeStepTwo: "See what may not match",
     welcomeStepThree: "Find the right person to call",
     signIn: "Continue with Google",
@@ -277,7 +279,7 @@ const copy = {
     contractCta: "Start Contract Check",
     crisisKicker: "Short, calm, and direct",
     crisisTitle: "Crisis Help",
-    crisisBody: "Answer a few questions para ma-route sa tamang official support.",
+    crisisBody: "Tell us what's happening para ma-connect ka sa tamang official support.",
     crisisCta: "Get help now",
     contractTime: "About five minutes",
     crisisTime: "Straight to the right number",
@@ -287,21 +289,22 @@ const copy = {
     privacyBody: "Hindi nagsa-save ng conversations ang preview. Designed to expire automatically ang stored Crisis Sessions.",
     backDashboard: "Back to dashboard",
     contractIntroTitle: "Start with what changed",
-    contractIntroBody: "One concern at a time. Puwede ang English, Tagalog, Taglish, or Bisaya.",
-    contractPrompt: "Ano ang nasa contract, at ano ang actual na nangyayari?",
+    contractIntroBody: "Tell us what's happening. Puwede ang English, Tagalog, Taglish, or Bisaya.",
+    contractPrompt: "Tell us what your contract says and what's actually happening.",
     contractPlaceholder: "Example: One rest day weekly ang contract, pero everyday akong working this month.",
     continue: "Continue",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    initialProgress: "1 of 9",
     progress: "4 of 9",
     savedProgress: "Saved. Puwede kang bumalik mamaya.",
-    conversationHint: "One question at a time. Answer in your own words.",
-    typeAnswer: "Or type it",
-    voiceInput: "Answer by voice",
+    conversationHint: "Take your time. Tell us in your own words.",
+    typeAnswer: "Type your message",
+    voiceInput: "Use voice",
     photoContract: "Photograph my contract",
     voicePrototype: "Prototype pa ang voice input. Nothing is being recorded.",
     photoPrototype: "Prototype pa ang contract photo. Walang camera or upload na binuksan.",
-    sampleAssistant: "Salamat. Nakalagay ba sa contract na paid ang overtime or work on rest day?",
+    sampleAssistant: "Salamat. Tell us kung nakalagay sa contract na paid ang overtime or work on rest day.",
     sampleUser: "Yes, paid dapat ang overtime, pero wala akong overtime pay.",
     viewReport: "View sample Findings Report",
     findingsTitle: "Two of these are serious.",
@@ -318,7 +321,7 @@ const copy = {
     done: "Done",
     crisisStep: "Crisis Help",
     crisisQuestionTitle: "Nasa physical danger ka ba ngayon?",
-    crisisQuestionBody: "Choose the closest answer. Ibibigay agad ang contact details without unnecessary questions.",
+    crisisQuestionBody: "Choose what feels closest sa situation mo. Ibibigay agad ang contact details without asking for details we do not need.",
     dangerYes: "Yes, or hindi ako safe na makaalis",
     dangerNo: "No, safe kong magagamit ang phone",
     countryTitle: "Which country are you in?",
@@ -358,8 +361,8 @@ const copy = {
     loading: "Giablihan ang imong pribadong luna...",
     welcomeEyebrow: "Praktikal nga suporta para sa Pilipinong trabahante sa abroad",
     welcomeTitle: "Nagsunod ba ang imong trabaho sa kontrata?",
-    welcomeBody: "Tubaga ang pipila ka pangutana. Ipakita namo ang dili motakdo ug kinsa ang tawagan.",
-    welcomeStepOne: "Tubaga ang usa ka pangutana matag higayon",
+    welcomeBody: "Isulti kanamo unsay nahitabo. Tabangan ka namo nga makita ang posibleng dili motakdo ug kinsa ang tawagan.",
+    welcomeStepOne: "Isulti sa imong kaugalingong mga pulong",
     welcomeStepTwo: "Tan-awa ang posibleng dili motakdo",
     welcomeStepThree: "Pangitaa ang hustong tawagan",
     signIn: "Padayon gamit ang Google",
@@ -392,7 +395,7 @@ const copy = {
     contractCta: "Sugdi ang Contract Check",
     crisisKicker: "Mubo, kalmado, ug direkta",
     crisisTitle: "Crisis Help",
-    crisisBody: "Tubaga ang pipila ka pangutana ug itudlo ka sa hustong opisyal nga suporta.",
+    crisisBody: "Isulti unsay nahitabo ug itudlo ka namo sa hustong opisyal nga suporta.",
     crisisCta: "Pangayo og tabang",
     contractTime: "Mga lima ka minuto",
     crisisTime: "Diretso sa hustong numero",
@@ -402,21 +405,22 @@ const copy = {
     privacyBody: "Dili i-save sa preview ang panag-istorya. Gidisenyo nga awtomatikong mapapas ang stored Crisis Sessions.",
     backDashboard: "Balik sa dashboard",
     contractIntroTitle: "Sugdi sa nausab",
-    contractIntroBody: "Usa ka concern matag higayon. Puwede English, Tagalog, Taglish, o Bisaya.",
-    contractPrompt: "Unsa ang giingon sa kontrata, ug unsa ang aktuwal nga nahitabo?",
+    contractIntroBody: "Isulti kanamo unsay nahitabo. Puwede English, Tagalog, Taglish, o Bisaya.",
+    contractPrompt: "Isulti kanamo unsay giingon sa kontrata ug unsay aktuwal nga nahitabo.",
     contractPlaceholder: "Pananglitan: Usa ka rest day kada semana ang kontrata, pero adlaw-adlaw ko nagtrabaho karong buwana.",
     continue: "Padayon",
     contractStep: "Contract Check",
     interviewerName: "Gabay Interviewer",
+    initialProgress: "1 sa 9",
     progress: "4 sa 9",
     savedProgress: "Na-save. Makabalik ka unya.",
-    conversationHint: "Usa ka pangutana matag higayon. Tubag sa imong kaugalingong pulong.",
-    typeAnswer: "O i-type kini",
-    voiceInput: "Tubag gamit ang tingog",
+    conversationHint: "Ayaw pagdali. Isulti sa imong kaugalingong mga pulong.",
+    typeAnswer: "I-type ang mensahe",
+    voiceInput: "Gamita ang tingog",
     photoContract: "Litrati ang akong kontrata",
     voicePrototype: "Prototype pa ang voice input. Walay gi-record.",
     photoPrototype: "Prototype pa ang contract photo. Walay camera o upload nga giablihan.",
-    sampleAssistant: "Salamat. Naa ba sa kontrata nga bayran ang overtime o trabaho sa rest day?",
+    sampleAssistant: "Salamat. Isulti kung naa sa kontrata nga bayran ang overtime o trabaho sa rest day.",
     sampleUser: "Oo, bayran unta ang overtime, pero wala koy nadawat nga overtime pay.",
     viewReport: "Tan-awa ang sample Findings Report",
     findingsTitle: "Duha niini seryoso.",
@@ -433,7 +437,7 @@ const copy = {
     done: "Human",
     crisisStep: "Crisis Help",
     crisisQuestionTitle: "Naa ka ba sa pisikal nga peligro karon?",
-    crisisQuestionBody: "Pilia ang pinakaduol nga tubag. Ihatag dayon ang contact information nga walay dili kinahanglan nga pangutana.",
+    crisisQuestionBody: "Pilia ang labing duol sa imong kahimtang. Ihatag dayon ang contact information nga dili mangayo og detalye nga wala namo kinahanglana.",
     dangerYes: "Oo, o dili ko luwas nga makagawas",
     dangerNo: "Dili, luwas nakong magamit ang phone",
     countryTitle: "Asang nasod ka karon?",
@@ -536,7 +540,7 @@ function dashboardTemplate() {
         <p>${t("dashboardBody")}</p>
       </header>
       <div class="mode-grid">
-        <button class="mode-card" type="button" data-action="contract-intro">
+        <button class="mode-card" type="button" data-action="contract-chat">
           <span class="mode-icon" aria-hidden="true"></span>
           <span>
             <h2>${t("contractTitle")}</h2>
@@ -574,52 +578,42 @@ function flowNav(label) {
 }
 
 function progressTemplate() {
-  return `<div class="progress-wrap" aria-label="${escapeHtml(t("progress"))}">
+  const completed = contractDraft ? 4 : 1;
+  const label = t(contractDraft ? "progress" : "initialProgress");
+  return `<div class="progress-wrap" aria-label="${escapeHtml(label)}">
     <div class="progress-track" aria-hidden="true">
-      ${Array.from({ length: 9 }, (_, index) => `<span${index < 4 ? ' class="complete"' : ""}></span>`).join("")}
+      ${Array.from({ length: 9 }, (_, index) => `<span${index < completed ? ' class="complete"' : ""}></span>`).join("")}
     </div>
-    <span class="progress-text">${t("progress")}</span>
+    <span class="progress-text">${label}</span>
   </div>`;
 }
 
-function contractIntroTemplate() {
-  return `<section class="flow-shell">
-    ${flowNav(t("contractStep"))}
-    ${progressTemplate()}
-    <form class="question-card" data-form="contract-intro">
-      <h1>${t("contractIntroTitle")}</h1>
-      <p>${t("contractIntroBody")}</p>
-      <div class="field">
-        <label for="contract-message">${t("contractPrompt")}</label>
-        <textarea id="contract-message" required maxlength="4000" placeholder="${escapeHtml(t("contractPlaceholder"))}">${escapeHtml(contractDraft)}</textarea>
-      </div>
-      <button class="button ink-button" type="submit">${t("continue")}</button>
-    </form>
-  </section>`;
-}
-
 function contractChatTemplate() {
+  const hasStarted = Boolean(contractDraft);
   return `<section class="flow-shell">
     ${flowNav(t("contractStep"))}
     ${progressTemplate()}
-    <p class="saved-note">${t("savedProgress")}</p>
     <div class="conversation-layout">
       <div class="conversation-main">
         <div class="chat-thread" aria-live="polite">
-          <div class="message user">${escapeHtml(contractDraft || t("contractPlaceholder"))}</div>
-          <div class="message assistant">${t("sampleAssistant")}</div>
-          <div class="message user">${t("sampleUser")}</div>
+          ${hasStarted
+            ? `<div class="message user">${escapeHtml(contractDraft)}</div>
+               <div class="message assistant">${t("sampleAssistant")}</div>`
+            : `<div class="message assistant">
+                 <p>${t("contractIntroBody")}</p>
+                 <p><strong>${t("contractPrompt")}</strong></p>
+               </div>`}
         </div>
-        <div class="composer">
+        <form class="composer" data-form="contract-chat">
           <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">●</button>
           <div class="composer-stack">
             <div class="composer-input">
-              <span>${t("typeAnswer")}</span>
-              <button class="send-button" type="button" data-action="findings" aria-label="${escapeHtml(t("viewReport"))}">↑</button>
+              <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
+              <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
             </div>
             <button class="photo-button" type="button" data-action="prototype-photo">${t("photoContract")}</button>
           </div>
-        </div>
+        </form>
       </div>
       <aside class="conversation-aside">${t("conversationHint")}</aside>
     </div>
@@ -760,7 +754,6 @@ function profileTemplate() {
 
 const templates = {
   dashboard: dashboardTemplate,
-  "contract-intro": contractIntroTemplate,
   "contract-chat": contractChatTemplate,
   findings: findingsTemplate,
   crisis: crisisQuestionTemplate,
@@ -826,9 +819,13 @@ document.addEventListener("submit", (event) => {
   const form = event.target;
   if (!form.dataset.form) return;
   event.preventDefault();
-  if (form.dataset.form === "contract-intro") {
-    contractDraft = document.getElementById("contract-message").value.trim();
-    navigate("contract-chat");
+  if (form.dataset.form === "contract-chat") {
+    if (contractDraft) {
+      navigate("findings");
+    } else {
+      contractDraft = document.getElementById("contract-message").value.trim();
+      renderScreen("contract-chat");
+    }
   } else if (form.dataset.form === "crisis-country") {
     crisisCountry = document.getElementById("crisis-country").value;
     navigate("crisis-situation");
