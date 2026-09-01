@@ -23,6 +23,10 @@ strict Claims/Findings schemas, deterministic routing, and a custom
 Firestore-backed SessionService proven through canned-model HTTP tests. Real
 Gemini and UI wiring land in issue #5.
 
+App shell (issue #4): responsive signed-in dashboard, four-language copy,
+static click-throughs for both Modes, Findings Report styles, first-run service
+limits, optional profile, and a globally available Crisis Help entry.
+
 Live: https://gabay-ofw-417534361115.asia-southeast1.run.app
 
 ## Stack

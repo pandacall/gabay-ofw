@@ -1,162 +1,93 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Gabay OFW</title>
-<style>
-  :root { color-scheme: light; }
-  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 3rem auto; padding: 0 1rem; color: #1a2233; }
-  h1 { font-size: 1.6rem; }
-  .muted { color: #667; font-size: .9rem; }
-  button { font-size: 1rem; padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid #ccd; background: #fff; cursor: pointer; margin: .25rem .4rem .25rem 0; }
-  button.primary { background: #1a56db; color: #fff; border-color: #1a56db; }
-  #lang-toggle { float: right; font-size: .85rem; padding: .3rem .7rem; }
-  #status { margin: 1rem 0; padding: .6rem .8rem; background: #f3f5f9; border-radius: 8px; }
-  textarea { width: 100%; min-height: 70px; margin-top: .5rem; }
-  ul#notes { padding-left: 1.2rem; }
-  .hidden { display: none; }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b5d4b">
+  <title>Gabay OFW</title>
+  <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<button id="lang-toggle"></button>
-<h1 data-copy="title"></h1>
-<p class="muted" data-copy="disclaimer"></p>
+  <div id="auth-loading" class="centered-state" aria-live="polite">
+    <div class="shell-skeleton" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+    <p data-copy="loading"></p>
+  </div>
 
-<div id="status"></div>
+  <main id="signed-out" class="auth-page hidden">
+    <section class="welcome-panel">
+      <div class="welcome-nav">
+        <a class="brand" href="/" data-copy-aria="homeLabel">
+          <span class="brand-mark">G</span>
+          <span>Gabay OFW</span>
+        </a>
+        <label class="language-control">
+          <span class="sr-only" data-copy="languageLabel"></span>
+          <select class="language-select" data-copy-aria="languageLabel"></select>
+        </label>
+      </div>
+      <div class="welcome-copy">
+        <p class="eyebrow" data-copy="welcomeEyebrow"></p>
+        <h1 data-copy="welcomeTitle"></h1>
+        <p class="lead" data-copy="welcomeBody"></p>
+        <button class="button primary" id="signin" type="button" data-copy="signIn"></button>
+        <p class="fine-print" data-copy="privacyNote"></p>
+      </div>
+    </section>
+    <aside class="welcome-context" data-copy-aria="serviceOverview">
+      <div>
+        <p class="context-number">1348</p>
+        <p data-copy="owwaAlways"></p>
+      </div>
+    </aside>
+  </main>
 
-<div id="signed-out" class="hidden">
-  <button class="primary" id="signin" data-copy="signIn"></button>
-</div>
+  <div id="signed-in" class="app hidden">
+    <header class="topbar">
+      <button class="brand brand-button" type="button" data-action="dashboard">
+        <span class="brand-mark">G</span>
+        <span>Gabay OFW</span>
+      </button>
+      <nav class="topbar-actions" data-copy-aria="accountControls">
+        <label class="language-control">
+          <span class="sr-only" data-copy="languageLabel"></span>
+          <select class="language-select" data-copy-aria="languageLabel"></select>
+        </label>
+        <button class="button quiet" type="button" data-action="profile" data-copy="profile"></button>
+        <button class="button quiet" id="signout" type="button" data-copy="signOut"></button>
+      </nav>
+    </header>
 
-<div id="signed-in" class="hidden">
-  <button id="signout" data-copy="signOut"></button>
-  <h2 data-copy="notesHeading"></h2>
-  <textarea id="note-text"></textarea>
-  <br>
-  <button class="primary" id="save" data-copy="save"></button>
-  <button id="refresh" data-copy="refresh"></button>
-  <ul id="notes"></ul>
-</div>
+    <div id="screen-loading" class="screen-loading hidden" aria-live="polite">
+      <div class="content-skeleton" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </div>
+      <p data-copy="loading"></p>
+    </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    <main id="screen" tabindex="-1"></main>
 
-// UI copy keyed by language (prototype pattern) — no hardcoded English-only strings.
-const copy = {
-  en: {
-    title: "Gabay OFW — walking skeleton",
-    disclaimer: "Guidance for OFWs. Not legal advice, not an emergency service. This page proves auth + user-isolated storage end to end.",
-    signIn: "Sign in with Google",
-    signOut: "Sign out",
-    notesHeading: "Your private notes",
-    notePlaceholder: "Write a test note…",
-    save: "Save note",
-    refresh: "Refresh",
-    loading: "Loading…",
-    signedOut: "Signed out.",
-    signedInAs: (name) => `Signed in as ${name}`,
-    signInFailed: (msg) => `Sign-in failed: ${msg}`,
-    notConfigured: "Server is not configured with a Firebase web config yet.",
-    langToggle: "Tagalog",
-  },
-  tl: {
-    title: "Gabay OFW — panimulang balangkas",
-    disclaimer: "Gabay para sa mga OFW. Hindi ito legal na payo at hindi serbisyong pang-emergency. Pinapatunayan ng pahinang ito ang sign-in at pribadong imbakan.",
-    signIn: "Mag-sign in gamit ang Google",
-    signOut: "Mag-sign out",
-    notesHeading: "Ang iyong mga pribadong tala",
-    notePlaceholder: "Sumulat ng pansubok na tala…",
-    save: "I-save ang tala",
-    refresh: "I-refresh",
-    loading: "Naglo-load…",
-    signedOut: "Naka-sign out.",
-    signedInAs: (name) => `Naka-sign in bilang ${name}`,
-    signInFailed: (msg) => `Hindi nagtagumpay ang pag-sign in: ${msg}`,
-    notConfigured: "Hindi pa naka-configure ang server ng Firebase web config.",
-    langToggle: "English",
-  },
-};
+    <button id="global-help" class="global-help" type="button" data-action="crisis" data-copy="needHelp"></button>
+  </div>
 
-let lang = localStorage.getItem("gabay-lang") || "en";
-const t = (key, ...args) => {
-  const entry = copy[lang][key];
-  return typeof entry === "function" ? entry(...args) : entry;
-};
+  <dialog id="first-run-dialog" class="disclaimer-dialog">
+    <form method="dialog">
+      <div class="dialog-mark">G</div>
+      <h2 data-copy="disclaimerTitle"></h2>
+      <p data-copy="disclaimerBody"></p>
+      <div class="notice-list">
+        <p><strong data-copy="notLegalTitle"></strong> <span data-copy="notLegalBody"></span></p>
+        <p><strong data-copy="notEmergencyTitle"></strong> <span data-copy="notEmergencyBody"></span></p>
+      </div>
+      <div class="dialog-actions">
+        <button class="button primary full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
+        <button class="button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
+      </div>
+    </form>
+  </dialog>
 
-const statusEl = document.getElementById("status");
-const show = (id, on) => document.getElementById(id).classList.toggle("hidden", !on);
-let statusKey = ["loading"];
-
-function render() {
-  document.documentElement.lang = lang;
-  for (const el of document.querySelectorAll("[data-copy]")) {
-    el.textContent = t(el.dataset.copy);
-  }
-  document.getElementById("note-text").placeholder = t("notePlaceholder");
-  document.getElementById("lang-toggle").textContent = t("langToggle");
-  statusEl.textContent = t(...statusKey);
-}
-
-function setStatus(...keyAndArgs) {
-  statusKey = keyAndArgs;
-  statusEl.textContent = t(...statusKey);
-}
-
-document.getElementById("lang-toggle").onclick = () => {
-  lang = lang === "en" ? "tl" : "en";
-  localStorage.setItem("gabay-lang", lang);
-  render();
-};
-render();
-
-const cfgResp = await fetch("/api/firebase-config");
-if (!cfgResp.ok) {
-  setStatus("notConfigured");
-  throw new Error("no firebase config");
-}
-const auth = getAuth(initializeApp(await cfgResp.json()));
-
-async function api(path, options = {}) {
-  const token = await auth.currentUser.getIdToken();
-  const resp = await fetch(path, {
-    ...options,
-    headers: { ...options.headers, "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-  });
-  if (!resp.ok) throw new Error(`API ${path} failed: ${resp.status}`);
-  return resp.json();
-}
-
-async function refreshNotes() {
-  const { notes } = await api("/api/notes");
-  const ul = document.getElementById("notes");
-  ul.replaceChildren(...notes.map(n => Object.assign(document.createElement("li"), { textContent: n.text })));
-}
-
-document.getElementById("signin").onclick = () =>
-  signInWithPopup(auth, new GoogleAuthProvider()).catch(e => setStatus("signInFailed", e.message));
-document.getElementById("signout").onclick = () => signOut(auth);
-document.getElementById("save").onclick = async () => {
-  const text = document.getElementById("note-text").value.trim();
-  if (!text) return;
-  await api("/api/notes", { method: "POST", body: JSON.stringify({ text }) });
-  document.getElementById("note-text").value = "";
-  await refreshNotes();
-};
-document.getElementById("refresh").onclick = refreshNotes;
-
-onAuthStateChanged(auth, async (user) => {
-  show("signed-in", !!user);
-  show("signed-out", !user);
-  if (user) {
-    setStatus("signedInAs", user.displayName || user.email);
-    await refreshNotes().catch(() => {});
-  } else {
-    setStatus("signedOut");
-  }
-});
-</script>
+  <div id="status" class="toast hidden" role="status" aria-live="polite"></div>
+  <script type="module" src="/static/app.js"></script>
 </body>
 </html>
