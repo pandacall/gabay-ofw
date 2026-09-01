@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project gabay-ofw-rules-test \"node node_modules/mocha/bin/mocha.js --timeout 20000 firestore.rules.test.mjs\""
+    "test": "firebase emulators:exec --only firestore --project gabay-ofw-rules-test \"node node_modules/mocha/bin/mocha.js --timeout 20000 firestore.rules.test.mjs\"",
+    "test:contract-check": "firebase emulators:exec --only firestore --project gabay-ofw-rules-test \"python -m pytest ../tests/test_contract_check_firestore.py --quiet\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",
