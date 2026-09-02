@@ -345,6 +345,159 @@ const copy = {
   },
 };
 
+Object.assign(copy.en, {
+  howItWorks: "How it works",
+  privacyLink: "Your privacy",
+  callOwwa: "Call OWWA 1348",
+  startNow: "Start now",
+  signInBody: "Signing in keeps your conversation private to you. Nobody at your work is told.",
+  signIn: "Sign in with Google",
+  trustFree: "Free",
+  trustPrivate: "Private to you",
+  trustNoAds: "No ads",
+  dangerTonight: "In danger tonight? Call OWWA, any hour. Free from any phone.",
+  greeting: (name) => `${name}, what do you need?`,
+  dashboardBody: "Choose where to begin. You can move between both kinds of support at any time.",
+  contractTitle: "Check my contract",
+  contractBody: "A calm conversation about your hours, pay, rest days, and papers. Stop and come back whenever you like.",
+  contractCta: "Start talking",
+  crisisTitle: "I need help now",
+  crisisBody: "Tell us what is happening, then see the numbers that can help tonight.",
+  topicPrompt: "Or start with what is happening",
+  topicPassport: "They keep my passport",
+  topicPay: "I am not paid",
+  topicRest: "No rest day",
+  topicLeave: "I cannot go out",
+  switchAnytime: "You can move between the two at any time.",
+  currentTopic: "Now talking about your contract and work",
+  summaryTitle: "What you have told us",
+  summaryConcern: "Your concern",
+  summaryActive: "Talking now",
+  summaryEdit: "Anything here can be changed before we make your list.",
+  verifyTitle: "Verify the details",
+  verifyRule: "Bring this list to DMW, OWWA, or a licensed lawyer. They decide, not Gabay OFW.",
+  resultCount: (current, total) => `${current} of ${total}`,
+  youSaid: "You said",
+  contractSays: "Standard contract",
+  restDaySaid: "You said you work every day.",
+  restDayContract: "Standard contracts include a weekly rest day.",
+  overtimeSaid: "You said overtime has not been paid.",
+  overtimeContract: "Extra hours should be paid under the applicable contract.",
+  recordsSaid: "Your records can support what you shared.",
+  recordsContract: "Keep copies only where it is safe.",
+  verifySaid: "This list reflects only what you told us.",
+  verifyContract: "An official adviser can verify each item.",
+  takeToPerson: "Take this to a person",
+  takeToPersonBody: "We will show you OWWA, the Actionline, and the official Migrant Workers Office directory.",
+  saveCopy: "Save a copy",
+  readToMe: "Read it to me",
+  reportPrivacy: "This list is built only from what you told us. It is not a legal decision, and nothing has been sent anywhere.",
+  savePrototype: "Saving a report is a prototype for now. Nothing was downloaded.",
+  readPrototype: "Read-aloud is a prototype for now. No audio was started.",
+});
+
+Object.assign(copy.tl, {
+  howItWorks: "Paano ito gumagana",
+  privacyLink: "Ang privacy mo",
+  callOwwa: "Tumawag sa OWWA 1348",
+  startNow: "Magsimula",
+  signInBody: "Ang pag-sign in ay nagpapanatiling pribado sa iyo ang usapan. Walang sasabihin sa pinagtatrabahuhan mo.",
+  signIn: "Mag-sign in gamit ang Google",
+  trustFree: "Libre",
+  trustPrivate: "Pribado sa iyo",
+  trustNoAds: "Walang ads",
+  dangerTonight: "Nasa panganib ngayong gabi? Tumawag sa OWWA anumang oras. Libre mula sa kahit anong telepono.",
+  greeting: (name) => `${name}, ano ang kailangan mo?`,
+  dashboardBody: "Piliin kung saan magsisimula. Puwede kang lumipat sa dalawang uri ng suporta anumang oras.",
+  contractTitle: "Suriin ang kontrata ko",
+  contractBody: "Isang kalmadong usapan tungkol sa oras, sahod, rest day, at papeles mo. Huminto at bumalik anumang oras.",
+  contractCta: "Magsimulang magkuwento",
+  crisisTitle: "Kailangan ko ng tulong ngayon",
+  crisisBody: "Kuwento mo ang nangyayari, pagkatapos ay tingnan ang mga numerong makakatulong ngayong gabi.",
+  topicPrompt: "O magsimula sa nangyayari",
+  topicPassport: "Hawak nila ang passport ko",
+  topicPay: "Hindi ako binabayaran",
+  topicRest: "Walang rest day",
+  topicLeave: "Hindi ako makalabas",
+  switchAnytime: "Puwede kang lumipat sa dalawa anumang oras.",
+  currentTopic: "Pinag-uusapan ngayon ang kontrata at trabaho mo",
+  summaryTitle: "Ang naikuwento mo",
+  summaryConcern: "Concern mo",
+  summaryActive: "Pinag-uusapan ngayon",
+  summaryEdit: "Puwedeng baguhin ang anumang narito bago namin buuin ang listahan mo.",
+  verifyTitle: "Ipa-verify ang detalye",
+  verifyRule: "Dalhin ang listahang ito sa DMW, OWWA, o lisensiyadong abogado. Sila ang magpapasya, hindi ang Gabay OFW.",
+  resultCount: (current, total) => `${current} sa ${total}`,
+  youSaid: "Sinabi mo",
+  contractSays: "Standard contract",
+  restDaySaid: "Sinabi mong araw-araw kang nagtatrabaho.",
+  restDayContract: "May lingguhang rest day sa standard contracts.",
+  overtimeSaid: "Sinabi mong hindi binayaran ang overtime.",
+  overtimeContract: "Dapat bayaran ang extra hours ayon sa naaangkop na kontrata.",
+  recordsSaid: "Makakatulong ang records sa naikuwento mo.",
+  recordsContract: "Magtago lamang ng kopya kung ligtas.",
+  verifySaid: "Ang listahang ito ay mula lamang sa sinabi mo.",
+  verifyContract: "Maaaring i-verify ng opisyal na adviser ang bawat item.",
+  takeToPerson: "Dalhin ito sa isang tao",
+  takeToPersonBody: "Ipapakita namin ang OWWA, Actionline, at opisyal na Migrant Workers Office directory.",
+  saveCopy: "Mag-save ng kopya",
+  readToMe: "Basahin sa akin",
+  reportPrivacy: "Mula lamang sa sinabi mo ang listahang ito. Hindi ito legal na desisyon, at walang ipinadala kahit saan.",
+  savePrototype: "Prototype pa ang pag-save ng report. Walang na-download.",
+  readPrototype: "Prototype pa ang pagbasa nang malakas. Walang audio na nagsimula.",
+});
+
+Object.assign(copy.ceb, {
+  howItWorks: "Giunsa kini pagtrabaho",
+  privacyLink: "Imong privacy",
+  callOwwa: "Tawag sa OWWA 1348",
+  startNow: "Pagsugod",
+  signInBody: "Ang pag-sign in magpabiling pribado sa imo ang panag-istorya. Walay sultihan sa imong trabaho.",
+  signIn: "Sign in gamit ang Google",
+  trustFree: "Libre",
+  trustPrivate: "Pribado sa imo",
+  trustNoAds: "Walay ads",
+  dangerTonight: "Naa sa peligro karong gabii? Tawag sa OWWA bisan unsang oras. Libre sa bisan unsang phone.",
+  greeting: (name) => `${name}, unsay imong kinahanglan?`,
+  dashboardBody: "Pilia asa magsugod. Makabalhin ka sa duha ka klase sa suporta bisan kanus-a.",
+  contractTitle: "Susiha ang akong kontrata",
+  contractBody: "Kalmadong panag-istorya bahin sa oras, sweldo, rest day, ug papeles. Hunong ug balik bisan kanus-a.",
+  contractCta: "Sugdi ang pag-istorya",
+  crisisTitle: "Kinahanglan ko og tabang karon",
+  crisisBody: "Isulti unsay nahitabo, dayon tan-awa ang mga numero nga makatabang karong gabii.",
+  topicPrompt: "O sugdi sa unsay nahitabo",
+  topicPassport: "Gikuptan nila akong passport",
+  topicPay: "Wala ko bayri",
+  topicRest: "Walay rest day",
+  topicLeave: "Dili ko makagawas",
+  switchAnytime: "Makabalhin ka sa duha bisan kanus-a.",
+  currentTopic: "Gihisgutan karon ang imong kontrata ug trabaho",
+  summaryTitle: "Ang imong gisulti",
+  summaryConcern: "Imong concern",
+  summaryActive: "Gihisgutan karon",
+  summaryEdit: "Mahimong usbon ang bisan unsa dinhi sa dili pa buhaton ang imong lista.",
+  verifyTitle: "Ipa-verify ang detalye",
+  verifyRule: "Dad-a kini sa DMW, OWWA, o lisensiyadong abogado. Sila ang mohukom, dili ang Gabay OFW.",
+  resultCount: (current, total) => `${current} sa ${total}`,
+  youSaid: "Imong gisulti",
+  contractSays: "Standard contract",
+  restDaySaid: "Miingon ka nga kada adlaw ka nagtrabaho.",
+  restDayContract: "Ang standard contracts adunay senemanang rest day.",
+  overtimeSaid: "Miingon ka nga wala bayri ang overtime.",
+  overtimeContract: "Ang extra hours kinahanglan bayran sumala sa angay nga kontrata.",
+  recordsSaid: "Makatabang ang records sa imong gisulti.",
+  recordsContract: "Tipigi lang ang kopya kung luwas.",
+  verifySaid: "Gikan lamang sa imong gisulti kining listaha.",
+  verifyContract: "Mahimong i-verify sa opisyal nga adviser ang matag item.",
+  takeToPerson: "Dad-a kini sa usa ka tawo",
+  takeToPersonBody: "Ipakita namo ang OWWA, Actionline, ug opisyal nga Migrant Workers Office directory.",
+  saveCopy: "I-save ang kopya",
+  readToMe: "Basaha para nako",
+  reportPrivacy: "Gikan lamang sa imong gisulti kining listaha. Dili kini legal nga desisyon, ug walay gipadala.",
+  savePrototype: "Prototype pa ang pag-save. Walay na-download.",
+  readPrototype: "Prototype pa ang read-aloud. Walay audio nga gisugdan.",
+});
+
 const screen = document.getElementById("screen");
 const screenLoading = document.getElementById("screen-loading");
 const app = document.getElementById("signed-in");
@@ -407,41 +560,47 @@ function renderLanguageOptions() {
 }
 
 function dashboardTemplate() {
+  const firstName = userName.split(" ")[0] || "friend";
   return `
-    <section>
-      <header class="screen-header">
-        <p class="user-greeting">${escapeHtml(t("greeting", userName))}</p>
-        <h1>${t("dashboardTitle")}</h1>
+    <section class="dashboard-shell">
+      <header class="dashboard-heading">
+        <h1>${escapeHtml(t("greeting", firstName))}</h1>
         <p>${t("dashboardBody")}</p>
       </header>
-      <div class="mode-grid">
-        <button class="mode-card" type="button" data-action="contract-chat">
-          <span class="mode-icon" aria-hidden="true"></span>
+      <div class="service-grid">
+        <button class="mode-card contract-card" type="button" data-action="contract-chat">
+          <svg class="service-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <rect x="11" y="7" width="26" height="34" rx="4"></rect>
+            <path d="M17 17h14M17 24h14M17 31h9"></path>
+          </svg>
           <span>
             <h2>${t("contractTitle")}</h2>
-            <p>${t("contractTime")}</p>
-            <span class="mode-cta">${t("contractCta")}</span>
+            <p>${t("contractBody")}</p>
+            <span class="mode-cta">${t("contractCta")} →</span>
           </span>
         </button>
         <button class="mode-card crisis-card" type="button" data-action="crisis">
-          <span class="mode-icon" aria-hidden="true"></span>
+          <svg class="service-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <circle cx="24" cy="24" r="18"></circle>
+            <path d="M18 16c1 8 6 13 14 16M19 14l5 7-4 3M34 29l-7-4-3 4"></path>
+          </svg>
           <span>
             <h2>${t("crisisTitle")}</h2>
-            <p>${t("crisisTime")}</p>
-            <span class="mode-cta">${t("crisisCta")}</span>
+            <p>${t("crisisBody")}</p>
+            <span class="mode-cta">${t("crisisCta")} →</span>
           </span>
         </button>
       </div>
-      <div class="dashboard-lower">
-        <section class="plain-section">
-          <h3>${t("recentTitle")}</h3>
-          <p class="empty-state">${t("recentEmpty")}</p>
-        </section>
-        <section class="plain-section">
-          <h3>${t("privacyTitle")}</h3>
-          <p>${t("privacyBody")}</p>
-        </section>
+      <div class="topic-starters">
+        <p>${t("topicPrompt")}</p>
+        <div class="topic-chips">
+          <button type="button" data-action="contract-chat">${t("topicPassport")}</button>
+          <button type="button" data-action="contract-chat">${t("topicPay")}</button>
+          <button type="button" data-action="contract-chat">${t("topicRest")}</button>
+          <button type="button" data-action="crisis">${t("topicLeave")}</button>
+        </div>
       </div>
+      <p class="switch-note"><span aria-hidden="true">↔</span> ${t("switchAnytime")}</p>
     </section>`;
 }
 
@@ -454,57 +613,87 @@ function flowNav(label) {
 
 function contractChatTemplate() {
   const hasStarted = contractMessages.length > 0;
-  return `<section class="flow-shell">
-    ${flowNav(t("contractStep"))}
-    <div class="conversation-layout">
-      <div class="conversation-main">
+  const userMessages = contractMessages.filter((message) => message.role === "user");
+  return `<section class="contract-workspace">
+    <div class="conversation-pane">
+      <div class="conversation-inner">
+        <p class="conversation-topic"><span aria-hidden="true">✦</span> ${t("currentTopic")}</p>
         <div class="chat-thread" aria-live="polite">
           ${hasStarted
             ? contractMessages.map((message) =>
                 `<div class="message ${message.role}">${escapeHtml(message.text)}</div>`,
               ).join("")
-            : `<div class="message assistant">
-                 <p>${t("contractIntroBody")}</p>
-                 <p><strong>${t("contractPrompt")}</strong></p>
-               </div>`}
+            : `<div class="message assistant">${t("contractPrompt")}</div>`}
         </div>
         <form class="composer" data-form="contract-chat">
-          <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">●</button>
-          <div class="composer-stack">
-            <div class="composer-input">
-              <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
-              <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
-            </div>
-            <button class="photo-button" type="button" data-action="prototype-photo">${t("photoContract")}</button>
-          </div>
+          <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">⌁</button>
+          <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
+          <button class="photo-button" type="button" data-action="prototype-photo" aria-label="${escapeHtml(t("photoContract"))}">▣</button>
+          <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
         </form>
+        <p class="composer-hint">${t("conversationHint")}</p>
       </div>
-      <aside class="conversation-aside">${t("conversationHint")}</aside>
     </div>
+    <aside class="conversation-summary">
+      <header>
+        <p class="eyebrow">${t("contractStep")}</p>
+        <h2>${t("summaryTitle")}</h2>
+      </header>
+      <article class="summary-card active">
+        <span>${t("summaryActive")}</span>
+        <strong>${t("contractTitle")}</strong>
+      </article>
+      ${userMessages.map((message) => `
+        <article class="summary-card">
+          <span>${t("summaryConcern")}</span>
+          <p>${escapeHtml(message.text)}</p>
+        </article>
+      `).join("")}
+      <p class="summary-note">${t("summaryEdit")}</p>
+    </aside>
   </section>`;
 }
 
 function findingsTemplate() {
   const report = findingsReport;
   if (!report) return contractChatTemplate();
-  return `<section class="flow-shell">
-    ${flowNav(t("contractStep"))}
-    <article class="report">
-      <h1>${t("findingsTitle")}</h1>
-      <p class="report-intro">${escapeHtml(t("findingsIntro"))}</p>
-      <div class="finding-list">
-        ${report.findings.map((finding) => `
-          <section class="finding ${escapeHtml(finding.severity)}">
-            <span class="severity">${escapeHtml(t(finding.severity))}</span>
-            <h3>${escapeHtml(finding.issue)}</h3>
-            <p>${escapeHtml(finding.rule)}</p>
-          </section>`).join("")}
+  return `<section class="report-workspace">
+    <div class="report-main">
+      <header class="report-heading">
+        <p class="eyebrow">${t("contractStep")}</p>
+        <h1>${t("findingsTitle")}</h1>
+        <p>${escapeHtml(report.disclaimer || t("findingsIntro"))}</p>
+      </header>
+      <div class="findings-grid">
+        ${report.findings.map((finding, index) => `
+          <article class="finding ${escapeHtml(finding.severity)}">
+            <div class="finding-meta">
+              <span>${escapeHtml(t(finding.severity))}</span>
+              <small>${t("resultCount", index + 1, report.findings.length)}</small>
+            </div>
+            <h2>${escapeHtml(finding.issue)}</h2>
+            <dl>
+              <div><dt>${t("contractSays")}</dt><dd>${escapeHtml(finding.rule)}</dd></div>
+            </dl>
+          </article>
+        `).join("")}
       </div>
-      <p class="reassurance"><a href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("salaryGuidance"))}</a></p>
-      <div class="button-row" style="margin-top: 1.5rem">
-        <button class="button ink-button" type="button" data-action="dashboard">${t("done")}</button>
+    </div>
+    <aside class="report-actions">
+      <div>
+        <p class="eyebrow">${t("takeToPerson")}</p>
+        <h2>${t("takeToPerson")}</h2>
+        <p>${t("takeToPersonBody")}</p>
+        <button class="button ink-button" type="button" data-action="crisis">${t("showHelp")} <span aria-hidden="true">→</span></button>
       </div>
-    </article>
+      <a class="report-guidance" href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("salaryGuidance"))}</a>
+      <div class="report-tools">
+        <button type="button" data-action="prototype-save">${t("saveCopy")} <span aria-hidden="true">↓</span></button>
+        <button type="button" data-action="prototype-read">${t("readToMe")} <span aria-hidden="true">◖</span></button>
+      </div>
+      <p class="report-privacy">${t("reportPrivacy")}</p>
+      <button class="back-button" type="button" data-action="dashboard">← ${t("done")}</button>
+    </aside>
   </section>`;
 }
 
@@ -623,11 +812,12 @@ const templates = {
 
 function renderScreen(name = currentScreen) {
   currentScreen = name;
+  screen.dataset.screen = name;
   screen.innerHTML = templates[name]();
   const isContract = name.startsWith("contract") || name === "findings";
   const isCrisis = name.startsWith("crisis");
   modeSwitcher.classList.toggle("hidden", name === "dashboard" || name === "profile");
-  globalHelp.classList.toggle("hidden", name === "dashboard" || isCrisis);
+  globalHelp.classList.toggle("hidden", name === "dashboard" || isContract || isCrisis);
   modeSwitcher.querySelector('[data-mode-link="contract"]').classList.toggle("active", isContract);
   modeSwitcher.querySelector('[data-mode-link="crisis"]').classList.toggle("active", isCrisis);
   screen.focus({ preventScroll: true });
@@ -735,6 +925,14 @@ document.addEventListener("click", (event) => {
     showStatus(t("photoPrototype"));
     return;
   }
+  if (action === "prototype-save") {
+    showStatus(t("savePrototype"));
+    return;
+  }
+  if (action === "prototype-read") {
+    showStatus(t("readPrototype"));
+    return;
+  }
   navigate(action);
 });
 
@@ -803,6 +1001,7 @@ if (auth) {
     if (!user) return;
     userName = user.displayName || user.email || "";
     userId = user.uid || user.email || "signed-in-user";
+    document.getElementById("account-name").textContent = userName;
     document.getElementById("avatar-initial").textContent = userName.trim().charAt(0).toUpperCase() || "G";
     renderScreen("dashboard");
     if (!localStorage.getItem(`gabay-disclaimer-accepted:${userId}`)) {

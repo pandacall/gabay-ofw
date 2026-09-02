@@ -23,32 +23,48 @@
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </a>
-      <label class="language-control">
-        <span class="sr-only" data-copy="languageLabel"></span>
-        <select class="language-select" data-copy-aria="languageLabel"></select>
-      </label>
+      <div class="welcome-links">
+        <a href="#how-it-works" data-copy="howItWorks"></a>
+        <a href="#privacy" data-copy="privacyLink"></a>
+        <label class="language-control">
+          <span class="sr-only" data-copy="languageLabel"></span>
+          <select class="language-select" data-copy-aria="languageLabel"></select>
+        </label>
+        <a class="welcome-hotline" href="tel:1348" data-copy="callOwwa"></a>
+      </div>
     </nav>
 
-    <section class="welcome-copy">
-      <h1 data-copy="welcomeTitle"></h1>
-      <p class="lead" data-copy="welcomeBody"></p>
-      <ol class="welcome-steps">
-        <li><span>1</span><p data-copy="welcomeStepOne"></p></li>
-        <li><span>2</span><p data-copy="welcomeStepTwo"></p></li>
-        <li><span>3</span><p data-copy="welcomeStepThree"></p></li>
-      </ol>
-    </section>
-
-    <section class="welcome-actions">
-      <button class="google-button" id="signin" type="button">
-        <span class="google-mark" aria-hidden="true">G</span>
-        <span data-copy="signIn"></span>
-      </button>
-      <p class="privacy-line" data-copy="privacyNote"></p>
-      <a class="urgent-strip" href="tel:1348">
-        <strong>1348</strong>
-        <span data-copy="owwaAlways"></span>
-      </a>
+    <section class="welcome-layout">
+      <div class="welcome-copy">
+        <h1 data-copy="welcomeTitle"></h1>
+        <p class="lead" data-copy="welcomeBody"></p>
+        <ol class="welcome-steps" id="how-it-works">
+          <li><span>1</span><p data-copy="welcomeStepOne"></p></li>
+          <li><span>2</span><p data-copy="welcomeStepTwo"></p></li>
+          <li><span>3</span><p data-copy="welcomeStepThree"></p></li>
+        </ol>
+      </div>
+      <div class="welcome-actions">
+        <section class="signin-card" id="privacy">
+          <h2 data-copy="startNow"></h2>
+          <p data-copy="signInBody"></p>
+          <button class="google-button" id="signin" type="button">
+            <span class="google-mark" aria-hidden="true">G</span>
+            <span data-copy="signIn"></span>
+          </button>
+          <p class="trust-line">
+            <span data-copy="trustFree"></span>
+            <span aria-hidden="true">·</span>
+            <span data-copy="trustPrivate"></span>
+            <span aria-hidden="true">·</span>
+            <span data-copy="trustNoAds"></span>
+          </p>
+        </section>
+        <a class="urgent-strip" href="tel:1348">
+          <strong>1348</strong>
+          <span data-copy="dangerTonight"></span>
+        </a>
+      </div>
     </section>
   </main>
 
@@ -58,7 +74,15 @@
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </button>
+      <nav class="mode-switcher" data-copy-aria="modeNavigation">
+        <button type="button" data-mode-link="contract" data-action="contract-chat" data-copy="contractTab"></button>
+        <button class="urgent-mode" type="button" data-mode-link="crisis" data-action="crisis">
+          <span class="urgent-dot" aria-hidden="true"></span>
+          <span data-copy="helpTab"></span>
+        </button>
+      </nav>
       <nav class="topbar-actions" data-copy-aria="accountControls">
+        <span id="account-name" class="account-name"></span>
         <label class="language-control compact-control">
           <span class="sr-only" data-copy="languageLabel"></span>
           <select class="language-select" data-copy-aria="languageLabel"></select>
@@ -69,14 +93,6 @@
         <button class="text-button" id="signout" type="button" data-copy="signOut"></button>
       </nav>
     </header>
-
-    <nav class="mode-switcher" data-copy-aria="modeNavigation">
-      <button type="button" data-mode-link="contract" data-action="contract-chat" data-copy="contractTab"></button>
-      <button class="urgent-mode" type="button" data-mode-link="crisis" data-action="crisis">
-        <span class="urgent-dot" aria-hidden="true"></span>
-        <span data-copy="helpTab"></span>
-      </button>
-    </nav>
 
     <div id="screen-loading" class="screen-loading hidden" aria-live="polite">
       <div class="content-skeleton" aria-hidden="true">

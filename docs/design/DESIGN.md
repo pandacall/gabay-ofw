@@ -2,9 +2,10 @@
 
 Status: current frontend design
 
-The frontend uses the **Dawn, one accent** direction. It should feel like a
-quiet conversation with someone on the user's side: warm, spacious, direct,
-and easy to operate under stress.
+The frontend uses the **Dawn, one accent** direction and the current four-state
+desktop composition (landing, dashboard, conversation, and findings). It should
+feel like a quiet conversation with someone on the user's side: warm, spacious,
+direct, and easy to operate under stress.
 
 ## Core rule
 
@@ -41,7 +42,8 @@ The current design is intentionally light-only.
 
 ## Shape and depth
 
-- Main cards use 20-26px radii.
+- Large desktop service and findings panels use crisp, nearly square edges.
+- Conversation messages and supporting mobile panels use soft 20-24px radii.
 - Primary actions and segmented controls are pills.
 - Chat messages use soft corners with one tighter speaker-side corner.
 - Shadows are warm, broad, and low contrast.
@@ -50,7 +52,7 @@ The current design is intentionally light-only.
 ## Interaction
 
 - Interactive targets are at least 56px high where space permits.
-- Show one question or decision at a time.
+- Invite the user to talk in their own words; avoid questionnaire framing.
 - Contract Check and Crisis Help remain explicit choices.
 - Crisis Help remains visibly available throughout signed-in screens.
 - Voice and contract-photo controls are prototype affordances until their real
@@ -60,17 +62,20 @@ The current design is intentionally light-only.
 
 ## Responsive behavior
 
-Mobile follows the supplied 390px compositions closely with a single vertical
-flow and bottom-weighted actions.
+Mobile converts the desktop composition to a single vertical flow with
+bottom-weighted conversation actions.
 
 Desktop is an adaptation, not a phone frame:
 
-- Content sits in a centered workspace with generous dawn gutters.
-- The dashboard presents the two modes side by side.
-- Conversation content uses a readable central column with supporting guidance
-  alongside it when space allows.
-- Findings and contact cards can use two columns, while preserving answer-first
-  reading order.
+- The signed-out view uses an editorial explanation beside one focused sign-in
+  panel and an attached clay OWWA strip.
+- The dashboard presents two wide service panels, followed by optional
+  conversation starters.
+- The Contract Check / Help Now switcher sits in the signed-in top bar.
+- Contract Check uses a bottom-weighted conversation beside a truthful
+  "What you have told us" rail. The rail reflects only information entered in
+  the current preview.
+- Findings use a compact two-column grid beside a person-first action rail.
 - Line lengths remain constrained even when the workspace grows.
 
 ## Safety constraints
