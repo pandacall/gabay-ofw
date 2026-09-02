@@ -643,10 +643,17 @@ function flowNav(label) {
 function contractChatTemplate() {
   const hasStarted = contractMessages.length > 0;
   const userMessages = contractMessages.filter((message) => message.role === "user");
-  return `<section class="contract-workspace">
+  return `<section class="contract-workspace ${hasStarted ? "has-messages" : "is-empty"}">
     <div class="conversation-pane">
       <div class="conversation-inner">
-        <p class="conversation-topic"><span aria-hidden="true">✦</span> ${t("currentTopic")}</p>
+        ${hasStarted ? `
+          <p class="conversation-topic">${t("currentTopic")}</p>
+        ` : `
+          <header class="conversation-intro">
+            <h1>${t("contractTitle")}</h1>
+            <p>${t("contractIntroBody")}</p>
+          </header>
+        `}
         <div class="chat-thread" aria-live="polite">
           <div class="message assistant">${t("contractPrompt")}</div>
           ${contractMessages.map((message, index) =>
@@ -676,16 +683,18 @@ function contractChatTemplate() {
           </div>
         ` : ""}
         <form class="composer" data-form="contract-chat">
-          <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">⌁</button>
           <div class="composer-field">
-            <input id="contract-message" required maxlength="4000" value="${escapeHtml(contractFailedMessage)}" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
-            <button class="photo-button" type="button" data-action="prototype-photo" aria-label="${escapeHtml(t("photoContract"))}"><span aria-hidden="true">▣</span><span>${t("photoContract")}</span></button>
+            <input id="contract-message" required maxlength="4000" value="${escapeHtml(contractFailedMessage)}" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(t("typeAnswer"))}">
             <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
+          </div>
+          <div class="composer-tools">
+            <button class="voice-button" type="button" data-action="prototype-voice">${t("voiceInput")}</button>
+            <button class="photo-button" type="button" data-action="prototype-photo">${t("photoContract")}</button>
           </div>
         </form>
       </div>
     </div>
-    <aside class="conversation-summary">
+    <aside class="conversation-summary ${hasStarted ? "" : "hidden"}">
       <h2>${t("summaryTitle")}</h2>
       <article class="summary-card active">
         <span>${t("summaryActive")}</span>
@@ -881,6 +890,12 @@ function renderScreen(name = currentScreen) {
   currentScreen = name;
   screen.dataset.screen = name;
   screen.innerHTML = templates[name]();
+  if (name === "contract-chat" && contractMessages.length > 0) {
+    window.requestAnimationFrame(() => {
+      const thread = screen.querySelector(".chat-thread");
+      if (thread) thread.scrollTop = thread.scrollHeight;
+    });
+  }
   const isContract = name.startsWith("contract") || name === "findings";
   const isCrisis = name.startsWith("crisis");
   modeSwitcher.classList.toggle("hidden", name === "dashboard" || name === "profile");
