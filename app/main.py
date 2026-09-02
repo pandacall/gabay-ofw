@@ -47,10 +47,15 @@ def _contract_check_http_error(error: Exception) -> HTTPException:
             provider_reason=error.reason,
         )
         status_code = 503
-        if error.reason in ("UNAUTHENTICATED", "PERMISSION_DENIED"):
-            message = "Gemini is not configured correctly. Please contact support"
-        else:
+        # A 429 (RESOURCE_EXHAUSTED) or 5xx is a genuine transient failure
+        # worth retrying. Any other 4xx (INVALID_ARGUMENT for a bad/expired
+        # API key, PERMISSION_DENIED, UNAUTHENTICATED, NOT_FOUND for an
+        # unavailable model, etc.) will not be fixed by retrying.
+        is_transient = error.status_code == 429 or error.status_code >= 500
+        if is_transient:
             message = "Gemini is temporarily unavailable"
+        else:
+            message = "Gemini is not configured correctly. Please contact support"
     elif isinstance(error, ContractCheckPersistenceError):
         diagnostic["category"] = "persistence"
         status_code = 503
