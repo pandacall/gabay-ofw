@@ -42,8 +42,9 @@ The current design is intentionally light-only.
 
 ## Shape and depth
 
-- Large desktop service and findings panels use crisp, nearly square edges.
-- Conversation messages and supporting mobile panels use soft 20-24px radii.
+- Desktop service panels use 30px radii; findings use 22px radii with a
+  severity-colored left edge.
+- Conversation messages and supporting panels use soft 16-26px radii.
 - Primary actions and segmented controls are pills.
 - Chat messages use soft corners with one tighter speaker-side corner.
 - Shadows are warm, broad, and low contrast.
