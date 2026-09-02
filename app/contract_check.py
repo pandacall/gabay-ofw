@@ -11,6 +11,7 @@ from google.adk.agents.context import Context
 from google.adk.apps import App, ResumabilityConfig
 from google.adk.events import Event, RequestInput
 from google.adk.models import BaseLlm
+from google.adk.models.llm_request import LlmRequest
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService
 from google.adk.workflow import Workflow
@@ -69,7 +70,15 @@ HTML in any field.
 
 
 class StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # Deliberately not extra="forbid": Pydantic's model_json_schema() then
+    # emits "additionalProperties": false, which google-genai's response_schema
+    # serialization mis-encodes as a snake_case "additional_properties" key
+    # that the real Gemini API rejects with a 400 INVALID_ARGUMENT
+    # (googleapis/python-genai#1815, closed not-planned upstream). Required
+    # fields, enums, and literals are still fully enforced either way; this
+    # only stops rejecting genuinely unexpected extra keys, which Gemini's
+    # own structured-output enforcement makes vanishingly unlikely anyway.
+    model_config = ConfigDict(extra="ignore")
 
 
 class Claim(StrictModel):
@@ -285,6 +294,29 @@ class ContractCheckService:
         )
         self._sessions = session_service
         self._runner = Runner(app=app, session_service=session_service)
+        self._interviewer_model = interviewer_model
+
+    async def check_connectivity(self) -> dict[str, Any]:
+        """Performs one minimal real call to verify Gemini connectivity.
+
+        Returns only safe status info -- never prompt or response content.
+        """
+        request = LlmRequest(
+            model=self._interviewer_model.model,
+            contents=[
+                types.Content(role="user", parts=[types.Part.from_text(text="ping")])
+            ],
+        )
+        try:
+            async for _ in self._interviewer_model.generate_content_async(request):
+                pass
+        except APIError as error:
+            return {
+                "reachable": False,
+                "status_code": error.code,
+                "reason": error.status,
+            }
+        return {"reachable": True}
 
     async def start(self, uid: str, message: str) -> dict[str, Any]:
         check_id = uuid4().hex

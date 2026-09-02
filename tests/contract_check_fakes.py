@@ -21,6 +21,7 @@ class CannedModel(BaseLlm):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
+        assert llm_request.model, "llm_request.model must be set by the caller"
         response = self.responses[self.call_count]
         self.call_count += 1
         yield LlmResponse(
@@ -39,6 +40,7 @@ class FailingModel(BaseLlm):
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
+        assert llm_request.model, "llm_request.model must be set by the caller"
         raise APIError(
             self.status_code,
             {
