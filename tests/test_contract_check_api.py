@@ -267,7 +267,7 @@ def test_contract_check_endpoints_require_authentication(client):
 def test_gemini_rate_limit_returns_safe_diagnostic():
     service = ContractCheckService(
         session_service=InMemorySessionService(),
-        interviewer_model=FailingModel(status_code=429),
+        interviewer_model=FailingModel(status_code=429, reason="RESOURCE_EXHAUSTED"),
         rule_matcher_model=CannedModel(responses=[]),
     )
     client = TestClient(
@@ -285,6 +285,31 @@ def test_gemini_rate_limit_returns_safe_diagnostic():
     assert response.headers["x-request-id"]
     assert response.json()["detail"] == (
         "Gemini is temporarily unavailable. "
+        f"Reference: {response.headers['x-request-id']}"
+    )
+    assert "provider detail" not in response.text
+
+
+def test_gemini_auth_failure_is_not_reported_as_temporary():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=FailingModel(status_code=403, reason="PERMISSION_DENIED"),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my contract."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Gemini is not configured correctly. Please contact support. "
         f"Reference: {response.headers['x-request-id']}"
     )
     assert "provider detail" not in response.text

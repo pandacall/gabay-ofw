@@ -183,8 +183,9 @@ class ContractCheckModelOutputError(Exception):
 
 
 class ContractCheckProviderError(Exception):
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, reason: str | None) -> None:
         self.status_code = status_code
+        self.reason = reason
         super().__init__("Gemini provider request failed")
 
 
@@ -369,7 +370,7 @@ class ContractCheckService:
         except ValidationError as error:
             raise ContractCheckModelOutputError(error) from error
         except APIError as error:
-            raise ContractCheckProviderError(error.code) from error
+            raise ContractCheckProviderError(error.code, error.status) from error
         except GoogleAPICallError as error:
             raise ContractCheckPersistenceError from error
 
