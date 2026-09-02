@@ -315,6 +315,34 @@ def test_gemini_auth_failure_is_not_reported_as_temporary():
     assert "provider detail" not in response.text
 
 
+def test_invalid_gemini_api_key_is_not_reported_as_temporary():
+    # This is the real error shape Google's Gemini API returns for a bad or
+    # expired API key: HTTP 400, status "INVALID_ARGUMENT" -- not
+    # UNAUTHENTICATED/PERMISSION_DENIED. Retrying never fixes this.
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=FailingModel(status_code=400, reason="INVALID_ARGUMENT"),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my contract."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == (
+        "Gemini is not configured correctly. Please contact support. "
+        f"Reference: {response.headers['x-request-id']}"
+    )
+    assert "provider detail" not in response.text
+
+
 def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():
     sessions = InMemorySessionService()
     service = ContractCheckService(
