@@ -83,9 +83,10 @@ Desktop is an adaptation, not a phone frame:
 - The Contract Check / Help Now switcher sits in the signed-in top bar.
 - Account controls are grouped into one quiet utility surface so they do not
   compete with the active mode.
-- Contract Check uses a bottom-weighted conversation beside a truthful
-  "What you have told us" rail. The rail reflects only information entered in
-  the current preview.
+- Contract Check opens with a focused introduction and message field. Once the
+  conversation starts, it becomes bottom-weighted beside a truthful "What you
+  have told us" rail. The rail stays hidden until there is something to
+  summarize and reflects only information entered in the current preview.
 - Findings use a compact two-column grid beside a person-first action rail.
 - Crisis Help uses a stable editorial split: the active step occupies the main
   area and a warm support rail keeps the official OWWA path visible. The final

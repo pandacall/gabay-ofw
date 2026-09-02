@@ -117,6 +117,8 @@ test("user completes a genuine multi-turn Contract Check", async ({ page }) => {
   await openAsSignedInUser(page);
 
   await page.getByRole("button", { name: /Check my contract/ }).click();
+  await expect(page.getByRole("heading", { name: "Check my contract" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What you have told us" })).toHaveCount(0);
   await expect(
     page.getByText("Talk to us about what your contract says and what is actually happening."),
   ).toBeVisible();
@@ -178,6 +180,65 @@ test("Contract Check shows the backend failure reason", async ({ page }) => {
   await expect(
     page.getByLabel("Talk to us about what your contract says and what is actually happening."),
   ).toHaveValue("Please check my contract.");
+});
+
+test("Contract Check keeps the newest turn visible in a long conversation", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+  await page.route("**/api/contract-checks", (route) =>
+    route.fulfill({
+      status: 201,
+      json: {
+        id: "long-check",
+        status: "in_progress",
+        prompt: "Tell us the next detail.",
+        interrupt_id: "interrupt-1",
+      },
+    }),
+  );
+  await page.route("**/api/contract-checks/long-check/messages", (route) =>
+    route.fulfill({
+      json: {
+        id: "long-check",
+        status: "in_progress",
+        prompt: "Tell us the next detail.",
+        interrupt_id: "interrupt-1",
+      },
+    }),
+  );
+
+  await page.getByRole("button", { name: /Check my contract/ }).click();
+  const input = page.getByLabel(
+    "Talk to us about what your contract says and what is actually happening.",
+  );
+  for (let turn = 1; turn <= 7; turn += 1) {
+    await input.fill(`Conversation detail ${turn}`);
+    await page.getByRole("button", {
+      name: turn === 1 ? "Continue" : "View Findings Report",
+    }).click();
+    await expect(page.locator(".message.user").last()).toContainText(
+      `Conversation detail ${turn}`,
+    );
+  }
+
+  await expect(page.locator(".message.user").last()).toContainText(
+    "Conversation detail 7",
+  );
+  await expect(page.locator(".message.user").last()).toBeInViewport();
+});
+
+test("Contract Check composer remains accessible on short landscape screens", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 900, height: 400 });
+  await openAsSignedInUser(page);
+  await page.getByRole("button", { name: /Check my contract/ }).click();
+
+  await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Photograph my contract" }),
+  ).toBeVisible();
 });
 
 test("user can click through Crisis Help to code-owned contact cards", async ({
