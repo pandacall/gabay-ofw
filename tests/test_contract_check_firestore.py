@@ -56,7 +56,8 @@ def test_new_app_instance_resumes_contract_check_from_firestore():
                     '{"status":"complete","claims":[{"topic":"rest_days",'
                     '"contract_says":"One day off each week",'
                     '"actually_happening":"No rest days",'
-                    '"user_quote":"Wala akong day off"}],"country":"KW"}'
+                    '"user_quote":"Wala akong day off"}],"country":"KW",'
+                    '"next_question":""}'
                 )
             ]
         ),

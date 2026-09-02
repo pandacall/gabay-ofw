@@ -21,7 +21,8 @@ def interviewer():
                 '{"status":"complete","claims":[{"topic":"rest_days",'
                 '"contract_says":"One day off each week",'
                 '"actually_happening":"No rest days",'
-                '"user_quote":"Wala akong day off"}],"country":"SA"}'
+                '"user_quote":"Wala akong day off"}],"country":"SA",'
+                '"next_question":""}'
             ),
         ]
     )
@@ -133,7 +134,7 @@ def test_in_progress_resume_loops_with_a_new_interrupt_id():
                 '{"status":"in_progress","claims":[],"country":"AE",'
                 '"next_question":"What happens in practice?"}'
             ),
-            '{"status":"complete","claims":[],"country":"AE"}',
+            '{"status":"complete","claims":[],"country":"AE","next_question":""}',
         ]
     )
     rule_matcher = CannedModel(responses=[])
@@ -185,7 +186,8 @@ def test_escalation_ends_without_calling_rule_matcher():
                 '{"status":"escalate_to_crisis","claims":[{"topic":"passport",'
                 '"contract_says":"I keep my passport",'
                 '"actually_happening":"My employer locked it away",'
-                '"user_quote":"Hindi ako makaalis"}],"country":"QA"}'
+                '"user_quote":"Hindi ako makaalis"}],"country":"QA",'
+                '"next_question":""}'
             )
         ]
     )
@@ -293,7 +295,9 @@ def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():
     service = ContractCheckService(
         session_service=sessions,
         interviewer_model=CannedModel(
-            responses=['{"status":"complete","claims":[],"country":"SA"}']
+            responses=[
+                '{"status":"complete","claims":[],"country":"SA","next_question":""}'
+            ]
         ),
         rule_matcher_model=CannedModel(
             responses=['{"findings":[{"severity":"unknown"}]}']
@@ -330,7 +334,9 @@ def test_ungrounded_rule_matcher_output_is_rejected():
     service = ContractCheckService(
         session_service=InMemorySessionService(),
         interviewer_model=CannedModel(
-            responses=['{"status":"complete","claims":[],"country":"SA"}']
+            responses=[
+                '{"status":"complete","claims":[],"country":"SA","next_question":""}'
+            ]
         ),
         rule_matcher_model=CannedModel(
             responses=[
@@ -360,7 +366,9 @@ def test_salary_figure_in_rule_matcher_output_is_rejected():
     service = ContractCheckService(
         session_service=InMemorySessionService(),
         interviewer_model=CannedModel(
-            responses=['{"status":"complete","claims":[],"country":"SA"}']
+            responses=[
+                '{"status":"complete","claims":[],"country":"SA","next_question":""}'
+            ]
         ),
         rule_matcher_model=CannedModel(
             responses=[
