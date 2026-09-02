@@ -214,9 +214,8 @@ test("Contract Check keeps the newest turn visible in a long conversation", asyn
   );
   for (let turn = 1; turn <= 7; turn += 1) {
     await input.fill(`Conversation detail ${turn}`);
-    await page.getByRole("button", {
-      name: turn === 1 ? "Continue" : "View Findings Report",
-    }).click();
+    await input.press("Enter");
+    await expect(input).toHaveValue("");
     await expect(page.locator(".message.user").last()).toContainText(
       `Conversation detail ${turn}`,
     );
