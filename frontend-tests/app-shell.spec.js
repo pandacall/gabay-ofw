@@ -44,11 +44,12 @@ test("signed-in user explicitly chooses either mode from the dashboard", async (
 }) => {
   await openAsSignedInUser(page);
 
-  await expect(page.getByRole("heading", { name: "What do you need?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Start Contract Check" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Check my contract/ })).toBeVisible();
   await expect(page.locator(".crisis-card")).toBeVisible();
   await expect(page.locator(".crisis-card")).toHaveCSS("background-color", "rgb(168, 67, 31)");
-  await expect(page.locator(".mode-card").first()).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".contract-card")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "They keep my passport" })).toBeVisible();
 });
 
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
@@ -58,7 +59,7 @@ test("signed-out user can choose a language before sign-in", async ({ page }) =>
   await expect(
     page.getByRole("heading", { name: "Sinusunod ba ng trabaho mo ang kontrata?" }),
   ).toBeVisible();
-  await expect(page.getByRole("button", { name: "Magpatuloy gamit ang Google" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Mag-sign in gamit ang Google" })).toBeVisible();
 });
 
 test("first-time user sees the service limits before using the app", async ({
@@ -77,10 +78,7 @@ test("first-time user sees the service limits before using the app", async ({
 test("user can click through the static Contract Check flow", async ({ page }) => {
   await openAsSignedInUser(page);
 
-  await page.getByRole("button", { name: /Start Contract Check/ }).click();
-  await expect(
-    page.getByText("Talk to us about what is happening. You can use English, Tagalog, Taglish, or Bisaya."),
-  ).toBeVisible();
+  await page.getByRole("button", { name: /Check my contract/ }).click();
   await expect(
     page.getByText("Talk to us about what your contract says and what is actually happening."),
   ).toBeVisible();
@@ -88,11 +86,12 @@ test("user can click through the static Contract Check flow", async ({ page }) =
     "My contract promises a weekly rest day, but I work every day.",
   );
   await page.getByRole("button", { name: "Continue" }).click();
-  await expect(
-    page.getByText("My contract promises a weekly rest day, but I work every day."),
-  ).toBeVisible();
+  await expect(page.locator(".message.user")).toHaveText(
+    "My contract promises a weekly rest day, but I work every day.",
+  );
+  await expect(page.getByRole("heading", { name: "What you have told us" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "I Need Help Now" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Help now" })).toBeVisible();
 
   await page.getByRole("button", { name: "Use voice" }).click();
   await expect(page.getByRole("status")).toContainText("Nothing is being recorded");
@@ -106,6 +105,10 @@ test("user can click through the static Contract Check flow", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Two of these are serious." })).toBeVisible();
   await expect(page.getByText("Missing weekly rest day")).toBeVisible();
   await expect(page.getByText("Unpaid overtime")).toBeVisible();
+  await page.getByRole("button", { name: /Save a copy/ }).click();
+  await expect(page.getByRole("status")).toContainText("Nothing was downloaded");
+  await page.getByRole("button", { name: /Read it to me/ }).click();
+  await expect(page.getByRole("status")).toContainText("No audio was started");
 });
 
 test("user can click through Crisis Help to code-owned contact cards", async ({
@@ -133,11 +136,11 @@ test("language choice updates every flow and persists", async ({ page }) => {
   await openAsSignedInUser(page);
 
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
-  await expect(page.getByRole("heading", { name: "Unsay imong kinahanglan?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
   await expect(page.locator(".crisis-card")).toContainText("Pangayo og tabang");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Unsay imong kinahanglan?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ceb");
 });
 
