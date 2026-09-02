@@ -1,123 +1,73 @@
-# Dawn One Accent
+# Civic Utility
 
 Status: current frontend design
 
-The frontend uses the **Dawn, one accent** direction as a warm field guide, not
-as a literal concept-board copy. It should feel like a quiet conversation with
-someone on the user's side: warm, spacious, direct, and easy to operate under
-stress.
+Gabay OFW is a high-trust public-service tool. Its interface should feel as
+clear and dependable as a mature government or financial service: calm under
+normal use, unmistakable during urgent use, and easy to scan on a phone.
 
-## Core rule
+## Visual contract
 
-Clay means **act now**. Nothing else uses clay.
+- **Public Sans** carries every interface role. Hierarchy comes from size,
+  weight, spacing, and rules rather than an editorial display face.
+- **Operational navy** (`#10233F`) is the brand and primary-action color.
+- **Mineral neutrals** (`#F3F5F6`, `#E9EDF0`, and white) organize content
+  without cream nostalgia, decorative texture, or tinted paper effects.
+- **Response red** (`#B33A24`) is reserved for urgent help, urgent findings,
+  and official immediate-contact actions.
+- Geometry is compact and controlled: 6px controls, 10px task surfaces, and
+  16px only for major composed panels.
+- Thin rules establish information structure. Shadows are reserved for focused
+  task surfaces, not used to turn every section into a floating card.
 
-Urgent controls, the Crisis Help mode, urgent findings, and immediate contact
-actions use clay. Contract Check, profile, navigation, ordinary
-controls, and informational content use warm ink and neutral dawn surfaces.
+## Composition
 
-## Tokens
+- The signed-out screen is a service explanation beside one navy sign-in
+  surface with an attached urgent-contact strip.
+- The dashboard is a task console: a concise greeting, two ruled service rows,
+  and compact conversation starters. It is not a promotional card grid.
+- Contract Check is a bottom-weighted workbench once a conversation starts.
+  The empty entry state is centered. User facts remain visible in a separate
+  summary rail.
+- Findings form one inspectable report list. Severity, issue, and applicable
+  contract rule align in stable columns; they are not repeated cards.
+- Crisis Help uses a white decision surface beside a permanent navy support
+  panel. The red OWWA action remains available without competing with every
+  other control.
+- Profile uses a restrained editorial split with one compact form surface.
 
-| Role | Value |
-| --- | --- |
-| Dawn highlight | `#FDF1E5` |
-| Dawn surface | `#FCF5ED` |
-| Dawn base | `#FAF2E8` |
-| Raised surface | `#FFFFFF` |
-| Warm ink | `#3F2917` |
-| Body text | `#5C4229` |
-| Muted text | `#6B5138` |
-| Sand border | `#D9C4AE` |
-| Soft sand | `#F0E3D3` |
-| Clay urgency | `#A8431F` |
+## Interaction and accessibility
 
-The current design is intentionally light-only.
+- Controls name the action they perform and have visible hover, pressed, and
+  keyboard-focus states.
+- A skip link is the first focusable control.
+- Body and placeholder text meet WCAG AA contrast on their surfaces.
+- Request failures remain inline beside Contract Check, preserve the failed
+  draft, and state both the problem and recovery.
+- Voice, photo, save, and read controls remain explicit prototype affordances;
+  they never claim an action occurred.
+- Responsive layouts preserve information order instead of shrinking desktop
+  columns. At narrow widths, the task surface comes before supporting context.
 
-## Typography
+## Safety and truth
 
-- **Newsreader**: display headings, finding titles, and prominent hotline
-  numbers.
-- **Karla**: body copy, buttons, labels, form controls, and navigation.
-- Display headings are regular weight with tight tracking and comfortable line
-  height. Body text stays large enough to read on a phone under stress.
-
-## Shape and depth
-
-- A low-contrast paper grain keeps large dawn surfaces from feeling digitally
-  flat.
-- Desktop service panels use 30px radii and custom line symbols; findings use
-  18-22px radii with a severity-colored left edge.
-- Conversation messages and supporting panels use soft 16-26px radii.
-- Primary actions and segmented controls are pills.
-- Chat messages use soft corners with one tighter speaker-side corner.
-- Shadows are warm, broad, and low contrast.
-- Borders are sand-colored and secondary to spacing.
-- Raised white surfaces are reserved for focused tasks, inputs, messages, and
-  findings. They are not the default wrapper for every section.
-
-## Interaction
-
-- Interactive targets are at least 56px high where space permits.
-- Invite the user to talk in their own words; avoid questionnaire framing.
-- Contract Check and Crisis Help remain explicit choices.
-- Crisis Help remains visibly available throughout signed-in screens.
-- Contract failures appear inline beside the conversation, preserve the
-  submitted message, and give a specific recovery instruction. A toast is not
-  sufficient for request failures.
-- Voice and contract-photo controls are prototype affordances until their real
-  capabilities are implemented. They must acknowledge a click without claiming
-  recording, camera, upload, or saved data.
-- Severity uses a word, a dot pattern, and weight. Color is supplementary.
-
-## Responsive behavior
-
-Mobile converts the desktop composition to a single vertical flow with
-bottom-weighted conversation actions.
-
-Desktop is an adaptation, not a phone frame:
-
-- The signed-out view uses an editorial explanation beside one focused sign-in
-  panel and an attached clay OWWA strip.
-- The dashboard presents two wide service panels, followed by optional
-  conversation starters. Service symbols must contain meaningful line art;
-  blank circles are not acceptable placeholders.
-- The Contract Check / Help Now switcher sits in the signed-in top bar.
-- Account controls are grouped into one quiet utility surface so they do not
-  compete with the active mode.
-- Contract Check uses a bottom-weighted conversation beside a truthful
-  "What you have told us" rail. The rail reflects only information entered in
-  the current preview.
-- Findings use a compact two-column grid beside a person-first action rail.
-- Crisis Help uses a stable editorial split: the active step occupies the main
-  area and a warm support rail keeps the official OWWA path visible. The final
-  contact result uses the full width and does not duplicate hotline cards.
-- Profile uses an open editorial introduction beside a compact form. On mobile,
-  Crisis Help is part of this composition instead of floating over form
-  controls.
-- Line lengths remain constrained even when the workspace grows.
+- Do not fabricate user answers, legal citations, office locations, contact
+  numbers, distances, saved-state claims, or implemented media behavior.
+- Do not infer urgency from contract concerns. Users choose Contract Check or
+  Crisis Help explicitly.
+- Only official contact paths already established by the product may be shown.
+- Dynamic Contract Check findings remain backend-generated.
 
 ## Required visual review
 
-Frontend changes are not complete after DOM assertions or a successful build.
-Every meaningful visual change must be reviewed from deterministic rendered
-screenshots.
+Frontend work is not complete after DOM assertions.
 
-1. Capture signed-out, dashboard, Contract Check opening, mid-conversation,
-   failure, and findings; every Crisis Help step; profile; disclaimer; and
-   loading.
-2. Capture each state at 1440x900 and 390x844 with stable authentication and API
-   fixtures. Never use fabricated DOM snapshots in place of the real templates.
-3. Compare before and after images for hierarchy, typography, spacing, grid
-   alignment, density, color semantics, affordances, overflow, and content
-   truthfulness.
-4. Inspect at least one small-laptop viewport and one 320px-wide phone before
-   approval.
-5. Correct visible regressions and recapture the affected states. Preserve the
-   screenshot matrix outside the repository as review evidence.
-
-## Safety constraints
-
-- Do not show fabricated MWO phone numbers, distances, office status, or legal
-  citations.
-- Do not claim that prototype interactions record, upload, or save anything.
-- Do not use clay decoratively.
-- Do not infer the user's mode.
+1. Capture signed-out, dashboard, Contract Check entry, mid-conversation,
+   failure, findings, every Crisis Help step, profile, disclaimer, and loading
+   with deterministic auth and API fixtures.
+2. Review the states at 1440x900 and 390x844. Also inspect 1180x720 and 320x568
+   before approval.
+3. Check hierarchy, text wrapping, density, alignment, contrast, overflow,
+   focus, and truthful state representation.
+4. Correct visible defects in one bounded pass, then recapture affected states.
+5. Keep screenshots outside the repository as review evidence.
