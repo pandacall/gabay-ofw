@@ -34,13 +34,17 @@ class CannedModel(BaseLlm):
 class FailingModel(BaseLlm):
     model: str = "failing"
     status_code: int
+    reason: str | None = None
 
     async def generate_content_async(
         self, llm_request: LlmRequest, stream: bool = False
     ) -> AsyncGenerator[LlmResponse, None]:
         raise APIError(
             self.status_code,
-            {"message": "provider detail must not reach the user"},
+            {
+                "message": "provider detail must not reach the user",
+                "status": self.reason,
+            },
         )
         yield
 

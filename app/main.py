@@ -44,9 +44,13 @@ def _contract_check_http_error(error: Exception) -> HTTPException:
         diagnostic.update(
             category="model_provider",
             provider_status=error.status_code,
+            provider_reason=error.reason,
         )
         status_code = 503
-        message = "Gemini is temporarily unavailable"
+        if error.reason in ("UNAUTHENTICATED", "PERMISSION_DENIED"):
+            message = "Gemini is not configured correctly. Please contact support"
+        else:
+            message = "Gemini is temporarily unavailable"
     elif isinstance(error, ContractCheckPersistenceError):
         diagnostic["category"] = "persistence"
         status_code = 503
