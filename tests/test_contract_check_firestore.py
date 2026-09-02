@@ -21,7 +21,12 @@ def test_new_app_instance_resumes_contract_check_from_firestore():
     started_service = ContractCheckService(
         session_service=FirestoreSessionService(db),
         interviewer_model=CannedModel(
-            responses=['{"status":"in_progress","claims":[],"country":"KW"}']
+            responses=[
+                (
+                    '{"status":"in_progress","claims":[],"country":"KW",'
+                    '"next_question":"What happens in practice?"}'
+                )
+            ]
         ),
         rule_matcher_model=CannedModel(responses=[]),
     )
@@ -38,7 +43,7 @@ def test_new_app_instance_resumes_contract_check_from_firestore():
         responses=[
             (
                 '{"findings":[{"issue":"No weekly rest day",'
-                '"rule":"Minimum 1 rest day per week; premium pay if worked.",'
+                '"rule":"At least one rest day per week, with premium compensation if worked.",'
                 '"severity":"concerning"}]}'
             )
         ]
@@ -51,7 +56,8 @@ def test_new_app_instance_resumes_contract_check_from_firestore():
                     '{"status":"complete","claims":[{"topic":"rest_days",'
                     '"contract_says":"One day off each week",'
                     '"actually_happening":"No rest days",'
-                    '"user_quote":"Wala akong day off"}],"country":"KW"}'
+                    '"user_quote":"Wala akong day off"}],"country":"KW",'
+                    '"next_question":""}'
                 )
             ]
         ),

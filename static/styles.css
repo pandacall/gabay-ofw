@@ -457,10 +457,10 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
 .findings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .finding { min-height: 260px; padding: 1.4rem; border: 1px solid var(--sand-border); background: rgba(255,255,255,0.72); }
 .finding.urgent { border-top: 5px solid var(--clay); }
-.finding.concerning { border-top: 5px solid var(--ink); }
+.finding.concerning, .finding.informational { border-top: 5px solid var(--ink); }
 .finding-meta { display: flex; justify-content: space-between; align-items: center; }
 .finding-meta span { color: var(--clay); font-size: 0.76rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-.finding.concerning .finding-meta span { color: var(--ink); }
+.finding.concerning .finding-meta span, .finding.informational .finding-meta span { color: var(--ink); }
 .finding-meta small { color: var(--muted); }
 .finding h2 { margin: 1.1rem 0; font-size: 1.8rem; }
 .finding dl { display: grid; gap: 0.8rem; margin: 0; }
@@ -478,6 +478,7 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
 .report-actions h2 { margin-bottom: 0.9rem; font-size: 2.6rem; }
 .report-actions p { color: var(--body); line-height: 1.5; }
 .report-actions .ink-button { width: 100%; margin-top: 1rem; }
+.report-guidance { color: var(--body); font-size: 0.88rem; font-weight: 700; line-height: 1.45; text-underline-offset: 3px; }
 .report-tools { display: grid; grid-template-columns: 1fr 1fr; border-block: 1px solid var(--sand-border); }
 .report-tools button { min-height: 72px; border: 0; color: var(--ink); background: transparent; font-weight: 700; }
 .report-tools button + button { border-left: 1px solid var(--sand-border); }
