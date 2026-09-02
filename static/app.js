@@ -73,6 +73,8 @@ const copy = {
     findingsIntro: "These findings appear to conflict with standard POEA/DMW contract rules. Verify them with DMW, OWWA, or a licensed lawyer.",
     salaryGuidance: "For current salary minimums, visit dmw.gov.ph.",
     contractFailed: "Contract Check could not continue. Please try again.",
+    contractErrorTitle: "We could not continue the conversation.",
+    contractErrorBody: "Your message is still here. Check your connection, then try sending it again.",
     contractEscalated: "This may need Crisis Help. Use “I Need Help Now” for official contacts.",
     urgent: "Urgent",
     concerning: "Concerning",
@@ -85,6 +87,10 @@ const copy = {
     reportInfoRule: "Save copies of your verified contract, payslips, schedules, and messages where it is safe to do so.",
     done: "Done",
     crisisStep: "Crisis Help",
+    crisisAsideKicker: "Official help stays close",
+    crisisAsideTitle: "You do not have to explain everything.",
+    crisisAsideBody: "Share only what feels safe. We use this to show official contacts and do not save this conversation in the preview.",
+    crisisHotlineLabel: "OWWA, any hour",
     crisisQuestionTitle: "Are you in physical danger right now?",
     crisisQuestionBody: "Choose what feels closest to your situation. We will give contact information without asking for details we do not need.",
     dangerYes: "Yes, or I cannot leave safely",
@@ -108,6 +114,7 @@ const copy = {
     reassurance: "You are not alone. These offices exist specifically to help OFWs in your situation, and reaching out does not cost you anything.",
     call: (number) => `Call ${number}`,
     profileTitle: "Your profile",
+    profileKicker: "Optional and private",
     profileBody: "Optional details help keep future conversations relevant. Any destination country is accepted.",
     countryOptional: "Destination country (optional)",
     occupationOptional: "Occupation (optional)",
@@ -185,6 +192,8 @@ const copy = {
     findingsTitle: "Iyong Findings Report",
     findingsIntro: "Ang findings ay posibleng salungat sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
     salaryGuidance: "Para sa kasalukuyang minimum na sahod, bisitahin ang dmw.gov.ph.",
+    contractErrorTitle: "Hindi namin maituloy ang usapan.",
+    contractErrorBody: "Nandito pa rin ang mensahe mo. Tingnan ang koneksiyon, pagkatapos ay subukang ipadala muli.",
     urgent: "Agarang pansin",
     concerning: "Nakababahala",
     informational: "Impormasyon",
@@ -196,6 +205,10 @@ const copy = {
     reportInfoRule: "Magtago ng kopya ng verified contract, payslip, schedule, at mensahe kung ligtas gawin.",
     done: "Tapos",
     crisisStep: "Crisis Help",
+    crisisAsideKicker: "Malapit lang ang opisyal na tulong",
+    crisisAsideTitle: "Hindi mo kailangang ikuwento ang lahat.",
+    crisisAsideBody: "Ibahagi lang ang ligtas para sa iyo. Ginagamit ito para ipakita ang opisyal na contact at hindi sine-save ang usapan sa preview.",
+    crisisHotlineLabel: "OWWA, anumang oras",
     crisisQuestionTitle: "Nasa pisikal na panganib ka ba ngayon?",
     crisisQuestionBody: "Piliin ang pinakamalapit sa sitwasyon mo. Ibibigay agad ang contact information nang hindi humihingi ng detalyeng hindi kailangan.",
     dangerYes: "Oo, o hindi ako ligtas na makaalis",
@@ -219,6 +232,7 @@ const copy = {
     reassurance: "Hindi ka nag-iisa. Nariyan ang mga opisinang ito para tulungan ang OFW sa ganitong sitwasyon, at walang bayad ang paglapit.",
     call: (number) => `Tumawag sa ${number}`,
     profileTitle: "Iyong profile",
+    profileKicker: "Opsiyonal at pribado",
     profileBody: "Opsiyonal ang detalye at makakatulong sa susunod na usapan. Tinatanggap ang anumang destination country.",
     countryOptional: "Destination country (opsiyonal)",
     occupationOptional: "Trabaho (opsiyonal)",
@@ -296,6 +310,8 @@ const copy = {
     findingsTitle: "Imong Findings Report",
     findingsIntro: "Posibleng supak ang findings sa standard POEA/DMW contract rules. I-verify sa DMW, OWWA, o lisensiyadong abogado.",
     salaryGuidance: "Para sa kasamtangang minimum nga suweldo, bisitaha ang dmw.gov.ph.",
+    contractErrorTitle: "Dili namo mapadayon ang panag-istorya.",
+    contractErrorBody: "Naa pa dinhi ang imong mensahe. Susiha ang koneksiyon, dayon sulayi pagpadala pag-usab.",
     urgent: "Dinalian",
     concerning: "Makapabalaka",
     informational: "Impormasyon",
@@ -307,6 +323,10 @@ const copy = {
     reportInfoRule: "Tipigi ang kopya sa verified contract, payslip, schedule, ug mensahe kung luwas.",
     done: "Human",
     crisisStep: "Crisis Help",
+    crisisAsideKicker: "Duol ra ang opisyal nga tabang",
+    crisisAsideTitle: "Dili kinahanglan isulti ang tanan.",
+    crisisAsideBody: "Ipaambit lang ang luwas para nimo. Gamiton kini sa pagpakita sa opisyal nga contact ug dili i-save ang panag-istorya sa preview.",
+    crisisHotlineLabel: "OWWA, bisan unsang orasa",
     crisisQuestionTitle: "Naa ka ba sa pisikal nga peligro karon?",
     crisisQuestionBody: "Pilia ang labing duol sa imong kahimtang. Ihatag dayon ang contact information nga dili mangayo og detalye nga wala namo kinahanglana.",
     dangerYes: "Oo, o dili ko luwas nga makagawas",
@@ -330,6 +350,7 @@ const copy = {
     reassurance: "Dili ka nag-inusara. Anaa kining mga opisina para motabang sa OFW sa imong kahimtang, ug walay bayad ang pagpangayo og tabang.",
     call: (number) => `Tawag sa ${number}`,
     profileTitle: "Imong profile",
+    profileKicker: "Opsiyonal ug pribado",
     profileBody: "Opsiyonal ang detalye ug makatabang sa umaabot nga panag-istorya. Dawaton ang bisan unsang destination country.",
     countryOptional: "Destination country (opsiyonal)",
     occupationOptional: "Trabaho (opsiyonal)",
@@ -526,6 +547,8 @@ let userName = "";
 let userId = "";
 let contractCheck = null;
 let contractMessages = [];
+let contractError = "";
+let contractFailedMessage = "";
 let findingsReport = null;
 let crisisDanger = false;
 let crisisCountry = "";
@@ -635,6 +658,16 @@ function contractChatTemplate() {
             </div>`,
           ).join("")}
         </div>
+        ${contractError ? `
+          <div class="contract-error" role="alert">
+            <span aria-hidden="true">!</span>
+            <div>
+              <strong>${t("contractErrorTitle")}</strong>
+              <p>${escapeHtml(contractError)}</p>
+              <small>${t("contractErrorBody")}</small>
+            </div>
+          </div>
+        ` : ""}
         ${hasStarted ? `
           <div class="quick-replies">
             <button type="button" data-quick-reply="${escapeHtml(t("quickNo"))}">${t("quickNo")}</button>
@@ -645,7 +678,7 @@ function contractChatTemplate() {
         <form class="composer" data-form="contract-chat">
           <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">⌁</button>
           <div class="composer-field">
-            <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
+            <input id="contract-message" required maxlength="4000" value="${escapeHtml(contractFailedMessage)}" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
             <button class="photo-button" type="button" data-action="prototype-photo" aria-label="${escapeHtml(t("photoContract"))}"><span aria-hidden="true">▣</span><span>${t("photoContract")}</span></button>
             <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
           </div>
@@ -707,24 +740,43 @@ function findingsTemplate() {
   </section>`;
 }
 
-function crisisQuestionTemplate() {
-  return `<section class="flow-shell">
+function crisisContext() {
+  return `<aside class="crisis-context">
+    <p class="eyebrow">${t("crisisAsideKicker")}</p>
+    <h2>${t("crisisAsideTitle")}</h2>
+    <p>${t("crisisAsideBody")}</p>
+    <a class="crisis-hotline" href="tel:1348">
+      <span>${t("crisisHotlineLabel")}</span>
+      <strong>1348</strong>
+    </a>
+  </aside>`;
+}
+
+function crisisFrame(content, extraClass = "", showContext = true) {
+  return `<section class="flow-shell crisis-shell ${extraClass}">
     ${flowNav(t("crisisStep"))}
-    <div class="question-card">
+    <div class="crisis-layout">
+      <div class="crisis-main">${content}</div>
+      ${showContext ? crisisContext() : ""}
+    </div>
+  </section>`;
+}
+
+function crisisQuestionTemplate() {
+  return crisisFrame(`<div class="question-card">
+      <p class="eyebrow">${t("crisisStep")}</p>
       <h1>${t("crisisQuestionTitle")}</h1>
       <p>${t("crisisQuestionBody")}</p>
       <div class="choice-stack">
         <button class="choice" type="button" data-action="crisis-country" data-danger="true">${t("dangerYes")}</button>
         <button class="choice" type="button" data-action="crisis-country" data-danger="false">${t("dangerNo")}</button>
       </div>
-    </div>
-  </section>`;
+    </div>`);
 }
 
 function crisisCountryTemplate() {
-  return `<section class="flow-shell">
-    ${flowNav(t("crisisStep"))}
-    <form class="question-card" data-form="crisis-country">
+  return crisisFrame(`<form class="question-card" data-form="crisis-country">
+      <p class="eyebrow">${t("crisisStep")}</p>
       <h1>${t("countryTitle")}</h1>
       <div class="field">
         <label for="crisis-country">${t("countryLabel")}</label>
@@ -735,14 +787,12 @@ function crisisCountryTemplate() {
         </select>
       </div>
       <button class="button ink-button" type="submit">${t("continue")}</button>
-    </form>
-  </section>`;
+    </form>`);
 }
 
 function crisisSituationTemplate() {
-  return `<section class="flow-shell">
-    ${flowNav(t("crisisStep"))}
-    <form class="question-card" data-form="crisis-situation">
+  return crisisFrame(`<form class="question-card" data-form="crisis-situation">
+      <p class="eyebrow">${t("crisisStep")}</p>
       <h1>${t("situationTitle")}</h1>
       <p>${t("situationBody")}</p>
       <div class="field">
@@ -750,8 +800,7 @@ function crisisSituationTemplate() {
         <textarea id="crisis-situation" required maxlength="500" placeholder="${escapeHtml(t("situationPlaceholder"))}"></textarea>
       </div>
       <button class="button ink-button" type="submit">${t("showHelp")}</button>
-    </form>
-  </section>`;
+    </form>`);
 }
 
 function crisisRouteTemplate() {
@@ -759,9 +808,8 @@ function crisisRouteTemplate() {
   const routeBody = crisisDanger
     ? t("routeBody")
     : t("mwoRouteBody", crisisCountry || t("otherCountry"));
-  return `<section class="flow-shell">
-    ${flowNav(t("crisisStep"))}
-    <article class="report">
+  return crisisFrame(`<article class="report">
+      <p class="eyebrow">${t("crisisStep")}</p>
       <h1>${routeTitle}</h1>
       <p class="report-intro">${routeBody}</p>
       <div class="route-grid">
@@ -782,17 +830,25 @@ function crisisRouteTemplate() {
       </div>
       <p class="reassurance">${t("reassurance")}</p>
       <button class="button" type="button" data-action="dashboard">${t("done")}</button>
-    </article>
-  </section>`;
+    </article>`, "crisis-route-shell", false);
 }
 
 function profileTemplate() {
   const profile = JSON.parse(localStorage.getItem(`gabay-profile:${userId}`) || "{}");
-  return `<section class="flow-shell">
+  return `<section class="flow-shell profile-shell">
     ${flowNav(t("profile"))}
-    <form class="profile-form" data-form="profile">
-      <h1>${t("profileTitle")}</h1>
-      <p>${t("profileBody")}</p>
+    <div class="profile-layout">
+      <header class="profile-intro">
+        <p class="eyebrow">${t("profileKicker")}</p>
+        <h1>${t("profileTitle")}</h1>
+        <p>${t("profileBody")}</p>
+        <button class="profile-help-link" type="button" data-action="crisis">
+          <span class="urgent-dot" aria-hidden="true"></span>
+          ${t("needHelp")}
+        </button>
+      </header>
+      <form class="profile-form" data-form="profile">
+      <h2 class="profile-form-title">${t("profile")}</h2>
       <div class="field">
         <label for="profile-country">${t("countryOptional")}</label>
         <input id="profile-country" name="country" value="${escapeHtml(profile.country || "")}" placeholder="${escapeHtml(t("countryPlaceholder"))}">
@@ -805,7 +861,8 @@ function profileTemplate() {
         <button class="button ink-button" type="submit">${t("saveProfile")}</button>
         <button class="button" type="button" data-action="delete-profile">${t("deleteData")}</button>
       </div>
-    </form>
+      </form>
+    </div>
   </section>`;
 }
 
@@ -827,7 +884,7 @@ function renderScreen(name = currentScreen) {
   const isContract = name.startsWith("contract") || name === "findings";
   const isCrisis = name.startsWith("crisis");
   modeSwitcher.classList.toggle("hidden", name === "dashboard" || name === "profile");
-  globalHelp.classList.toggle("hidden", name === "dashboard" || isContract || isCrisis);
+  globalHelp.classList.toggle("hidden", name === "dashboard" || name === "profile" || isContract || isCrisis);
   modeSwitcher.querySelector('[data-mode-link="contract"]').classList.toggle("active", isContract);
   modeSwitcher.querySelector('[data-mode-link="crisis"]').classList.toggle("active", isCrisis);
   screen.focus({ preventScroll: true });
@@ -838,6 +895,7 @@ function navigate(name) {
   screenLoading.classList.remove("hidden");
   window.setTimeout(() => {
     renderScreen(name);
+    window.scrollTo(0, 0);
     screenLoading.classList.add("hidden");
     screen.classList.remove("hidden");
   }, 120);
@@ -884,7 +942,17 @@ async function submitContractMessage(form) {
   const input = document.getElementById("contract-message");
   const message = input.value.trim();
   if (!message) return;
-  contractMessages.push({ role: "user", text: message });
+  const lastMessage = contractMessages.at(-1);
+  const replacesFailedMessage = Boolean(contractFailedMessage)
+    && lastMessage?.role === "user"
+    && lastMessage.text === contractFailedMessage;
+  contractError = "";
+  contractFailedMessage = "";
+  if (replacesFailedMessage) {
+    lastMessage.text = message;
+  } else {
+    contractMessages.push({ role: "user", text: message });
+  }
   renderScreen("contract-chat");
   try {
     const result = await contractRequest(message);
@@ -900,11 +968,13 @@ async function submitContractMessage(form) {
     if (result.status === "complete") {
       findingsReport = result.report;
       renderScreen("findings");
+      window.scrollTo(0, 0);
       return;
     }
     showStatus(t("contractEscalated"));
   } catch (error) {
-    showStatus(error.message || t("contractFailed"));
+    contractError = error.message || t("contractFailed");
+    contractFailedMessage = message;
     renderScreen("contract-chat");
   }
 }
@@ -923,6 +993,8 @@ document.addEventListener("click", (event) => {
   if (action === "contract-chat" && currentScreen === "dashboard") {
     contractCheck = null;
     contractMessages = [];
+    contractError = "";
+    contractFailedMessage = "";
     findingsReport = null;
   }
   if (action === "crisis-country") {

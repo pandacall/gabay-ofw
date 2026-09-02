@@ -169,9 +169,15 @@ test("Contract Check shows the backend failure reason", async ({ page }) => {
   ).fill("Please check my contract.");
   await page.getByRole("button", { name: "Continue" }).click();
 
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.getByRole("alert")).toContainText(
     "Gemini returned an invalid response (502)",
   );
+  await expect(page.getByRole("alert")).toContainText(
+    "Your message is still here",
+  );
+  await expect(
+    page.getByLabel("Talk to us about what your contract says and what is actually happening."),
+  ).toHaveValue("Please check my contract.");
 });
 
 test("user can click through Crisis Help to code-owned contact cards", async ({
