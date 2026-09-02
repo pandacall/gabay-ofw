@@ -79,9 +79,10 @@ test("signed-in user explicitly chooses either mode from the dashboard", async (
 
   await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Check my contract/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Skip to main content" })).toHaveAttribute("href", "#screen");
   await expect(page.locator(".crisis-card")).toBeVisible();
-  await expect(page.locator(".crisis-card")).toHaveCSS("background-color", "rgb(168, 67, 31)");
-  await expect(page.locator(".contract-card")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.locator(".crisis-card .service-icon")).toHaveCSS("background-color", "rgb(179, 58, 36)");
+  await expect(page.locator(".contract-card .service-icon")).toHaveCSS("background-color", "rgb(16, 35, 63)");
   await expect(page.getByRole("button", { name: "They keep my passport" })).toBeVisible();
 });
 
@@ -94,6 +95,10 @@ test("signed-out user can choose a language before sign-in", async ({ page }) =>
     "Bisaya",
   ]);
   await page.locator("#signed-out").getByLabel("Language").selectOption("tl");
+  await expect(page.getByRole("link", { name: "Lumaktaw sa pangunahing nilalaman" })).toHaveAttribute(
+    "href",
+    "#signed-out",
+  );
   await expect(
     page.getByRole("heading", { name: "Sinusunod ba ng trabaho mo ang kontrata?" }),
   ).toBeVisible();
