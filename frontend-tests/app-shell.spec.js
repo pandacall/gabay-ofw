@@ -129,6 +129,10 @@ test("user completes a genuine multi-turn Contract Check", async ({ page }) => {
   );
   await expect(page.getByRole("heading", { name: "What you have told us" })).toBeVisible();
   await expect(page.getByText("Does your contract promise overtime pay?")).toBeVisible();
+  await page.getByRole("button", { name: "Not sure" }).click();
+  await expect(
+    page.getByLabel("Talk to us about what your contract says and what is actually happening."),
+  ).toHaveValue("Not sure");
   await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Help now" })).toBeVisible();
 
@@ -196,7 +200,7 @@ test("language choice updates every flow and persists", async ({ page }) => {
 
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
   await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
-  await expect(page.locator(".crisis-card")).toContainText("Pangayo og tabang");
+  await expect(page.locator(".crisis-card")).toContainText("Kinahanglan ko og tabang karon");
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();

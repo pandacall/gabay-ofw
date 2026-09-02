@@ -394,6 +394,9 @@ Object.assign(copy.en, {
   reportPrivacy: "This list is built only from what you told us. It is not a legal decision, and nothing has been sent anywhere.",
   savePrototype: "Saving a report is a prototype for now. Nothing was downloaded.",
   readPrototype: "Read-aloud is a prototype for now. No audio was started.",
+  quickNo: "No",
+  quickSometimes: "Sometimes",
+  quickUnsure: "Not sure",
 });
 
 Object.assign(copy.tl, {
@@ -445,6 +448,9 @@ Object.assign(copy.tl, {
   reportPrivacy: "Mula lamang sa sinabi mo ang listahang ito. Hindi ito legal na desisyon, at walang ipinadala kahit saan.",
   savePrototype: "Prototype pa ang pag-save ng report. Walang na-download.",
   readPrototype: "Prototype pa ang pagbasa nang malakas. Walang audio na nagsimula.",
+  quickNo: "Hindi",
+  quickSometimes: "Minsan",
+  quickUnsure: "Hindi sigurado",
 });
 
 Object.assign(copy.ceb, {
@@ -496,6 +502,9 @@ Object.assign(copy.ceb, {
   reportPrivacy: "Gikan lamang sa imong gisulti kining listaha. Dili kini legal nga desisyon, ug walay gipadala.",
   savePrototype: "Prototype pa ang pag-save. Walay na-download.",
   readPrototype: "Prototype pa ang read-aloud. Walay audio nga gisugdan.",
+  quickNo: "Dili",
+  quickSometimes: "Usahay",
+  quickUnsure: "Dili sigurado",
 });
 
 const screen = document.getElementById("screen");
@@ -565,7 +574,6 @@ function dashboardTemplate() {
     <section class="dashboard-shell">
       <header class="dashboard-heading">
         <h1>${escapeHtml(t("greeting", firstName))}</h1>
-        <p>${t("dashboardBody")}</p>
       </header>
       <div class="service-grid">
         <button class="mode-card contract-card" type="button" data-action="contract-chat">
@@ -576,7 +584,6 @@ function dashboardTemplate() {
           <span>
             <h2>${t("contractTitle")}</h2>
             <p>${t("contractBody")}</p>
-            <span class="mode-cta">${t("contractCta")} →</span>
           </span>
         </button>
         <button class="mode-card crisis-card" type="button" data-action="crisis">
@@ -587,7 +594,6 @@ function dashboardTemplate() {
           <span>
             <h2>${t("crisisTitle")}</h2>
             <p>${t("crisisBody")}</p>
-            <span class="mode-cta">${t("crisisCta")} →</span>
           </span>
         </button>
       </div>
@@ -619,26 +625,35 @@ function contractChatTemplate() {
       <div class="conversation-inner">
         <p class="conversation-topic"><span aria-hidden="true">✦</span> ${t("currentTopic")}</p>
         <div class="chat-thread" aria-live="polite">
-          ${hasStarted
-            ? contractMessages.map((message) =>
-                `<div class="message ${message.role}">${escapeHtml(message.text)}</div>`,
-              ).join("")
-            : `<div class="message assistant">${t("contractPrompt")}</div>`}
+          <div class="message assistant">${t("contractPrompt")}</div>
+          ${contractMessages.map((message, index) =>
+            `<div class="message ${message.role}">
+              ${escapeHtml(message.text)}
+              ${message.role === "assistant" && index === contractMessages.length - 1
+                ? `<span class="message-hint">${t("conversationHint")}</span>`
+                : ""}
+            </div>`,
+          ).join("")}
         </div>
+        ${hasStarted ? `
+          <div class="quick-replies">
+            <button type="button" data-quick-reply="${escapeHtml(t("quickNo"))}">${t("quickNo")}</button>
+            <button type="button" data-quick-reply="${escapeHtml(t("quickSometimes"))}">${t("quickSometimes")}</button>
+            <button type="button" data-quick-reply="${escapeHtml(t("quickUnsure"))}">${t("quickUnsure")}</button>
+          </div>
+        ` : ""}
         <form class="composer" data-form="contract-chat">
           <button class="voice-button" type="button" data-action="prototype-voice" aria-label="${escapeHtml(t("voiceInput"))}">⌁</button>
-          <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
-          <button class="photo-button" type="button" data-action="prototype-photo" aria-label="${escapeHtml(t("photoContract"))}">▣</button>
-          <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
+          <div class="composer-field">
+            <input id="contract-message" required maxlength="4000" aria-label="${escapeHtml(t("contractPrompt"))}" placeholder="${escapeHtml(hasStarted ? t("typeAnswer") : t("contractPlaceholder"))}">
+            <button class="photo-button" type="button" data-action="prototype-photo" aria-label="${escapeHtml(t("photoContract"))}"><span aria-hidden="true">▣</span><span>${t("photoContract")}</span></button>
+            <button class="send-button" type="submit" aria-label="${escapeHtml(hasStarted ? t("viewReport") : t("continue"))}">↑</button>
+          </div>
         </form>
-        <p class="composer-hint">${t("conversationHint")}</p>
       </div>
     </div>
     <aside class="conversation-summary">
-      <header>
-        <p class="eyebrow">${t("contractStep")}</p>
-        <h2>${t("summaryTitle")}</h2>
-      </header>
+      <h2>${t("summaryTitle")}</h2>
       <article class="summary-card active">
         <span>${t("summaryActive")}</span>
         <strong>${t("contractTitle")}</strong>
@@ -680,19 +695,14 @@ function findingsTemplate() {
       </div>
     </div>
     <aside class="report-actions">
-      <div>
-        <p class="eyebrow">${t("takeToPerson")}</p>
-        <h2>${t("takeToPerson")}</h2>
-        <p>${t("takeToPersonBody")}</p>
-        <button class="button ink-button" type="button" data-action="crisis">${t("showHelp")} <span aria-hidden="true">→</span></button>
-      </div>
+      <button class="person-button" type="button" data-action="crisis">${t("takeToPerson")}</button>
+      <p>${t("takeToPersonBody")}</p>
       <a class="report-guidance" href="https://dmw.gov.ph/" target="_blank" rel="noopener noreferrer">${escapeHtml(t("salaryGuidance"))}</a>
       <div class="report-tools">
-        <button type="button" data-action="prototype-save">${t("saveCopy")} <span aria-hidden="true">↓</span></button>
-        <button type="button" data-action="prototype-read">${t("readToMe")} <span aria-hidden="true">◖</span></button>
+        <button type="button" data-action="prototype-save">${t("saveCopy")}</button>
+        <button type="button" data-action="prototype-read">${t("readToMe")}</button>
       </div>
       <p class="report-privacy">${t("reportPrivacy")}</p>
-      <button class="back-button" type="button" data-action="dashboard">← ${t("done")}</button>
     </aside>
   </section>`;
 }
@@ -900,6 +910,13 @@ async function submitContractMessage(form) {
 }
 
 document.addEventListener("click", (event) => {
+  const quickReply = event.target.closest("[data-quick-reply]");
+  if (quickReply) {
+    const input = document.getElementById("contract-message");
+    input.value = quickReply.dataset.quickReply;
+    input.focus();
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
