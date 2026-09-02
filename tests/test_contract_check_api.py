@@ -179,6 +179,109 @@ def test_in_progress_resume_loops_with_a_new_interrupt_id():
     assert interviewer.call_count == 2
 
 
+def test_interviewer_retains_conversation_context_across_loop_iterations():
+    # Regression guard: LlmAgent used directly as a Workflow node defaults to
+    # mode="single_turn", which then defaults include_contents="none",
+    # silently dropping all prior turns unless include_contents is set
+    # explicitly. Confirmed against the real Gemini API: without this, the
+    # Interviewer forgets everything the user said in earlier turns of the
+    # same Contract Check.
+    interviewer = CannedModel(
+        responses=[
+            (
+                '{"status":"in_progress","claims":[],"country":null,'
+                '"next_question":"What does your contract say?"}'
+            ),
+            '{"status":"complete","claims":[],"country":null,"next_question":""}',
+        ]
+    )
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=interviewer,
+        rule_matcher_model=CannedModel(responses=['{"findings":[]}']),
+    )
+    client = TestClient(create_app(verifier=FakeVerifier(), contract_checks=service))
+
+    started = client.post(
+        "/api/contract-checks",
+        json={"message": "My name is John John."},
+        headers=auth("alice"),
+    ).json()
+    client.post(
+        f"/api/contract-checks/{started['id']}/messages",
+        json={
+            "message": "What is my name?",
+            "interrupt_id": started["interrupt_id"],
+        },
+        headers=auth("alice"),
+    )
+
+    # Turn 1 has exactly one content: Workflow's single_turn node-input
+    # injection would otherwise duplicate the very first message, which the
+    # Interviewer's before_model_callback collapses.
+    assert interviewer.received_content_counts[0] == 1
+    # Without the fix, turn 2 sees exactly as much content as turn 1 (both are
+    # 1) because every prior turn is silently dropped. With the fix, turn 2
+    # must include strictly more content than turn 1, proving the earlier
+    # exchange was carried forward.
+    assert interviewer.received_content_counts[1] > interviewer.received_content_counts[0]
+
+
+def test_dedupe_adjacent_content_collapses_true_duplicate():
+    from google.adk.models import LlmRequest
+    from google.genai import types
+
+    from app.contract_check import _dedupe_adjacent_content
+
+    request = LlmRequest(
+        model="test",
+        contents=[
+            types.Content(
+                role="user", parts=[types.Part.from_text(text="Ako si John John.")]
+            ),
+            types.Content(
+                role="user", parts=[types.Part.from_text(text="Ako si John John.")]
+            ),
+        ],
+    )
+
+    _dedupe_adjacent_content(None, request)
+
+    assert len(request.contents) == 1
+
+
+def test_dedupe_adjacent_content_preserves_function_call_parts():
+    # Same text is not enough to call two contents duplicates: a tool
+    # call/response transcript must never be silently stripped just because
+    # its narrated text happens to match a plain adjacent turn.
+    from google.adk.models import LlmRequest
+    from google.genai import types
+
+    from app.contract_check import _dedupe_adjacent_content
+
+    request = LlmRequest(
+        model="test",
+        contents=[
+            types.Content(
+                role="model", parts=[types.Part.from_text(text="same text")]
+            ),
+            types.Content(
+                role="model",
+                parts=[
+                    types.Part.from_text(text="same text"),
+                    types.Part(
+                        function_call=types.FunctionCall(name="foo", args={"a": 1})
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    _dedupe_adjacent_content(None, request)
+
+    assert len(request.contents) == 2
+
+
 def test_escalation_ends_without_calling_rule_matcher():
     interviewer = CannedModel(
         responses=[

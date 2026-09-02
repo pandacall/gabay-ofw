@@ -202,6 +202,31 @@ class ContractCheckPersistenceError(Exception):
     pass
 
 
+def _dedupe_adjacent_content(
+    callback_context: Any, llm_request: LlmRequest
+) -> None:
+    """Drops an exact repeat of the immediately preceding content.
+
+    Workflow's single_turn node-input injection (required for this
+    Interviewer to receive include_contents="default" history at all -- see
+    the comment on the interviewer LlmAgent below) can record the same
+    content twice in a row: once via the session's own event trail, once as
+    a synthetic duplicate. Compares full content equality (every part,
+    including function_call/function_response, not just text) so a
+    tool-call/response pair is never mistaken for a plain duplicate and
+    silently stripped. Never touches non-adjacent repeats, which may be
+    legitimate (e.g. the user genuinely saying the same short reply twice in
+    an unrelated later turn).
+    """
+    deduped: list[types.Content] = []
+    for content in llm_request.contents:
+        previous = deduped[-1] if deduped else None
+        if previous is not None and previous == content and content.parts:
+            continue
+        deduped.append(content)
+    llm_request.contents = deduped
+
+
 def _build_workflow(
     interviewer_model: BaseLlm,
     rule_matcher_model: BaseLlm,
@@ -209,6 +234,16 @@ def _build_workflow(
     interviewer = LlmAgent(
         name="interviewer",
         model=interviewer_model,
+        # A plain LlmAgent used as a Workflow node defaults to
+        # mode="single_turn" (required here since interviewer has an incoming
+        # edge from request_more; mode="chat" is rejected by graph validation
+        # for any node with a preceding-node edge). single_turn also silently
+        # sets include_contents="none", dropping every prior turn's history,
+        # unless include_contents is set explicitly -- which the Interviewer
+        # needs, since it loops with the user across many turns and must
+        # remember what was already said.
+        include_contents="default",
+        before_model_callback=_dedupe_adjacent_content,
         instruction=INTERVIEWER_INSTRUCTION,
         output_schema=Claims,
         output_key="claims",
