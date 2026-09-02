@@ -2,10 +2,10 @@
 
 Status: current frontend design
 
-The frontend uses the **Dawn, one accent** direction and the current four-state
-desktop composition (landing, dashboard, conversation, and findings). It should
-feel like a quiet conversation with someone on the user's side: warm, spacious,
-direct, and easy to operate under stress.
+The frontend uses the **Dawn, one accent** direction as a warm field guide, not
+as a literal concept-board copy. It should feel like a quiet conversation with
+someone on the user's side: warm, spacious, direct, and easy to operate under
+stress.
 
 ## Core rule
 
@@ -42,13 +42,17 @@ The current design is intentionally light-only.
 
 ## Shape and depth
 
-- Desktop service panels use 30px radii; findings use 22px radii with a
-  severity-colored left edge.
+- A low-contrast paper grain keeps large dawn surfaces from feeling digitally
+  flat.
+- Desktop service panels use 30px radii and custom line symbols; findings use
+  18-22px radii with a severity-colored left edge.
 - Conversation messages and supporting panels use soft 16-26px radii.
 - Primary actions and segmented controls are pills.
 - Chat messages use soft corners with one tighter speaker-side corner.
 - Shadows are warm, broad, and low contrast.
 - Borders are sand-colored and secondary to spacing.
+- Raised white surfaces are reserved for focused tasks, inputs, messages, and
+  findings. They are not the default wrapper for every section.
 
 ## Interaction
 
@@ -56,6 +60,9 @@ The current design is intentionally light-only.
 - Invite the user to talk in their own words; avoid questionnaire framing.
 - Contract Check and Crisis Help remain explicit choices.
 - Crisis Help remains visibly available throughout signed-in screens.
+- Contract failures appear inline beside the conversation, preserve the
+  submitted message, and give a specific recovery instruction. A toast is not
+  sufficient for request failures.
 - Voice and contract-photo controls are prototype affordances until their real
   capabilities are implemented. They must acknowledge a click without claiming
   recording, camera, upload, or saved data.
@@ -71,13 +78,41 @@ Desktop is an adaptation, not a phone frame:
 - The signed-out view uses an editorial explanation beside one focused sign-in
   panel and an attached clay OWWA strip.
 - The dashboard presents two wide service panels, followed by optional
-  conversation starters.
+  conversation starters. Service symbols must contain meaningful line art;
+  blank circles are not acceptable placeholders.
 - The Contract Check / Help Now switcher sits in the signed-in top bar.
+- Account controls are grouped into one quiet utility surface so they do not
+  compete with the active mode.
 - Contract Check uses a bottom-weighted conversation beside a truthful
   "What you have told us" rail. The rail reflects only information entered in
   the current preview.
 - Findings use a compact two-column grid beside a person-first action rail.
+- Crisis Help uses a stable editorial split: the active step occupies the main
+  area and a warm support rail keeps the official OWWA path visible. The final
+  contact result uses the full width and does not duplicate hotline cards.
+- Profile uses an open editorial introduction beside a compact form. On mobile,
+  Crisis Help is part of this composition instead of floating over form
+  controls.
 - Line lengths remain constrained even when the workspace grows.
+
+## Required visual review
+
+Frontend changes are not complete after DOM assertions or a successful build.
+Every meaningful visual change must be reviewed from deterministic rendered
+screenshots.
+
+1. Capture signed-out, dashboard, Contract Check opening, mid-conversation,
+   failure, and findings; every Crisis Help step; profile; disclaimer; and
+   loading.
+2. Capture each state at 1440x900 and 390x844 with stable authentication and API
+   fixtures. Never use fabricated DOM snapshots in place of the real templates.
+3. Compare before and after images for hierarchy, typography, spacing, grid
+   alignment, density, color semantics, affordances, overflow, and content
+   truthfulness.
+4. Inspect at least one small-laptop viewport and one 320px-wide phone before
+   approval.
+5. Correct visible regressions and recapture the affected states. Preserve the
+   screenshot matrix outside the repository as review evidence.
 
 ## Safety constraints
 
