@@ -181,7 +181,10 @@ def production_app() -> FastAPI:
     if not api_key:
         raise RuntimeError("Gemini API key is not configured")
     model_client = Client(api_key=api_key)
-    model = Gemini(model="gemini-2.5-flash", client=model_client)
+    # gemini-2.5-flash is being phased out ahead of its Oct 2026 retirement
+    # date and was intermittently rejected with 404s in production; use the
+    # current agentic-workload Flash model instead.
+    model = Gemini(model="gemini-3.5-flash", client=model_client)
     service = ContractCheckService(
         session_service=FirestoreSessionService(firestore.Client()),
         interviewer_model=model,
