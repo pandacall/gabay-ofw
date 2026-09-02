@@ -1,6 +1,9 @@
 """Gabay OFW FastAPI application."""
 
+import json
+import logging
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -14,6 +17,8 @@ from app.contract_check import (
     ContractCheckModelOutputError,
     ContractCheckNotFoundError,
     ContractCheckNotResumableError,
+    ContractCheckPersistenceError,
+    ContractCheckProviderError,
     ContractCheckResponse,
     ContractCheckService,
     ContractCheckStart,
@@ -22,6 +27,38 @@ from app.firestore_session_service import FirestoreSessionService
 from app.notes import NotesStore, get_notes_store
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+_LOGGER = logging.getLogger(__name__)
+
+
+def _contract_check_http_error(error: Exception) -> HTTPException:
+    request_id = uuid4().hex
+    diagnostic: dict[str, object] = {
+        "event": "contract_check_failed",
+        "request_id": request_id,
+    }
+    if isinstance(error, ContractCheckModelOutputError):
+        diagnostic.update(category="model_output", issues=error.issues)
+        status_code = 502
+        message = "Gemini returned an invalid response"
+    elif isinstance(error, ContractCheckProviderError):
+        diagnostic.update(
+            category="model_provider",
+            provider_status=error.status_code,
+        )
+        status_code = 503
+        message = "Gemini is temporarily unavailable"
+    elif isinstance(error, ContractCheckPersistenceError):
+        diagnostic["category"] = "persistence"
+        status_code = 503
+        message = "Contract Check storage is temporarily unavailable"
+    else:
+        raise TypeError(f"Unsupported Contract Check error: {type(error).__name__}")
+    _LOGGER.warning(json.dumps(diagnostic, separators=(",", ":")))
+    return HTTPException(
+        status_code=status_code,
+        detail=f"{message}. Reference: {request_id}",
+        headers={"X-Request-ID": request_id},
+    )
 
 
 class NoteIn(BaseModel):
@@ -83,10 +120,12 @@ def create_app(
             )
         try:
             return await service.start(uid, request.message)
-        except ContractCheckModelOutputError:
-            raise HTTPException(
-                status_code=502, detail="Gemini returned an invalid response"
-            )
+        except (
+            ContractCheckModelOutputError,
+            ContractCheckProviderError,
+            ContractCheckPersistenceError,
+        ) as error:
+            raise _contract_check_http_error(error)
 
     @app.post(
         "/api/contract-checks/{check_id}/messages",
@@ -112,10 +151,12 @@ def create_app(
             raise HTTPException(
                 status_code=409, detail="Contract Check cannot be resumed"
             )
-        except ContractCheckModelOutputError:
-            raise HTTPException(
-                status_code=502, detail="Gemini returned an invalid response"
-            )
+        except (
+            ContractCheckModelOutputError,
+            ContractCheckProviderError,
+            ContractCheckPersistenceError,
+        ) as error:
+            raise _contract_check_http_error(error)
 
     if _STATIC_DIR.is_dir():
 

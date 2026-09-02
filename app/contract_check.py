@@ -14,7 +14,9 @@ from google.adk.models import BaseLlm
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService
 from google.adk.workflow import Workflow
+from google.api_core.exceptions import GoogleAPICallError
 from google.genai import types
+from google.genai.errors import APIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 APP_NAME = "gabay_ofw_contract_check"
@@ -164,6 +166,24 @@ class ContractCheckNotResumableError(Exception):
 
 
 class ContractCheckModelOutputError(Exception):
+    def __init__(self, error: ValidationError) -> None:
+        self.issues = [
+            {
+                "location": ".".join(str(part) for part in issue["loc"]),
+                "type": issue["type"],
+            }
+            for issue in error.errors(include_input=False, include_url=False)
+        ]
+        super().__init__("Gemini output failed Contract Check validation")
+
+
+class ContractCheckProviderError(Exception):
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+        super().__init__("Gemini provider request failed")
+
+
+class ContractCheckPersistenceError(Exception):
     pass
 
 
@@ -262,14 +282,14 @@ class ContractCheckService:
 
     async def start(self, uid: str, message: str) -> dict[str, Any]:
         check_id = uuid4().hex
-        await self._sessions.create_session(
-            app_name=APP_NAME,
-            user_id=uid,
-            session_id=check_id,
-            state={"status": "started", "rule_matcher_runs": 0},
-        )
         try:
-            result = await self._run(
+            await self._sessions.create_session(
+                app_name=APP_NAME,
+                user_id=uid,
+                session_id=check_id,
+                state={"status": "started", "rule_matcher_runs": 0},
+            )
+            result = await self._run_checked(
                 uid=uid,
                 check_id=check_id,
                 message=types.Content(
@@ -277,8 +297,8 @@ class ContractCheckService:
                     parts=[types.Part.from_text(text=message)],
                 ),
             )
-        except ValidationError as error:
-            raise ContractCheckModelOutputError from error
+        except GoogleAPICallError as error:
+            raise ContractCheckPersistenceError from error
         return {"id": check_id, **result}
 
     async def resume(
@@ -288,11 +308,14 @@ class ContractCheckService:
         interrupt_id: str,
         message: str,
     ) -> dict[str, Any]:
-        session = await self._sessions.get_session(
-            app_name=APP_NAME,
-            user_id=uid,
-            session_id=check_id,
-        )
+        try:
+            session = await self._sessions.get_session(
+                app_name=APP_NAME,
+                user_id=uid,
+                session_id=check_id,
+            )
+        except GoogleAPICallError as error:
+            raise ContractCheckPersistenceError from error
         if session is None:
             raise ContractCheckNotFoundError(check_id)
         if session.state.get("status") != "in_progress":
@@ -311,26 +334,39 @@ class ContractCheckService:
         if not unresolved_interrupts or interrupt_id != unresolved_interrupts[-1]:
             raise ContractCheckNotResumableError(check_id)
 
-        try:
-            result = await self._run(
-                uid=uid,
-                check_id=check_id,
-                message=types.Content(
-                    role="user",
-                    parts=[
-                        types.Part(
-                            function_response=types.FunctionResponse(
-                                id=interrupt_id,
-                                name="adk_request_input",
-                                response={"result": message},
-                            )
+        result = await self._run_checked(
+            uid=uid,
+            check_id=check_id,
+            message=types.Content(
+                role="user",
+                parts=[
+                    types.Part(
+                        function_response=types.FunctionResponse(
+                            id=interrupt_id,
+                            name="adk_request_input",
+                            response={"result": message},
                         )
-                    ],
-                ),
-            )
-        except ValidationError as error:
-            raise ContractCheckModelOutputError from error
+                    )
+                ],
+            ),
+        )
         return {"id": check_id, **result}
+
+    async def _run_checked(
+        self,
+        *,
+        uid: str,
+        check_id: str,
+        message: types.Content,
+    ) -> dict[str, Any]:
+        try:
+            return await self._run(uid=uid, check_id=check_id, message=message)
+        except ValidationError as error:
+            raise ContractCheckModelOutputError(error) from error
+        except APIError as error:
+            raise ContractCheckProviderError(error.code) from error
+        except GoogleAPICallError as error:
+            raise ContractCheckPersistenceError from error
 
     async def _run(
         self,
