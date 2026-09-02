@@ -219,6 +219,7 @@ test("Contract Check keeps the newest turn visible in a long conversation", asyn
     await expect(page.locator(".message.user").last()).toContainText(
       `Conversation detail ${turn}`,
     );
+    await expect(page.locator(".message.assistant")).toHaveCount(turn + 1);
   }
 
   await expect(page.locator(".message.user").last()).toContainText(
