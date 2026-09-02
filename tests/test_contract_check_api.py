@@ -343,6 +343,44 @@ def test_invalid_gemini_api_key_is_not_reported_as_temporary():
     assert "provider detail" not in response.text
 
 
+def test_diag_reports_gemini_unreachable_with_safe_detail():
+    # A signed-in user should be able to check Gemini connectivity directly,
+    # without needing a full Contract Check turn to surface the same safe
+    # status/reason our error classifier already captures.
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=FailingModel(status_code=400, reason="INVALID_ARGUMENT"),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(create_app(verifier=FakeVerifier(), contract_checks=service))
+
+    response = client.get("/api/diag", headers=auth("alice"))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["gemini_reachable"] is False
+    assert body["gemini_status"] == 400
+    assert body["gemini_reason"] == "INVALID_ARGUMENT"
+
+
+def test_diag_reports_gemini_reachable_on_success():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=CannedModel(
+            responses=[
+                '{"status":"in_progress","claims":[],"next_question":"hi"}'
+            ]
+        ),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(create_app(verifier=FakeVerifier(), contract_checks=service))
+
+    response = client.get("/api/diag", headers=auth("alice"))
+
+    assert response.status_code == 200
+    assert response.json()["gemini_reachable"] is True
+
+
 def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():
     sessions = InMemorySessionService()
     service = ContractCheckService(

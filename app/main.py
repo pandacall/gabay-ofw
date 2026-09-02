@@ -94,9 +94,20 @@ def create_app(
         return config
 
     @app.get("/api/diag")
-    def diag(uid: str = Depends(get_current_uid)):
+    async def diag(uid: str = Depends(get_current_uid)):
         # Never exposes the key itself — presence only.
-        return {"uid": uid, "gemini_key_loaded": get_gemini_api_key() is not None}
+        result: dict[str, object] = {
+            "uid": uid,
+            "gemini_key_loaded": get_gemini_api_key() is not None,
+        }
+        service: ContractCheckService | None = app.state.contract_checks
+        if service is not None:
+            connectivity = await service.check_connectivity()
+            result["gemini_reachable"] = connectivity["reachable"]
+            if not connectivity["reachable"]:
+                result["gemini_status"] = connectivity["status_code"]
+                result["gemini_reason"] = connectivity["reason"]
+        return result
 
     @app.post("/api/notes", status_code=201)
     def create_note(
