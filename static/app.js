@@ -10,7 +10,6 @@ import {
 const copy = {
   en: {
     languageName: "English",
-    skipContent: "Skip to main content",
     loading: "Loading your private space...",
     welcomeEyebrow: "Practical support for Filipino workers abroad",
     welcomeTitle: "Is your work following your contract?",
@@ -131,7 +130,6 @@ const copy = {
   },
   tl: {
     languageName: "Filipino",
-    skipContent: "Lumaktaw sa pangunahing nilalaman",
     loading: "Binubuksan ang iyong pribadong espasyo...",
     welcomeEyebrow: "Praktikal na suporta para sa Pilipinong manggagawa sa abroad",
     welcomeTitle: "Sinusunod ba ng trabaho mo ang kontrata?",
@@ -250,7 +248,6 @@ const copy = {
   },
   ceb: {
     languageName: "Bisaya",
-    skipContent: "Adto sa pangunang sulod",
     loading: "Giablihan ang imong pribadong luna...",
     welcomeEyebrow: "Praktikal nga suporta para sa Pilipinong trabahante sa abroad",
     welcomeTitle: "Nagsunod ba ang imong trabaho sa kontrata?",
@@ -541,7 +538,6 @@ const languageSelects = document.querySelectorAll(".language-select");
 const modeSwitcher = document.querySelector(".mode-switcher");
 const globalHelp = document.getElementById("global-help");
 const status = document.getElementById("status");
-const skipLink = document.getElementById("skip-link");
 
 const supportedLanguages = Object.keys(copy);
 const savedLanguage = localStorage.getItem("gabay-language");
@@ -556,7 +552,6 @@ let contractFailedMessage = "";
 let findingsReport = null;
 let crisisDanger = false;
 let crisisCountry = "";
-let statusTimer = null;
 
 const t = (key, ...args) => {
   const value = copy[language][key] ?? copy.en[key];
@@ -651,7 +646,7 @@ function contractChatTemplate() {
   return `<section class="contract-workspace">
     <div class="conversation-pane">
       <div class="conversation-inner">
-        <p class="conversation-topic">${t("currentTopic")}</p>
+        <p class="conversation-topic"><span aria-hidden="true">✦</span> ${t("currentTopic")}</p>
         <div class="chat-thread" aria-live="polite">
           <div class="message assistant">${t("contractPrompt")}</div>
           ${contractMessages.map((message, index) =>
@@ -724,12 +719,10 @@ function findingsTemplate() {
               <span>${escapeHtml(t(finding.severity))}</span>
               <small>${t("resultCount", index + 1, report.findings.length)}</small>
             </div>
-            <div class="finding-content">
-              <h2>${escapeHtml(finding.issue)}</h2>
-              <dl>
-                <div><dt>${t("contractSays")}</dt><dd>${escapeHtml(finding.rule)}</dd></div>
-              </dl>
-            </div>
+            <h2>${escapeHtml(finding.issue)}</h2>
+            <dl>
+              <div><dt>${t("contractSays")}</dt><dd>${escapeHtml(finding.rule)}</dd></div>
+            </dl>
           </article>
         `).join("")}
       </div>
@@ -909,13 +902,9 @@ function navigate(name) {
 }
 
 function showStatus(message) {
-  if (statusTimer) window.clearTimeout(statusTimer);
   status.textContent = message;
   status.classList.remove("hidden");
-  statusTimer = window.setTimeout(() => {
-    status.classList.add("hidden");
-    statusTimer = null;
-  }, 2600);
+  window.setTimeout(() => status.classList.add("hidden"), 2600);
 }
 
 async function contractRequest(message) {
@@ -1098,7 +1087,6 @@ if (auth) {
     authLoading.classList.add("hidden");
     signedOut.classList.toggle("hidden", Boolean(user));
     app.classList.toggle("hidden", !user);
-    skipLink.setAttribute("href", user ? "#screen" : "#signed-out");
     if (!user) return;
     userName = user.displayName || user.email || "";
     userId = user.uid || user.email || "signed-in-user";
