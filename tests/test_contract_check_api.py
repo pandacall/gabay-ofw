@@ -6,7 +6,7 @@ from google.adk.sessions import InMemorySessionService
 
 from app.contract_check import ContractCheckService
 from app.main import create_app
-from tests.contract_check_fakes import CannedModel, FakeVerifier, auth
+from tests.contract_check_fakes import CannedModel, FailingModel, FakeVerifier, auth
 
 
 @pytest.fixture()
@@ -231,6 +231,8 @@ def test_malformed_model_output_is_rejected_and_not_persisted():
     )
 
     assert response.status_code == 502
+    assert response.headers["x-request-id"]
+    assert response.headers["x-request-id"] in response.json()["detail"]
     listed = asyncio.run(
         sessions.list_sessions(app_name="gabay_ofw_contract_check", user_id="alice")
     )
@@ -258,6 +260,32 @@ def test_contract_check_endpoints_require_authentication(client):
 
     assert started.status_code == 401
     assert resumed.status_code == 401
+
+
+def test_gemini_rate_limit_returns_safe_diagnostic():
+    service = ContractCheckService(
+        session_service=InMemorySessionService(),
+        interviewer_model=FailingModel(status_code=429),
+        rule_matcher_model=CannedModel(responses=[]),
+    )
+    client = TestClient(
+        create_app(verifier=FakeVerifier(), contract_checks=service),
+        raise_server_exceptions=False,
+    )
+
+    response = client.post(
+        "/api/contract-checks",
+        json={"message": "Please check my contract."},
+        headers=auth("alice"),
+    )
+
+    assert response.status_code == 503
+    assert response.headers["x-request-id"]
+    assert response.json()["detail"] == (
+        "Gemini is temporarily unavailable. "
+        f"Reference: {response.headers['x-request-id']}"
+    )
+    assert "provider detail" not in response.text
 
 
 def test_malformed_rule_matcher_output_is_rejected_and_not_persisted():

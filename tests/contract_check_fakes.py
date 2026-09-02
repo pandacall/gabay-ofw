@@ -2,6 +2,7 @@ from collections.abc import AsyncGenerator
 
 from fastapi import HTTPException
 from google.adk.models import BaseLlm, LlmRequest, LlmResponse
+from google.genai.errors import APIError
 from google.genai import types
 
 
@@ -28,6 +29,20 @@ class CannedModel(BaseLlm):
                 parts=[types.Part.from_text(text=response)],
             )
         )
+
+
+class FailingModel(BaseLlm):
+    model: str = "failing"
+    status_code: int
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        raise APIError(
+            self.status_code,
+            {"message": "provider detail must not reach the user"},
+        )
+        yield
 
 
 def auth(uid: str) -> dict[str, str]:
