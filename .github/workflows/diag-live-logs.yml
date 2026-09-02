@@ -1,0 +1,43 @@
+name: Diagnose live Contract Check failure
+
+# Temporary, manually-triggered diagnostic: reads Cloud Logging for a single
+# request_id already surfaced to the user by the deployed error toast.
+# Prints only the app's own privacy-safe diagnostic line (exception category
+# and provider/persistence status code) -- never prompt or model content,
+# since the app never logs those.
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "The Reference ID shown in the Contract Check error toast"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  read-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Read matching log entries
+        shell: bash
+        run: |
+          gcloud logging read \
+            'resource.type="cloud_run_revision"
+             AND resource.labels.service_name="${{ vars.CLOUD_RUN_SERVICE }}"
+             AND SEARCH("${{ inputs.request_id }}")' \
+            --project "${{ vars.GCP_PROJECT_ID }}" \
+            --freshness=1d \
+            --limit=20 \
+            --order=asc \
+            --format='value(timestamp,severity,textPayload,jsonPayload)'
