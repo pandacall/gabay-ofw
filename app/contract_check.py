@@ -92,13 +92,18 @@ class Claims(StrictModel):
     status: Literal["complete", "in_progress", "escalate_to_crisis"]
     claims: list[Claim]
     country: CountryCode | None = None
-    next_question: str | None = None
+    next_question: str = Field(
+        description=(
+            "Exactly one question in the user's language when status is "
+            "in_progress; an empty string for complete or escalate_to_crisis."
+        )
+    )
 
     @model_validator(mode="after")
     def validate_next_question(self) -> "Claims":
-        if self.status == "in_progress" and not self.next_question:
+        if self.status == "in_progress" and not self.next_question.strip():
             raise ValueError("in-progress Claims require one next question")
-        if self.status != "in_progress" and self.next_question is not None:
+        if self.status != "in_progress" and self.next_question:
             raise ValueError("only in-progress Claims may include a next question")
         if self.next_question and _SALARY_FIGURE.search(self.next_question):
             raise ValueError("salary figures are not allowed in Interviewer questions")
@@ -220,7 +225,7 @@ def _build_workflow(
         )
 
     def request_more(ctx: Context, node_input: Claims) -> RequestInput:
-        if node_input.next_question is None:
+        if not node_input.next_question:
             raise RuntimeError("in-progress Claims did not contain a question")
         return RequestInput(
             interrupt_id=f"contract-check-{ctx.session.id}-{ctx.state['turn_index']}",
