@@ -14,7 +14,12 @@ rendered by the UI outside the LLM text, per ADR-0002. When PROOF_BUILDER
 ran, its schema-validated ProofGap crosses the same seam as a
 ``proof_gap`` line: the scope limit, the satisfied/outstanding rows, and
 the single next-artifact ask are shown by the UI from the typed payload,
-so the voice only frames them.
+so the voice only frames them. When COMPLAINT_DRAFTER ran, its
+schema-validated ComplaintDraftOut crosses the same seam as a
+``complaint_draft`` line — the filled SEnA RFA (with its rendered PDF),
+the English intake narrative, the Arabic arithmetic-only loss
+calculation, or whichever refusal fired — never framed as prose the
+voice composed itself.
 
 ``ChatService.correct_case`` (issue #44) is the one-tap correction seam:
 the Case streamed on the ``case`` line is rendered and correctable by the
@@ -289,6 +294,7 @@ class ChatService:
         verdicts: list[dict] = []
         proof_gaps: list[dict] = []
         regeneration_failed = False
+        complaint_drafts: list[dict] = []
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -331,6 +337,21 @@ class ChatService:
                         "regeneration_failed"
                     ):
                         regeneration_failed = True
+                    # COMPLAINT_DRAFTER results are the schema-validated
+                    # ComplaintDraftOut dict (output_schema): exactly one
+                    # of draft / illegal_recruitment_refusal /
+                    # premature_filing_refusal is present, never more than
+                    # one and never none — the UI renders whichever the
+                    # specialist actually returned, verbatim.
+                    if function_response.name == "COMPLAINT_DRAFTER" and any(
+                        response.get(key) is not None
+                        for key in (
+                            "draft",
+                            "illegal_recruitment_refusal",
+                            "premature_filing_refusal",
+                        )
+                    ):
+                        complaint_drafts.append(response)
                 # DISPATCHER is the only voice in normal turns; EMERGENCY
                 # (issue #41) is the sole exception — the only other agent
                 # whose text is her reply, since a transfer hands the
@@ -425,6 +446,15 @@ class ChatService:
                 {
                     "type": "proof_gap",
                     "proof_gap": gap,
+                    "session_id": session.id,
+                }
+            )
+
+        for draft in complaint_drafts:
+            yield _line(
+                {
+                    "type": "complaint_draft",
+                    "complaint_draft": draft,
                     "session_id": session.id,
                 }
             )
