@@ -29,8 +29,10 @@ SAFETY_FLAGS = frozenset(
 )
 
 # Provenance sources. Only these may author a claim; none of them may clear
-# a safety flag.
-CLAIM_SOURCES = frozenset({"extraction", "document", "user"})
+# a safety flag. "debunker" is DEBUNKER's verdict write (issue #47): a
+# plan-relevant FALSE lands on the Case with provenance so a Plan resting
+# on the belief goes stale via the input-hash mechanism (issue #43).
+CLAIM_SOURCES = frozenset({"extraction", "document", "user", "debunker"})
 
 
 def empty_case() -> dict[str, Any]:

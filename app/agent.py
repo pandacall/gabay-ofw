@@ -20,6 +20,7 @@ from google.adk.apps import App
 from google.adk.models import BaseLlm
 
 from app.case import merge_case
+from app.debunker import build_debunker
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
 from app.tools import action_card, office_directory, safe_floor_card
@@ -87,6 +88,19 @@ sequence isn't verified, or her facts changed — call safe_floor_card
 with the fitting reason instead of guessing; the app shows her the card
 itself, so frame it warmly in your own words without repeating the
 numbers. Never direct her to local police.
+
+When her message reports something she has been TOLD — a claimed debt
+("utang mo ang placement fee"), a claimed rule or restriction ("you can't
+leave until you repay", "it's legal for the employer to keep your
+passport", "you need an NOC", "you must complete two years") — call
+DEBUNKER with each claim exactly as she reported it and the language of
+her message. The app shows her each verdict, its cited rebuttal, and any
+MWO routing itself, so frame the outcome warmly in your own words without
+repeating the numbers: state a FALSE plainly with its source named, keep
+a rebuttal's own confirm-with-the-MWO wording where it has one, and for
+NOT_COVERED tell her the MWO can verify it and the contact is on her
+screen — never a bare "I don't know", and never a verdict, number, or
+citation the tool did not return.
 """
 
 
@@ -123,7 +137,14 @@ def make_absorb_narrative_callback(llm: BaseLlm):
 
 
 def build_adk_app(llm: BaseLlm) -> App:
-    """Builds the ADK App with DISPATCHER as the chat-mode root agent."""
+    """Builds the ADK App with DISPATCHER as the chat-mode root agent.
+
+    Specialists are single-turn sub-agents (ADR-0004): google-adk 2.8.0
+    auto-wraps each ``mode='single_turn'`` sub-agent as a tool named
+    after the agent, with its typed ``input_schema`` as the parameters —
+    no ``AgentTool``, and no free-text request parameter anywhere. Their
+    tool calls cross ROUTING_GUARD like DISPATCHER's own.
+    """
     dispatcher = LlmAgent(
         name="DISPATCHER",
         mode="chat",
@@ -136,6 +157,7 @@ def build_adk_app(llm: BaseLlm) -> App:
         # plugin below): the tool allowlist holds even if the plugin list
         # is ever mishandled. Returns None to allow — never {}.
         before_tool_callback=guard_before_tool,
+        sub_agents=[build_debunker(llm)],
     )
     return App(
         name=APP_NAME, root_agent=dispatcher, plugins=[RoutingGuardPlugin()]
