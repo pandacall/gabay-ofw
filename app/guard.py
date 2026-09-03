@@ -65,8 +65,10 @@ logger = logging.getLogger(__name__)
 #: weaken ROUTING_GUARD's contact-data guarantees. ``COMPLAINT_DRAFTER``
 #: (issue #46) is wired the same way as the other specialists: its four
 #: internal tools (agency-license gate, safe-to-file gate, form fill,
-#: red-team finalize) all cross this guard too. All of these cross this
-#: guard like any other tool.
+#: red-team finalize) all cross this guard too. ``RECOURSE_ROUTER``
+#: (issue #48) is wired the same way: its one internal tool
+#: (``recourse_build_routes``) crosses this guard too. All of these cross
+#: this guard like any other tool.
 ALLOWED_TOOLS = frozenset(
     {
         "office_directory",
@@ -87,6 +89,8 @@ ALLOWED_TOOLS = frozenset(
         "complaint_check_safe_to_file",
         "complaint_prepare_form",
         "complaint_review_and_finalize",
+        "RECOURSE_ROUTER",
+        "recourse_build_routes",
     }
 )
 

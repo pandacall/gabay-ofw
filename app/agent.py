@@ -50,6 +50,7 @@ from app.directory import resolve_case_country
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
 from app.proof.agent import build_proof_builder
+from app.recourse.agent import RECOURSE_ROUTER_NAME, build_recourse_router
 from app.rules import Jurisdiction
 from app.sequencer import Plan, SequencerIn
 from app.sequencer_agent import FILING_SEQUENCER_NAME, build_filing_sequencer
@@ -267,6 +268,26 @@ in English, but how you tell her about them follows her language:
   grievance and has not yet left her employer. Say plainly that filing
   now risks exposing her before she is safely out, and point her to the
   MWO / Safe Floor instead; never push her toward filing regardless.
+
+When she asks which recourses are open to her, what office to go to, or
+whether her family back home can act for her, call {RECOURSE_ROUTER_NAME}
+with her country, tenure, grievances, her recruitment agency (or
+direct-hire flag), and her family's location in the Philippines if she
+has told you (Metro Manila or elsewhere) — it never sees this
+conversation, only the typed arguments you give it.
+
+{RECOURSE_ROUTER_NAME} returns {{"routes": [...]}}: every open door for
+her situation, each naming a venue, an executor (whether she herself can
+act, only a family member can, or either can), what must be true first,
+and what to bring. Walk her through EVERY route it returned, in order,
+in your own warm words — never drop one, never add one, and never
+invent a venue, an executor, or a prerequisite it did not return. Say
+plainly, for each route, whether she can do it herself from where she
+is (executor "self" or "either") or whether it needs her family in the
+Philippines (executor "kin"); never assume she has to wait until she is
+home. Contact numbers still come only from office_directory and
+action_card — never repeat a phone number {RECOURSE_ROUTER_NAME} did not
+return, since it does not return any.
 """
 
 
@@ -402,9 +423,9 @@ def make_absorb_narrative_callback(llm: BaseLlm):
 
 def build_adk_app(llm: BaseLlm) -> App:
     """Builds the ADK App: DISPATCHER as the chat-mode root agent, with
-    FILING_SEQUENCER, DEBUNKER, and PROOF_BUILDER as single-turn
-    specialist sub-agents (ADR-0004) and EMERGENCY as its one and only
-    LLM transfer sub-agent (issue #41).
+    FILING_SEQUENCER, DEBUNKER, PROOF_BUILDER, COMPLAINT_DRAFTER, and
+    RECOURSE_ROUTER as single-turn specialist sub-agents (ADR-0004) and
+    EMERGENCY as its one and only LLM transfer sub-agent (issue #41).
 
     Specialists are single-turn sub-agents: google-adk 2.8.0 auto-wraps
     each ``mode='single_turn'`` sub-agent as a tool named after the
@@ -453,13 +474,15 @@ def build_adk_app(llm: BaseLlm) -> App:
         # EMERGENCY (issue #41) is different: it is NOT single_turn, so it
         # stays a normal sub-agent and a valid transfer_to_agent target
         # instead of being auto-wrapped into a tool. COMPLAINT_DRAFTER
-        # (issue #46) is wired the same single_turn way as the others.
+        # (issue #46) and RECOURSE_ROUTER (issue #48) are wired the same
+        # single_turn way as the others.
         sub_agents=[
             filing_sequencer,
             build_debunker(llm),
             build_proof_builder(llm),
             emergency,
             build_complaint_drafter(llm),
+            build_recourse_router(llm),
         ],
         # ROUTING_GUARD's second, independent rail (the first is the App
         # plugin below): the tool allowlist holds even if the plugin list

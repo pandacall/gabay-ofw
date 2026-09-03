@@ -19,7 +19,11 @@ schema-validated ComplaintDraftOut crosses the same seam as a
 ``complaint_draft`` line — the filled SEnA RFA (with its rendered PDF),
 the English intake narrative, the Arabic arithmetic-only loss
 calculation, or whichever refusal fired — never framed as prose the
-voice composed itself.
+voice composed itself. When RECOURSE_ROUTER ran, its schema-validated
+list of RecourseRoute objects crosses the same seam as a
+``recourse_routes`` line — venue, executor, prerequisites, what to
+bring, and source per route, never framed as prose the voice composed
+itself.
 
 ``ChatService.correct_case`` (issue #44) is the one-tap correction seam:
 the Case streamed on the ``case`` line is rendered and correctable by the
@@ -295,6 +299,7 @@ class ChatService:
         proof_gaps: list[dict] = []
         regeneration_failed = False
         complaint_drafts: list[dict] = []
+        recourse_routes: list[dict] = []
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -352,6 +357,16 @@ class ChatService:
                         )
                     ):
                         complaint_drafts.append(response)
+                    # RECOURSE_ROUTER's own structured answer (issue #48):
+                    # its output_schema guarantees "routes" is a list (may
+                    # be empty in principle, though every fork this corpus
+                    # covers returns at least one) — the UI renders the
+                    # typed payload directly, never framed as prose the
+                    # voice composed itself (ADR-0002 seam).
+                    if function_response.name == "RECOURSE_ROUTER" and isinstance(
+                        response.get("routes"), (list, tuple)
+                    ):
+                        recourse_routes.append(response)
                 # DISPATCHER is the only voice in normal turns; EMERGENCY
                 # (issue #41) is the sole exception — the only other agent
                 # whose text is her reply, since a transfer hands the
@@ -455,6 +470,15 @@ class ChatService:
                 {
                     "type": "complaint_draft",
                     "complaint_draft": draft,
+                    "session_id": session.id,
+                }
+            )
+
+        for recourse in recourse_routes:
+            yield _line(
+                {
+                    "type": "recourse_routes",
+                    "recourse_routes": recourse,
                     "session_id": session.id,
                 }
             )
