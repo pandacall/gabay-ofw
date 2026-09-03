@@ -93,12 +93,21 @@ def sweep_expired(db, *, now: datetime) -> list[DeletionResult]:
 
 
 class RetentionSweeper:
-    """HTTP-seam dependency for the scheduled sweep endpoint."""
+    """HTTP-seam dependency for the scheduled sweep endpoint.
 
-    def __init__(self, db) -> None:
+    The Firestore client is created lazily on the first ``sweep`` call, not
+    at dependency-resolution time: FastAPI resolves ``Depends`` before the
+    handler's shared-secret check runs, so constructing a client here would
+    make an unauthenticated request require credentials (and fail closed as
+    a 500 on hosts without ADC) before the 403/503 is ever reached.
+    """
+
+    def __init__(self, db=None) -> None:
         self._db = db
 
     def sweep(self, *, now: datetime) -> list[DeletionResult]:
+        if self._db is None:
+            self._db = firestore.Client()
         return sweep_expired(self._db, now=now)
 
 
@@ -108,5 +117,5 @@ _sweeper: RetentionSweeper | None = None
 def get_retention_sweeper() -> RetentionSweeper:
     global _sweeper
     if _sweeper is None:
-        _sweeper = RetentionSweeper(firestore.Client())
+        _sweeper = RetentionSweeper()
     return _sweeper
