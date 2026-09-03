@@ -7,7 +7,6 @@ dependency overrides — no internals of the app are mocked.
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from google.cloud import firestore
 
 from app.auth import get_current_uid
 from app import main
@@ -61,10 +60,7 @@ class TestHealth:
         assert r.json() == {"status": "ok"}
 
 
-def test_production_app_starts_with_cloud_services(monkeypatch):
-    monkeypatch.setattr(main, "get_gemini_api_key", lambda: "test-key")
-    monkeypatch.setattr(firestore, "Client", lambda: object())
-
+def test_production_app_starts_with_cloud_services():
     app = main.production_app()
 
     assert TestClient(app).get("/api/health").json() == {"status": "ok"}

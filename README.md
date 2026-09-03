@@ -1,11 +1,8 @@
 # Gabay OFW
 
 A Gemini-powered web app for Filipino Overseas Foreign Workers (OFWs) in the
-Gulf corridor, with two explicitly chosen modes:
+Gulf corridor:
 
-- **Contract Check** — describe your contract and your actual conditions; get a
-  structured findings report grounded in the six non-negotiable POEA/DMW rules.
-  Guidance, never legal advice.
 - **Crisis Help ("I Need Help Now")** — a short, calm triage that routes you to
   real resources (1343 Actionline, OWWA 1348, your country's MWO via the
   official DMW directory). Contact cards are rendered by application code,
@@ -18,14 +15,9 @@ Built for the Hack2skill GenAI Academy APAC **Cloud Run AI Challenge**.
 Walking skeleton (issue #2): Firebase Auth (Google Sign-In), user-isolated
 Firestore round-trip, Secret Manager key retrieval, Cloud Run deploy.
 
-Contract Check architecture spike (issue #3): resumable ADK 2.0 Workflow,
-strict Claims/Findings schemas, deterministic routing, and a custom
-Firestore-backed SessionService proven through canned-model HTTP tests. Real
-Gemini and UI wiring are implemented in issue #5.
-
 App shell (issue #4): responsive signed-in dashboard, four-language copy,
-static click-throughs for both Modes, Findings Report styles, first-run service
-limits, optional profile, and a globally available Crisis Help entry.
+first-run service limits, optional profile, and a globally available Crisis
+Help entry.
 
 Live: https://gabay-ofw-417534361115.asia-southeast1.run.app
 
@@ -51,14 +43,13 @@ uvicorn --factory app.main:production_app --port 8000
 
 ### Firestore security-rules tests
 
-Rules and resumable Contract Check persistence are tested directly against the
-Firestore emulator (requires Node 18+ and Java 21+ on PATH):
+Rules are tested directly against the Firestore emulator (requires Node 18+
+and Java 21+ on PATH):
 
 ```bash
 cd rules-tests
 npm install
 npm test
-npm run test:contract-check
 ```
 
 ## Configuration
@@ -72,8 +63,8 @@ npm run test:contract-check
 ## Firestore security rules
 
 `firestore.rules` enforces `request.auth.uid == uid` on **every** path under
-`users/{uid}/...` (profile, contractChecks + messages, crisisSessions +
-messages). Everything outside the user tree is denied by default. Deploy with:
+`users/{uid}/...` (profile, notes, crisisSessions + messages). Everything
+outside the user tree is denied by default. Deploy with:
 
 ```bash
 firebase deploy --only firestore:rules --project <project-id>
@@ -133,5 +124,3 @@ Firestore rules, and authorizes the Cloud Run domain):
   land with the Crisis Help slice.
 - The Gemini key lives only in Secret Manager (enforced now — the app reads the
   env var only when no cloud project is configured, i.e. local dev).
-- Contract Check model output is schema-validated before being persisted or
-  returned by the API (implemented in the issue #3 architecture spike).

@@ -33,8 +33,6 @@ const anon = () => env.unauthenticatedContext().firestore();
 const writes = (uid) => [
   [`users/${uid}`, { ok: true }],
   [`users/${uid}/notes/n1`, { ok: true }],
-  [`users/${uid}/contractChecks/c1`, { ok: true }],
-  [`users/${uid}/contractChecks/c1/messages/m1`, { ok: true }],
   [`users/${uid}/crisisSessions/s1`, { expireAt: new Date(Date.now() + 48 * 3600 * 1000) }],
   [`users/${uid}/crisisSessions/s1/messages/m1`, { ok: true }],
 ];
@@ -91,7 +89,7 @@ describe("cross-user isolation", () => {
   });
 
   it("denies listing another user's collections", async () => {
-    await assertFails(bob().collection("users/alice/contractChecks").get());
+    await assertFails(bob().collection("users/alice/notes").get());
   });
 });
 

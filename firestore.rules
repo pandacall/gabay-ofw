@@ -15,14 +15,6 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
-    // Contract checks and their conversation turns.
-    match /users/{uid}/contractChecks/{checkId} {
-      allow read, write: if isOwner(uid);
-      match /messages/{msgId} {
-        allow read, write: if isOwner(uid);
-      }
-    }
-
     // Crisis sessions: every create/update must carry an expireAt timestamp
     // so the Firestore TTL policy can auto-delete the transcript (48-72h).
     match /users/{uid}/crisisSessions/{sessionId} {
