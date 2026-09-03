@@ -635,6 +635,25 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
 }
 .chat-message.agent.ack { color: var(--muted); font-style: italic; background: transparent; border-style: dashed; }
 .chat-message.agent.error { border-color: var(--clay); color: var(--clay-dark); }
+.chat-message.agent.contact-card {
+  max-width: 100%;
+  width: 100%;
+  white-space: normal;
+  border: 2px solid var(--clay);
+  border-radius: 14px;
+  background: var(--dawn-surface);
+}
+.contact-card .card-title { margin: 0 0 0.4rem; font-size: 1.02rem; }
+.contact-card .card-reason { margin: 0 0 0.7rem; color: var(--muted); font-size: 0.92rem; }
+.contact-card .card-contacts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+.contact-card .card-contact { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0.7rem; border: 1px solid var(--sand-border); border-radius: 10px; }
+.contact-card .card-contact.dialable { background: var(--soft-sand-2); }
+.contact-card .card-contact.relay { opacity: 0.85; border-style: dashed; }
+.contact-card .card-contact-label { font-weight: 600; font-size: 0.92rem; }
+.contact-card .card-contact-phone { font-size: 1.08rem; letter-spacing: 0.02em; color: var(--clay-dark); text-decoration: none; }
+.contact-card a.card-contact-phone { text-decoration: underline; }
+.contact-card .card-contact-note { color: var(--muted); font-size: 0.82rem; }
+.contact-card .card-hold-line { margin: 0.7rem 0 0; font-weight: 600; font-size: 0.92rem; }
 .chat-message.typing { display: inline-flex; gap: 0.3rem; align-items: center; }
 .chat-message.typing span {
   width: 7px; height: 7px; border-radius: 50%;

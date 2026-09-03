@@ -1,6 +1,7 @@
 """Gabay OFW FastAPI application."""
 
 import hmac
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.auth import FirebaseTokenVerifier, TokenVerifier, get_current_uid
-from app.chat import ChatService
+from app.chat import ChatService, stream_stateless_fallback
 from app.config import (
     get_firebase_web_config,
     get_gemini_api_key,
@@ -111,9 +112,18 @@ def create_app(
         uid: str = Depends(get_current_uid),
         service: ChatService = Depends(get_chat_service),
     ):
-        session = await service.get_or_create_session(
-            uid=uid, session_id=turn.session_id
-        )
+        try:
+            session = await service.get_or_create_session(
+                uid=uid, session_id=turn.session_id
+            )
+        except Exception:
+            # Session store down: the hard fallback — the cached Safe
+            # Floor card with zero model calls, surfaced not swallowed.
+            logging.getLogger(__name__).exception("session store unavailable")
+            return StreamingResponse(
+                stream_stateless_fallback(),
+                media_type="application/x-ndjson",
+            )
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return StreamingResponse(

@@ -224,6 +224,51 @@ test("user can open the conversation from a paired bilingual opener", async ({
   await expect(page.locator(".chat-case")).toContainText("passport withheld");
 });
 
+test("a Safe Floor card line renders as tappable contacts outside the LLM text", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        [
+          JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
+          JSON.stringify({
+            type: "card",
+            card: {
+              type: "safe_floor",
+              country: "SA",
+              title: "Saudi Arabia — Mga totoong opisina na makakatulong / Real offices that can help",
+              reason: "NO_VERIFIED_PLAN",
+              reason_line: "Wala pa akong verified na plano para sa sitwasyon mo. / I don't have a verified plan yet.",
+              contacts: [
+                { key: "mwo_riyadh", channel: "MWO", label: "MWO Riyadh (Migrant Workers Office)", phone: "+966 50 285 0944", dial_mode: "dialable", note: "" },
+                { key: "owwa_1348", channel: "OWWA_1348", label: "OWWA / DMW Hotline 1348", phone: "1348", dial_mode: "manila_relay", note: "for someone in the Philippines to call for you" },
+              ],
+              hold_line: "Huwag kang umalis sa amo mo bago ka makausap ang MWO. / Do not leave before speaking to the MWO.",
+            },
+            session_id: "s1",
+          }),
+          JSON.stringify({ type: "reply", text: "Narito ang mga totoong opisina na makakatulong sa iyo.", session_id: "s1" }),
+          JSON.stringify({ type: "case", case: {}, session_id: "s1" }),
+        ].join("\n") + "\n",
+    }),
+  );
+
+  await page.locator(".chat-card").click();
+  await page.locator("#chat-input").fill("Ano ang unang hakbang ko?");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const card = page.locator(".contact-card");
+  await expect(card).toBeVisible();
+  await expect(card.locator(".card-reason")).toContainText("verified na plano");
+  const dialable = card.locator(".card-contact.dialable a.card-contact-phone");
+  await expect(dialable).toHaveAttribute("href", "tel:+966502850944");
+  await expect(card.locator(".card-contact.relay")).toContainText("1348");
+  await expect(card.locator(".card-hold-line")).toContainText("Do not leave before speaking to the MWO");
+});
+
 test("profile and crisis entry remain available on a small screen", async ({
   page,
 }) => {
