@@ -44,6 +44,7 @@ from google.adk.apps import App
 from google.adk.models import BaseLlm
 
 from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
+from app.complaint.agent import COMPLAINT_DRAFTER_NAME, build_complaint_drafter
 from app.debunker import build_debunker
 from app.directory import resolve_case_country
 from app.extraction import read_narrative
@@ -241,6 +242,31 @@ When she tells you she has already completed one of her Plan's steps
 mark_plan_step_done with that Plan's plan_id and the step's id, both
 exactly as shown to her. The app re-renders the updated plan itself;
 acknowledge it warmly, and never mark a step done on a guess.
+
+Once she has a verified Plan and she asks about filing a complaint, what
+to bring, or wants her SEnA form or intake papers, call
+{COMPLAINT_DRAFTER_NAME} with her worker/employer/agency identity, her
+country, tenure, grievances, an optional wage-loss figure, and any
+safety flags — it never sees this conversation, only the typed
+arguments you give it. It fills forms, it NEVER submits anything.
+
+{COMPLAINT_DRAFTER_NAME} returns exactly one of three shapes; frame
+whichever one it returns warmly in her own language on screen, the same
+as every other specialist result — the fixed form fields and PDF stay
+in English, but how you tell her about them follows her language:
+- {{"draft": {{...}}}} — a red-team-cleared SEnA RFA (rendered as a
+  PDF), an English MWO/ATN intake narrative, and (when a wage-loss
+  figure was given) the Arabic arithmetic-only loss calculation. Tell
+  her the form is filled and ready for her to review and file herself —
+  never say it has been filed or sent anywhere.
+- {{"illegal_recruitment_refusal": {{...}}}} — her agency is not shown
+  licensed, or she was hired directly. Say plainly that SEnA is the
+  wrong office for this and relay the illegal-recruitment routing the
+  card carries; never draft a form for the wrong venue yourself.
+- {{"premature_filing_refusal": {{...}}}} — she has an urgent safety
+  grievance and has not yet left her employer. Say plainly that filing
+  now risks exposing her before she is safely out, and point her to the
+  MWO / Safe Floor instead; never push her toward filing regardless.
 """
 
 
@@ -426,12 +452,14 @@ def build_adk_app(llm: BaseLlm) -> App:
         # DEBUNKER and PROOF_BUILDER (issues #47/#45) are wired the same way.
         # EMERGENCY (issue #41) is different: it is NOT single_turn, so it
         # stays a normal sub-agent and a valid transfer_to_agent target
-        # instead of being auto-wrapped into a tool.
+        # instead of being auto-wrapped into a tool. COMPLAINT_DRAFTER
+        # (issue #46) is wired the same single_turn way as the others.
         sub_agents=[
             filing_sequencer,
             build_debunker(llm),
             build_proof_builder(llm),
             emergency,
+            build_complaint_drafter(llm),
         ],
         # ROUTING_GUARD's second, independent rail (the first is the App
         # plugin below): the tool allowlist holds even if the plugin list

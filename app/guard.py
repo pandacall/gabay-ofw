@@ -62,8 +62,11 @@ logger = logging.getLogger(__name__)
 #: ADK's own built-in tool that performs the one-way
 #: DISPATCHER->EMERGENCY handoff (issue #41's only LLM transfer) — it
 #: carries no contact data of its own, so allowlisting it does not
-#: weaken ROUTING_GUARD's contact-data guarantees. All of these cross
-#: this guard like any other tool.
+#: weaken ROUTING_GUARD's contact-data guarantees. ``COMPLAINT_DRAFTER``
+#: (issue #46) is wired the same way as the other specialists: its four
+#: internal tools (agency-license gate, safe-to-file gate, form fill,
+#: red-team finalize) all cross this guard too. All of these cross this
+#: guard like any other tool.
 ALLOWED_TOOLS = frozenset(
     {
         "office_directory",
@@ -79,6 +82,11 @@ ALLOWED_TOOLS = frozenset(
         "sequencer_compute_deadlines",
         "sequencer_verify_plan",
         "transfer_to_agent",
+        "COMPLAINT_DRAFTER",
+        "complaint_check_agency_license",
+        "complaint_check_safe_to_file",
+        "complaint_prepare_form",
+        "complaint_review_and_finalize",
     }
 )
 
