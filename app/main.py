@@ -93,7 +93,14 @@ def create_app(
     verifier: TokenVerifier | None = None,
     chat_service: ChatService | None = None,
 ) -> FastAPI:
-    app = FastAPI(title="Gabay OFW", docs_url=None, redoc_url=None)
+    # docs_url/redoc_url/openapi_url all disabled (issue #49 route audit):
+    # the interactive docs are gone already, and the raw schema at
+    # /openapi.json is otherwise reachable with no Firebase ID token — it
+    # leaks no user data or Gemini output, but it is unauthenticated attack
+    # surface with zero demo value, so it is off too.
+    app = FastAPI(
+        title="Gabay OFW", docs_url=None, redoc_url=None, openapi_url=None
+    )
     app.state.verifier = verifier or FirebaseTokenVerifier()
     app.state.chat_service = chat_service
 

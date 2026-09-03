@@ -30,6 +30,18 @@ to EMERGENCY, unconditionally, on every turn while the Imminent Danger
 predicate is active on her Case — the predicate the app itself owns
 (``app.case.is_imminent_danger``), never a fact EMERGENCY's own words are
 trusted to set or clear.
+
+Bounded context growth (issue #49): every specialist (FILING_SEQUENCER,
+DEBUNKER, PROOF_BUILDER, COMPLAINT_DRAFTER, RECOURSE_ROUTER) is a tool call
+whose full return value is replayed into DISPATCHER's context on every
+subsequent turn — a long crisis conversation with several specialist calls
+grows without bound unless the App itself compacts it. ``App(...)`` below
+sets ``events_compaction_config`` (an ``LlmEventSummarizer`` sliding-window
+plus a token-threshold safety net, verified against the pinned 2.8.0 wheel
+at ``google/adk/apps/app.py:84``) and ``context_cache_config`` (the wheel's
+default cache window, ``google/adk/apps/app.py:87``) so replay cost and
+per-turn latency stay bounded through a long demo session rather than
+growing turn over turn.
 """
 
 from __future__ import annotations
@@ -39,8 +51,11 @@ import json
 
 from google.adk.agents import LlmAgent
 from google.adk.agents.callback_context import CallbackContext
+from google.adk.agents.context_cache_config import ContextCacheConfig
 from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.apps import App
+from google.adk.apps._configs import EventsCompactionConfig
+from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 from google.adk.models import BaseLlm
 
 from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
@@ -490,5 +505,31 @@ def build_adk_app(llm: BaseLlm) -> App:
         before_tool_callback=guard_before_tool,
     )
     return App(
-        name=APP_NAME, root_agent=dispatcher, plugins=[RoutingGuardPlugin()]
+        name=APP_NAME,
+        root_agent=dispatcher,
+        plugins=[RoutingGuardPlugin()],
+        events_compaction_config=build_events_compaction_config(llm),
+        context_cache_config=ContextCacheConfig(),
+    )
+
+
+def build_events_compaction_config(llm: BaseLlm) -> EventsCompactionConfig:
+    """Bounds per-turn replay cost as a crisis conversation grows long.
+
+    Two independent triggers (issue #49), either of which fires compaction:
+    a sliding window by invocation count (every 6 new user-initiated turns,
+    keeping 2 turns of overlap for continuity) and a token-threshold safety
+    net for a single turn that grows unusually large (e.g. a long
+    FILING_SEQUENCER or COMPLAINT_DRAFTER return value), which keeps the
+    last 10 raw events uncompacted once triggered. ``LlmEventSummarizer``
+    is the wheel's only built-in summarizer (google-adk==2.8.0); a
+    ``None`` summarizer would make ``App.events_compaction_config`` a
+    no-op (verified against ``google/adk/apps/compaction.py``).
+    """
+    return EventsCompactionConfig(
+        summarizer=LlmEventSummarizer(llm=llm),
+        compaction_interval=6,
+        overlap_size=2,
+        token_threshold=6000,
+        event_retention_size=10,
     )

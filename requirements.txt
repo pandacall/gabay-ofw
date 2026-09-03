@@ -1,3 +1,9 @@
+# Top-level, human-edited dependency spec. The deployed container installs
+# from requirements-lock.txt instead (a full `pip freeze`, regenerated
+# whenever this file changes) so a transitive upstream release can never
+# change what ships to the demo (issue #49). google-adk is exact-pinned
+# here too since ADK's before-tool-callback and App(...) config surface
+# is a correctness dependency of ROUTING_GUARD and the topology (ADR-0004).
 google-adk==2.8.0
 google-genai>=2.22
 fastapi>=0.115
