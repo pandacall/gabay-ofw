@@ -79,7 +79,7 @@ from app.tools import (
 
 # Exact pins (PRD #34): google-adk==2.8.0 in requirements.txt, and the
 # Gemini model string pinned exactly — never a -latest alias.
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 APP_NAME = "gabay-ofw"
 
 # Bounded context growth (issue #49): compaction trigger policy for
