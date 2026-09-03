@@ -20,6 +20,8 @@ from app.directory import (
     resolve_keys,
 )
 from app.safe_floor import SafeFloorReason, build_card, is_imminent_danger
+from app.sequencer import Plan
+from app.staleness import mark_step_done
 
 logger = logging.getLogger(__name__)
 
@@ -99,3 +101,41 @@ def safe_floor_card(reason: str, tool_context: ToolContext) -> dict[str, Any]:
             imminent_danger=is_imminent_danger(case),
         )
     }
+
+
+def mark_plan_step_done(
+    plan_id: str, step_id: str, tool_context: ToolContext
+) -> dict[str, Any]:
+    """Marks one step of her CURRENT filing Plan as DONE (issue #43).
+
+    Call this whenever she reports having already completed a filing
+    step (she filed the SEnA request, she already reported the huroob
+    case). This is the only path a step ever reaches DONE — without it,
+    a regenerated plan would have nothing to carry forward and she would
+    lose her place every time her facts are corrected.
+
+    Args:
+        plan_id: The ``plan_id`` of her current Plan, exactly as it was
+            shown to her — a mismatch means the plan has since changed
+            and this call is refused rather than silently applied to the
+            wrong plan.
+        step_id: The step's own id, exactly as shown on that step.
+    """
+    raw_plan = tool_context.state.get("plan")
+    if not raw_plan:
+        return {"ok": False, "reason": "NO_ACTIVE_PLAN"}
+    if tool_context.state.get("plan_active") is False:
+        # ADR-0006: an inactive (stale) plan stops being presented as
+        # actionable. Advancing one of its steps to DONE would still be
+        # treating it as current — code-owned, not left to the model
+        # noticing the plan is inactive and declining to call this.
+        return {"ok": False, "reason": "PLAN_INACTIVE"}
+    plan = Plan.model_validate(raw_plan)
+    if plan.plan_id != plan_id:
+        return {"ok": False, "reason": "PLAN_MISMATCH"}
+    try:
+        updated = mark_step_done(plan, step_id)
+    except ValueError as exc:
+        return {"ok": False, "reason": "STEP_NOT_DONE_ELIGIBLE", "detail": str(exc)}
+    tool_context.state["plan"] = updated.model_dump(mode="json")
+    return {"card": {"type": "plan", **updated.model_dump(mode="json")}}

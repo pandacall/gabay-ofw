@@ -69,6 +69,7 @@ ALLOWED_TOOLS = frozenset(
         "office_directory",
         "action_card",
         "safe_floor_card",
+        "mark_plan_step_done",
         "DEBUNKER",
         "search_corpus",
         "PROOF_BUILDER",
