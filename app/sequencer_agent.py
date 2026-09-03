@@ -114,10 +114,11 @@ def sequencer_sequence_actions(
     situation with no sourced rule row returns a ``held`` /
     ``no_verified_plan`` refusal result instead of rows — never an
     invented sequence. Refuses first, code-owned, when the Case carries
-    an unresolved Conflict on a SequencerIn-mapped field (country, tenure,
-    grievances): a wrong jurisdiction or contested grievance would build a
-    verified-looking Plan around a fact she hasn't confirmed (issue #44) —
-    DISPATCHER never even reaches ``sequence_actions`` in that state. On
+    an unresolved Conflict on a SequencerIn-mapped field (``country`` or
+    ``tenure_months`` — see ``app.case.SEQUENCER_FIELDS``): a wrong
+    jurisdiction or a disputed tenure duration would build a
+    verified-looking Plan around a fact she hasn't confirmed (issue #44)
+    — DISPATCHER never even reaches ``sequence_actions`` in that state. On
     success, stores the built ``SequencerIn`` and its rows in session
     state (``temp:``, this turn only) so ``compute_deadlines`` and
     ``verify_plan`` can be called without the model re-transmitting the

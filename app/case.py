@@ -204,6 +204,26 @@ def record_emergency_turn(
     return merged
 
 
+def _record_conflict(
+    claim: dict[str, Any], *, value: Any, source: str, confidence: str, now: str
+) -> None:
+    """Appends a Conflict entry to ``claim`` in place, deduping by
+    ``(value, source)``: a disagreement that recurs turn after turn (the
+    same document re-processed, the same fact re-extracted) updates the
+    existing entry's ``at``/``confidence`` instead of piling up duplicate
+    entries the UI would otherwise render as separate tappable options.
+    """
+    conflicts = claim.setdefault("conflicts", [])
+    for entry in conflicts:
+        if entry.get("value") == value and entry.get("source") == source:
+            entry["confidence"] = confidence
+            entry["at"] = now
+            return
+    conflicts.append(
+        {"value": value, "source": source, "confidence": confidence, "at": now}
+    )
+
+
 def merge_case(
     case: dict[str, Any] | None,
     delta: dict[str, Any],
@@ -273,14 +293,7 @@ def merge_case(
             if value != existing["value"]:
                 # A confirmed value is never reverted; the disagreement is
                 # kept as a first-class Conflict on the claim.
-                existing.setdefault("conflicts", []).append(
-                    {
-                        "value": value,
-                        "source": source,
-                        "confidence": confidence,
-                        "at": now,
-                    }
-                )
+                _record_conflict(existing, value=value, source=source, confidence=confidence, now=now)
         elif (
             existing
             and existing.get("source") != source
@@ -293,14 +306,7 @@ def merge_case(
             # narrative doesn't silently overwrite a document already on
             # file either. Both values persist; only a later ``user``
             # correction (the one-tap resolution) picks one.
-            existing.setdefault("conflicts", []).append(
-                {
-                    "value": value,
-                    "source": source,
-                    "confidence": confidence,
-                    "at": now,
-                }
-            )
+            _record_conflict(existing, value=value, source=source, confidence=confidence, now=now)
         else:
             merged["claims"][field] = {
                 "value": value,
@@ -329,12 +335,22 @@ def merge_case(
 # Sequencer-blocking conflicts (issue #44, PRD #34 merge policy).
 # ---------------------------------------------------------------------------
 
-#: Case claim fields that parameterize FILING_SEQUENCER's typed input
+#: Case claim fields that feed FILING_SEQUENCER's typed input
 #: (``SequencerIn``: country, tenure, grievances). An unresolved Conflict
-#: on any of these blocks FILING_SEQUENCER — a wrong jurisdiction or
-#: contested grievance would build a Plan around a disputed fact.
+#: on any of these blocks FILING_SEQUENCER — a wrong jurisdiction or a
+#: disputed tenure duration would build a Plan around a contested fact.
 #: Conflicts elsewhere (e.g. ``employer_name``) are informational only.
-SEQUENCER_FIELDS = frozenset({"country", "tenure", "grievances"})
+#:
+#: Only fields that actually exist as Case claims today are listed:
+#: ``country`` maps 1:1 onto ``SequencerIn.country``, and
+#: ``tenure_months`` is the closest existing proxy for
+#: ``SequencerIn.tenure`` (extraction has no other tenure-shaped field).
+#: ``SequencerIn.grievances`` has no corresponding Case claim at all — it
+#: is derived by DISPATCHER's own judgment from the conversation, never
+#: written to ``case["claims"]`` with provenance — so it cannot be
+#: checked here; a real per-grievance Conflict mechanism is future work.
+SEQUENCER_FIELDS = frozenset({"country", "tenure_months"})
+
 
 
 def unresolved_sequencer_conflict(case: dict[str, Any] | None) -> Optional[str]:

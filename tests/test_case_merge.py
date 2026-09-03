@@ -140,11 +140,22 @@ class TestExtractionVsDocumentConflict:
         assert case["claims"]["months_unpaid"]["value"] == "3"
         assert case["claims"]["months_unpaid"]["conflicts"] == []
 
+    def test_repeated_identical_disagreement_does_not_duplicate(self):
+        # The same document re-processed (or the same fact re-extracted)
+        # must update the existing Conflict entry, not pile up duplicates
+        # the UI would render as separate tappable options.
+        case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, source="extraction", now=T1)
+        case = merge_case(case, {"claims": claims(country="Kuwait")}, source="document", now=T2)
+        case = merge_case(case, {"claims": claims(country="Kuwait")}, source="document", now="2026-09-03T00:10:00+00:00")
+        conflicts = case["claims"]["country"]["conflicts"]
+        assert len(conflicts) == 1
+        assert conflicts[0]["at"] == "2026-09-03T00:10:00+00:00"
+
 
 class TestUnresolvedSequencerConflict:
     """Issue #44: an unresolved Conflict on a SequencerIn-mapped field
-    (country, tenure, grievances) blocks FILING_SEQUENCER; a Conflict on
-    any other field is informational only and never blocks."""
+    (country, tenure_months) blocks FILING_SEQUENCER; a Conflict on any
+    other field is informational only and never blocks."""
 
     def test_no_case_or_empty_case_is_none(self):
         assert unresolved_sequencer_conflict(None) is None
@@ -158,6 +169,11 @@ class TestUnresolvedSequencerConflict:
         case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, now=T1)
         case = merge_case(case, {"claims": claims(country="Kuwait")}, source="document", now=T2)
         assert unresolved_sequencer_conflict(case) == "country"
+
+    def test_conflict_on_tenure_months_blocks(self):
+        case = merge_case(None, {"claims": claims(tenure_months="6")}, now=T1)
+        case = merge_case(case, {"claims": claims(tenure_months="18")}, source="document", now=T2)
+        assert unresolved_sequencer_conflict(case) == "tenure_months"
 
     def test_conflict_on_non_sequencer_field_never_blocks(self):
         case = merge_case(None, {"claims": claims(employer_name="Al Rashid")}, now=T1)
@@ -173,7 +189,7 @@ class TestUnresolvedSequencerConflict:
         assert unresolved_sequencer_conflict(case) is None
 
     def test_sequencer_fields_matches_documented_set(self):
-        assert SEQUENCER_FIELDS == {"country", "tenure", "grievances"}
+        assert SEQUENCER_FIELDS == {"country", "tenure_months"}
 
 
 class TestSafetyFlagsAddOnly:
