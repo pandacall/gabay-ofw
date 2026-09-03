@@ -66,11 +66,18 @@ WAGE_LOSS = WageLossInput(
     period_start="2026-01-01",
     period_end="2026-04-01",
 )
-SAFE_NARRATIVE = (
+CHRONOLOGY = (
     "Maria Santos worked as a domestic worker for the Al Rashid household "
-    "in Riyadh. She was not paid for the last three months. She is "
-    "requesting payment of her unpaid wages through the DOLE Single-Entry "
-    "Approach."
+    "in Riyadh from 2024-01-01 to 2026-06-01."
+)
+PARTIES = (
+    "Requesting party: Maria Santos. Responding party: Al Rashid Household "
+    "(employer)."
+)
+AMOUNTS = "She was not paid for the last three months of her contract."
+REMEDIES = (
+    "She is requesting payment of her unpaid wages through the DOLE "
+    "Single-Entry Approach."
 )
 
 
@@ -173,7 +180,8 @@ class TestReviewAndFinalizeTool:
     def test_without_prepared_form_refuses(self):
         ctx = _FakeToolContext()
         result = complaint_review_and_finalize(
-            SAFE_NARRATIVE, "departed_country", ["unpaid_wages"], ctx
+            CHRONOLOGY, PARTIES, AMOUNTS, REMEDIES,
+            "departed_country", ["unpaid_wages"], ctx,
         )
         assert result["ok"] is False
         assert result["reason"] == "NO_FORM"
@@ -181,20 +189,23 @@ class TestReviewAndFinalizeTool:
     def test_clean_narrative_finalizes_a_draft(self):
         ctx = self._prepared_ctx()
         result = complaint_review_and_finalize(
-            SAFE_NARRATIVE, "departed_country", ["unpaid_wages"], ctx
+            CHRONOLOGY, PARTIES, AMOUNTS, REMEDIES,
+            "departed_country", ["unpaid_wages"], ctx,
         )
         assert result["ok"] is True
         draft = result["draft"]
         assert draft["red_team"]["cleared"] is True
-        assert draft["intake_narrative_en"] == SAFE_NARRATIVE
+        assert draft["intake_narrative_en"]["chronology"] == CHRONOLOGY
+        assert draft["intake_narrative_en"]["remedies"] == REMEDIES
         pdf_bytes = base64.b64decode(draft["sena_rfa_pdf_base64"])
         assert pdf_bytes.startswith(b"%PDF")
 
     def test_leaking_narrative_returns_findings_for_revision(self):
         ctx = self._prepared_ctx()
-        leaking = SAFE_NARRATIVE + " She is currently staying in a shelter."
+        leaking_remedies = REMEDIES + " She is currently staying in a shelter."
         result = complaint_review_and_finalize(
-            leaking, "departed_country", ["unpaid_wages"], ctx
+            CHRONOLOGY, PARTIES, AMOUNTS, leaking_remedies,
+            "departed_country", ["unpaid_wages"], ctx,
         )
         assert result["ok"] is False
         assert result["reason"] == "RED_TEAM_FINDINGS"
@@ -215,7 +226,7 @@ class TestReviewAndFinalizeTool:
             ctx,
         )
         result = complaint_review_and_finalize(
-            SAFE_NARRATIVE,
+            CHRONOLOGY, PARTIES, AMOUNTS, REMEDIES,
             "employed_in_country",
             ["physical_abuse_or_danger", "unpaid_wages"],
             ctx,
@@ -297,6 +308,7 @@ class FakeModelRunnerWithComplaintDrafter(BaseLlm):
     drafter_calls: list = Field(default_factory=list)
     drafter_final: list = Field(default_factory=list)
     calls: list = Field(default_factory=list)
+    requests: list = Field(default_factory=list)
 
     _DRAFTER_TOOL_NAMES = {
         "complaint_check_agency_license",
@@ -307,6 +319,7 @@ class FakeModelRunnerWithComplaintDrafter(BaseLlm):
 
     async def generate_content_async(self, llm_request, stream: bool = False):
         tool_names = set(llm_request.tools_dict or {})
+        self.requests.append((tool_names, llm_request))
         schema = llm_request.config.response_schema if llm_request.config else None
 
         if tool_names and tool_names >= self._DRAFTER_TOOL_NAMES:
@@ -387,6 +400,21 @@ def turn(client, text, *, uid="maria"):
     return lines
 
 
+def complaint_drafter_request_texts(fake_model) -> list[str]:
+    """All text COMPLAINT_DRAFTER's own model turn actually saw (its
+    typed ComplaintDraftIn JSON) — mirrors PROOF_BUILDER's isolation
+    check in tests/test_proof_builder_api.py."""
+    texts = []
+    for tool_names, request in fake_model.requests:
+        if not (tool_names and tool_names >= fake_model._DRAFTER_TOOL_NAMES):
+            continue
+        for content in request.contents or []:
+            for part in content.parts or []:
+                if part.text:
+                    texts.append(part.text)
+    return texts
+
+
 _DRAFTER_ARGS = {
     "worker": {"full_name": "Maria Santos", "sex": "female"},
     "employer": {"name": "Al Rashid Household", "address": "Riyadh"},
@@ -405,6 +433,32 @@ _DRAFTER_ARGS = {
     "in_shelter": False,
     "spoke_to_mwo": False,
     "language": "en",
+}
+
+_PLAN_FIXTURE = {
+    "plan_id": "demo-plan-fixture",
+    "version": 1,
+    "input_hash": "abc123",
+    "steps": [
+        {
+            "id": "sa-wages-1",
+            "status": "PENDING",
+            "rule_citation": {
+                "source_name": "Test Source",
+                "reference": "Test reference",
+                "url": "https://example.test",
+                "tier": "tier_1",
+            },
+            "expires_at": None,
+            "grievance": "unpaid_wages",
+            "file_where": "MWO Riyadh",
+            "action_class": "protective_reversible",
+            "tier": "tier_1",
+            "confirm_first_notes": [],
+            "warnings": [],
+            "notes": [],
+        }
+    ],
 }
 
 
@@ -443,7 +497,8 @@ class TestComplaintDrafterHttpSeam:
         )
         assert prepare_result["ok"] is True
         finalize_result = complaint_review_and_finalize(
-            SAFE_NARRATIVE, "departed_country", ["unpaid_wages"], ctx
+            CHRONOLOGY, PARTIES, AMOUNTS, REMEDIES,
+            "departed_country", ["unpaid_wages"], ctx,
         )
         assert finalize_result["ok"] is True
 
@@ -480,7 +535,10 @@ class TestComplaintDrafterHttpSeam:
                 (
                     "complaint_review_and_finalize",
                     {
-                        "narrative_en": SAFE_NARRATIVE,
+                        "chronology": CHRONOLOGY,
+                        "parties": PARTIES,
+                        "amounts": AMOUNTS,
+                        "remedies": REMEDIES,
                         "tenure": "departed_country",
                         "grievances": ["unpaid_wages"],
                         "safety_flags": [],
@@ -593,3 +651,49 @@ class TestComplaintDrafterHttpSeam:
         assert card["premature_filing_refusal"] is not None
         assert card.get("draft") is None
         assert "safely out" in card["premature_filing_refusal"]["message"]
+
+    def test_the_model_sees_plan_and_shelter_mwo_flags_in_its_own_input(
+        self, client, fake_model
+    ):
+        # ComplaintDraftIn's `plan`, `in_shelter`, and `spoke_to_mwo`
+        # fields are not re-supplied to any tool call (the tools only
+        # need worker/employer/agency/grievances/wage_loss) — they are
+        # carried in the sub-agent's own initial turn content instead,
+        # the same mechanism PROOF_BUILDER's BundleState uses. This
+        # asserts they are actually present there, not dead input.
+        args = dict(
+            _DRAFTER_ARGS,
+            agency={"name": "Placeholder Global Recruitment Corp."},
+            plan=_PLAN_FIXTURE,
+            in_shelter=True,
+            spoke_to_mwo=True,
+        )
+        ctx = _FakeToolContext()
+        agency_result = complaint_check_agency_license(
+            AgencyInfo(name="Placeholder Global Recruitment Corp."), "SA", ctx
+        )
+        assert agency_result["licensed"] is False
+
+        fake_model.extraction_results.append(TAGLISH_EXTRACTION)
+        fake_model.dispatcher_drafter_args.append(args)
+        fake_model.drafter_calls.append(
+            (
+                "complaint_check_agency_license",
+                {"agency": args["agency"], "country": "SA"},
+            )
+        )
+        fake_model.drafter_final.append(
+            json.dumps(
+                {"illegal_recruitment_refusal": agency_result["refusal"]}
+            )
+        )
+        fake_model.dispatcher_replies.append("Mali ang venue para diyan.")
+
+        turn(client, "Gusto ko mag-file, ito ang agency ko.")
+
+        texts = complaint_drafter_request_texts(fake_model)
+        assert texts, "COMPLAINT_DRAFTER never ran"
+        first_turn_json = json.loads(texts[0])
+        assert first_turn_json["plan"]["plan_id"] == "demo-plan-fixture"
+        assert first_turn_json["in_shelter"] is True
+        assert first_turn_json["spoke_to_mwo"] is True

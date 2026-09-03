@@ -23,6 +23,7 @@ from app.complaint.schema import (
     ComplaintDraftOut,
     FormDraft,
     IllegalRecruitmentRefusal,
+    IntakeNarrative,
     PrematureFilingRefusal,
     RedTeamFinding,
     RedTeamResult,
@@ -38,6 +39,17 @@ _CIT = Citation(
     source_name="test source", reference="test reference", url="https://example.test",
     tier=SourceTier.TIER_1,
 )
+
+
+def _narrative(**overrides) -> IntakeNarrative:
+    defaults = dict(
+        chronology="She worked from 2024-01-01 to 2026-06-01.",
+        parties="Worker: Maria Santos. Employer: Al Rashid Household.",
+        amounts="Three months unpaid at SAR 1,500 per month.",
+        remedies="She requests payment of her unpaid wages.",
+    )
+    defaults.update(overrides)
+    return IntakeNarrative(**defaults)
 
 
 def _sena_fields(**overrides) -> SenaRfaFields:
@@ -133,7 +145,7 @@ class TestOnlyClearedDraftsShip:
             FormDraft(
                 sena_rfa=_sena_fields(),
                 sena_rfa_pdf_base64="",
-                intake_narrative_en="narrative",
+                intake_narrative_en=_narrative(),
                 red_team=uncleared,
             )
 
@@ -142,7 +154,7 @@ class TestOnlyClearedDraftsShip:
         draft = FormDraft(
             sena_rfa=_sena_fields(),
             sena_rfa_pdf_base64="cGRm",
-            intake_narrative_en="narrative",
+            intake_narrative_en=_narrative(),
             red_team=cleared,
         )
         assert draft.red_team.cleared is True
@@ -158,7 +170,7 @@ class TestExactlyOneOutcome:
         draft = FormDraft(
             sena_rfa=_sena_fields(),
             sena_rfa_pdf_base64="cGRm",
-            intake_narrative_en="narrative",
+            intake_narrative_en=_narrative(),
             red_team=cleared,
         )
         with pytest.raises(ValidationError):

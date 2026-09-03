@@ -36,7 +36,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, computed_field, field_validator, model_validator
 
 from app.case import SAFETY_FLAGS
 from app.proof.schema import Currency, DecimalAmount, IsoDate
@@ -406,7 +406,10 @@ ARABIC_PERIOD_LABEL = "الفترة"
 class ArabicLossLine(BaseModel):
     """One arithmetic line. ``label`` is a closed enum; ``amount`` is a
     pattern-constrained decimal string — no field on this model can hold
-    prose, in any language."""
+    prose, in any language. ``label_ar`` is a ``computed_field`` so the
+    fixed Arabic text is actually present in ``model_dump()`` /
+    ``model_dump_json()`` output — the UI (and this line's own JSON
+    payload) carries the Arabic label itself, not just a lookup key."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -414,6 +417,7 @@ class ArabicLossLine(BaseModel):
     amount: DecimalAmount
     currency: Currency
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def label_ar(self) -> str:
         return ARABIC_LABELS[self.label]
@@ -423,7 +427,9 @@ class ArabicLossCalculation(BaseModel):
     """The arithmetic-only Arabic deliverable (PRD #46): amounts, dates,
     and a total — nothing argumentative, nothing free-text, in either
     language. ``total_amount`` is independently re-checked against the
-    sum of ``lines`` so a drifted total cannot ship."""
+    sum of ``lines`` so a drifted total cannot ship. ``total_label_ar``
+    and ``period_label_ar`` are fixed Arabic text, computed so they
+    serialize with the rest of the payload."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -433,6 +439,16 @@ class ArabicLossCalculation(BaseModel):
     total_amount: DecimalAmount
     currency: Currency
     generated_at: IsoDate
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def total_label_ar(self) -> str:
+        return ARABIC_TOTAL_LABEL
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def period_label_ar(self) -> str:
+        return ARABIC_PERIOD_LABEL
 
     @model_validator(mode="after")
     def _total_matches_lines(self) -> "ArabicLossCalculation":
@@ -452,7 +468,14 @@ class ArabicLossCalculation(BaseModel):
 # The SEnA Request for Assistance (RFA) — filled fields.
 # ---------------------------------------------------------------------------
 
-SENA_FORM_TITLE = "DOLE Single-Entry Approach (SEnA) Request for Assistance (RFA)"
+#: The form title as displayed: the office-facing name plus the exact
+#: current form identifier this module was verified against (issue #46
+#: acceptance criterion: "SEnA form fields verified against the
+#: published source" — see CIT_SENA_RFA in sena_form.py for the source).
+SENA_FORM_TITLE = (
+    "DOLE Single-Entry Approach (SEnA) Request for Assistance (RFA) — "
+    "SEnA-2024-01 Request for Single Entry Assistance Application"
+)
 SENA_FILING_NOTE = (
     "Filable from abroad via MWO/POLO, the DOLE ARMS online portal, or a "
     "Special Power of Attorney (SPA) representative in the Philippines."
@@ -470,6 +493,7 @@ class RespondingParty(BaseModel):
     name: str
     role: RespondingPartyRole
     address: Optional[str] = None
+    contact: Optional[str] = None
 
 
 class NatureOfRequest(str, Enum):
@@ -495,7 +519,8 @@ class SenaRfaFields(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     form_title: Literal[
-        "DOLE Single-Entry Approach (SEnA) Request for Assistance (RFA)"
+        "DOLE Single-Entry Approach (SEnA) Request for Assistance (RFA) — "
+        "SEnA-2024-01 Request for Single Entry Assistance Application"
     ] = SENA_FORM_TITLE
     requesting_party_name: str
     requesting_party_sex: Optional[Sex] = None
@@ -529,6 +554,36 @@ class SenaRfaFields(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class IntakeNarrative(BaseModel):
+    """The structured MWO/ATN intake narrative (issue #46): chronology,
+    parties, amounts, and remedies — the four sections issue #46 asks
+    for, each its own field so the UI can render them separately and
+    ``safety_review`` scans the narrative as a whole. Model-authored
+    prose in English; never Arabic (the Arabic deliverable is the
+    arithmetic loss calculation only, structurally separate)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    chronology: str
+    parties: str
+    amounts: str
+    remedies: str
+
+    @field_validator("chronology", "parties", "amounts", "remedies")
+    @classmethod
+    def _non_empty(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("every narrative section is required")
+        return value
+
+    @property
+    def combined_text(self) -> str:
+        """All four sections joined — what ``safety_review`` scans."""
+        return "\n\n".join(
+            (self.chronology, self.parties, self.amounts, self.remedies)
+        )
+
+
 class FormDraft(BaseModel):
     """COMPLAINT_DRAFTER's positive outcome: fills, never submits.
 
@@ -543,7 +598,7 @@ class FormDraft(BaseModel):
     #: Base64-encoded PDF bytes from ``render_pdf`` — the UI renders it,
     #: DISPATCHER never repeats its content as prose (voice integrity).
     sena_rfa_pdf_base64: str
-    intake_narrative_en: str
+    intake_narrative_en: IntakeNarrative
     arabic_loss_calculation: Optional[ArabicLossCalculation] = None
     red_team: RedTeamResult
 

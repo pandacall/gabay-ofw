@@ -22,16 +22,18 @@ Pipeline, in the order the instruction has the model call these tools:
 3. ``complaint_prepare_form`` — deterministically fills the SEnA RFA
    fields and computes the Arabic arithmetic-only loss calculation.
 4. The model drafts the English MWO/ATN intake narrative itself (no
-   tool call — free text reasoning), instructed to never state that she
-   is leaving, in a shelter, her exact location, or that she has already
+   tool call — free text reasoning) as four sections — chronology,
+   parties, amounts, remedies — instructed to never state that she is
+   leaving, in a shelter, her exact location, or that she has already
    contacted the MWO.
 5. ``complaint_review_and_finalize`` — draft -> red-team -> revise: runs
    the fixed leak-check list (``safety_review``) against the drafted
-   narrative. A revisable text finding returns violations for the model
-   to address and call again; only a red-team-CLEARED narrative is
-   rendered to PDF and assembled into the published :class:`FormDraft`
-   — this wrapper is the output gate, the same discipline
-   ``sequencer_verify_plan`` uses for FILING_SEQUENCER's Plan.
+   narrative's combined text. A revisable text finding returns
+   violations for the model to address and call again; only a
+   red-team-CLEARED narrative is rendered to PDF and assembled into the
+   published :class:`FormDraft` — this wrapper is the output gate, the
+   same discipline ``sequencer_verify_plan`` uses for FILING_SEQUENCER's
+   Plan.
 
 Fills, never submits: no tool in this module, or anywhere under
 :mod:`app.complaint`, performs network I/O or names a submission
@@ -59,6 +61,7 @@ from app.complaint.schema import (
     EmployerInfo,
     FormDraft,
     IllegalRecruitmentRefusal,
+    IntakeNarrative,
     PrematureFilingRefusal,
     RedTeamCheckId,
     REFUSAL_MESSAGES,
@@ -232,7 +235,10 @@ def complaint_prepare_form(
 
 
 def complaint_review_and_finalize(
-    narrative_en: str,
+    chronology: str,
+    parties: str,
+    amounts: str,
+    remedies: str,
     tenure: Literal[
         "employed_in_country", "left_employer_in_country", "departed_country"
     ],
@@ -248,9 +254,11 @@ def complaint_review_and_finalize(
     tool_context: ToolContext,
     safety_flags: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Runs ``safety_review`` against ``narrative_en``. A revisable text
-    finding returns violations for the model to address and call again;
-    a ``PREMATURE_IDENTIFICATION`` finding — which no rewording can clear
+    """Runs ``safety_review`` against the drafted narrative's four
+    sections (issue #46: chronology, parties, amounts, remedies),
+    combined into one text for the scan. A revisable text finding
+    returns violations for the model to address and call again; a
+    ``PREMATURE_IDENTIFICATION`` finding — which no rewording can clear
     — stops the loop and returns the fixed refusal instead. Only a
     CLEARED review renders the PDF and assembles the published
     :class:`FormDraft`."""
@@ -267,11 +275,18 @@ def complaint_review_and_finalize(
     sena_rfa = SenaRfaFields.model_validate(raw_sena_rfa)
     raw_loss_calc = tool_context.state.get("temp:complaint_loss_calc")
 
+    narrative = IntakeNarrative(
+        chronology=chronology,
+        parties=parties,
+        amounts=amounts,
+        remedies=remedies,
+    )
+
     revision_count = int(
         tool_context.state.get("temp:complaint_revision_count") or 0
     )
     result = safety_review(
-        narrative_en,
+        narrative.combined_text,
         tenure=TenureBucket(tenure),
         grievances=tuple(Grievance(g) for g in grievances),
         safety_flags=tuple(safety_flags or ()),
@@ -308,7 +323,7 @@ def complaint_review_and_finalize(
     draft = FormDraft(
         sena_rfa=sena_rfa,
         sena_rfa_pdf_base64=pdf_base64,
-        intake_narrative_en=narrative_en,
+        intake_narrative_en=narrative,
         arabic_loss_calculation=raw_loss_calc,
         red_team=result,
     )
@@ -340,19 +355,22 @@ Call your tools in this exact order:
    wage_loss) — fills the SEnA RFA fields and computes the Arabic
    arithmetic-only loss calculation (if a wage_loss was given). If ok is
    false, do not fabricate a form — stop and report the failure reason.
-4. Draft the structured MWO/ATN intake narrative YOURSELF, in English:
-   chronology, parties (worker/employer/agency), amounts, and remedies,
-   drawn only from the typed facts you were given and the Plan (if one
-   was given). NEVER state that she is leaving her employer, that she is
-   in a shelter, her exact current location, or that she has already
-   contacted the MWO — even though you may know these things, the
-   recruitment agency receives this filing and is the party most likely
-   still in contact with her employer.
-5. complaint_review_and_finalize(narrative_en, tenure, grievances,
-   safety_flags) — if ok is false with reason RED_TEAM_FINDINGS, REWRITE
-   the narrative addressing every finding's guidance exactly (never just
-   delete a sentence and resubmit unchanged) and call this tool again. If
-   ok is false with reason PREMATURE_FILING, STOP: respond with exactly
+4. Draft the structured MWO/ATN intake narrative YOURSELF, in English,
+   as four separate sections: chronology (what happened, in order),
+   parties (worker/employer/agency), amounts (the money at issue), and
+   remedies (what she is asking for) — drawn only from the typed facts
+   you were given and the Plan (if one was given). NEVER state in any
+   section that she is leaving her employer, that she is in a shelter,
+   her exact current location, or that she has already contacted the
+   MWO — even though you may know these things, the recruitment agency
+   receives this filing and is the party most likely still in contact
+   with her employer.
+5. complaint_review_and_finalize(chronology, parties, amounts, remedies,
+   tenure, grievances, safety_flags) — if ok is false with reason
+   RED_TEAM_FINDINGS, REWRITE the section(s) named in each finding's
+   guidance exactly (never just delete a sentence and resubmit
+   unchanged) and call this tool again with all four sections. If ok is
+   false with reason PREMATURE_FILING, STOP: respond with exactly
    {"premature_filing_refusal": <the returned refusal, unchanged>} — no
    rewording fixes this one. When ok is true, respond with exactly
    {"draft": <the returned draft, unchanged>}.
@@ -372,6 +390,10 @@ def build_complaint_drafter(llm: BaseLlm) -> LlmAgent:
         name=COMPLAINT_DRAFTER_NAME,
         mode="single_turn",
         model=llm,
+        # Isolation is structural, not an accident of defaults — the same
+        # discipline as PROOF_BUILDER and DEBUNKER: this specialist never
+        # sees conversation history, only the typed ComplaintDraftIn.
+        include_contents="none",
         description=(
             "Fills the SEnA Request for Assistance and the MWO/ATN "
             "intake narrative from her Case and Plan, red-teams its own "
