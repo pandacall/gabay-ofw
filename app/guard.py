@@ -49,9 +49,10 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 #: The only tools any agent may reach. Anything else is refused before it
-#: runs (fail closed). DEBUNKER is the specialist sub-agent auto-wrapped
-#: as a tool on DISPATCHER (ADR-0004); search_corpus is DEBUNKER's own
-#: deterministic classifier tool — both cross this guard like any other.
+#: runs (fail closed). DEBUNKER and PROOF_BUILDER are specialist
+#: sub-agents auto-wrapped as tools on DISPATCHER (ADR-0004);
+#: search_corpus is DEBUNKER's own deterministic classifier tool — all
+#: cross this guard like any other.
 ALLOWED_TOOLS = frozenset(
     {
         "office_directory",
@@ -59,8 +60,16 @@ ALLOWED_TOOLS = frozenset(
         "safe_floor_card",
         "DEBUNKER",
         "search_corpus",
+        "PROOF_BUILDER",
     }
 )
+
+#: The one voice agent whose replies the after-model whitelist diffs.
+#: Specialists' structured outputs are schema-validated and cross the
+#: after-TOOL rail instead (filtered there, and their values enter the
+#: turn whitelist so the voice may repeat them); diffing their raw JSON
+#: would corrupt it before output-schema validation.
+VOICE_AGENT_NAME = "DISPATCHER"
 
 _GULF_PERMITTED = frozenset(
     {Channel.MWO, Channel.EMBASSY_ATN, Channel.OWWA_1348, Channel.DMW_HOTLINE}
@@ -344,6 +353,13 @@ class RoutingGuardPlugin(BasePlugin):
         callback_context: CallbackContext,
         llm_response: LlmResponse,
     ) -> Optional[LlmResponse]:
+        # Voice integrity is about the REPLY: only the voice agent's text
+        # is diffed. A specialist's model output is a structured payload
+        # validated by its output_schema and filtered on the after-tool
+        # rail — rewriting its JSON here would corrupt it into a
+        # validation failure instead of a caught fabrication.
+        if callback_context.agent_name != VOICE_AGENT_NAME:
+            return None
         content = llm_response.content
         if content is None or not content.parts:
             return None

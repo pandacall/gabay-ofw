@@ -10,7 +10,11 @@ and the reply plus the updated Case are streamed as further lines.
 When DEBUNKER ran this turn, the ``search_corpus`` tool results are
 streamed as a ``verdicts`` line: the code-owned, guard-filtered payload
 (verdict, cited rebuttal, MWO routing with directory-resolved numbers)
-rendered by the UI outside the LLM text, per ADR-0002.
+rendered by the UI outside the LLM text, per ADR-0002. When PROOF_BUILDER
+ran, its schema-validated ProofGap crosses the same seam as a
+``proof_gap`` line: the scope limit, the satisfied/outstanding rows, and
+the single next-artifact ask are shown by the UI from the typed payload,
+so the voice only frames them.
 """
 
 from __future__ import annotations
@@ -86,6 +90,7 @@ class ChatService:
         reply_parts: list[str] = []
         cards: list[dict] = []
         verdicts: list[dict] = []
+        proof_gaps: list[dict] = []
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -111,6 +116,15 @@ class ChatService:
                         response.get("verdicts"), list
                     ):
                         verdicts.extend(response["verdicts"])
+                    # PROOF_BUILDER results are the schema-validated
+                    # ProofGap dict (output_schema): the scope-limit
+                    # Literal guarantees the line is present, so the gap
+                    # analysis the UI renders carries it verbatim. An
+                    # invalid output never validates and never crosses.
+                    if function_response.name == "PROOF_BUILDER" and isinstance(
+                        response.get("scope_limit"), str
+                    ):
+                        proof_gaps.append(response)
                 if event.author == "DISPATCHER":
                     reply_parts.extend(
                         part.text for part in event.content.parts if part.text
@@ -151,6 +165,15 @@ class ChatService:
                 {
                     "type": "verdicts",
                     "verdicts": verdicts,
+                    "session_id": session.id,
+                }
+            )
+
+        for gap in proof_gaps:
+            yield _line(
+                {
+                    "type": "proof_gap",
+                    "proof_gap": gap,
                     "session_id": session.id,
                 }
             )
