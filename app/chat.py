@@ -6,6 +6,11 @@ design; turn 2+ uses the language recorded on the previous turn's
 CaseDelta). Then the ADK Runner drives the turn — read_narrative and
 merge_case in the root before-agent callback, DISPATCHER's reply after —
 and the reply plus the updated Case are streamed as further lines.
+
+When DEBUNKER ran this turn, the ``search_corpus`` tool results are
+streamed as a ``verdicts`` line: the code-owned, guard-filtered payload
+(verdict, cited rebuttal, MWO routing with directory-resolved numbers)
+rendered by the UI outside the LLM text, per ADR-0002.
 """
 
 from __future__ import annotations
@@ -80,6 +85,7 @@ class ChatService:
 
         reply_parts: list[str] = []
         cards: list[dict] = []
+        verdicts: list[dict] = []
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -94,10 +100,17 @@ class ChatService:
                 # (ADR-0002): the card is fixed data, DISPATCHER only frames it.
                 for function_response in event.get_function_responses():
                     response = function_response.response
-                    if isinstance(response, dict) and isinstance(
-                        response.get("card"), dict
-                    ):
+                    if not isinstance(response, dict):
+                        continue
+                    if isinstance(response.get("card"), dict):
                         cards.append(response["card"])
+                    # search_corpus results — already guard-filtered by
+                    # ROUTING_GUARD's after-tool rail — are the code-owned
+                    # verdicts payload the UI renders (ADR-0002).
+                    if function_response.name == "search_corpus" and isinstance(
+                        response.get("verdicts"), list
+                    ):
+                        verdicts.extend(response["verdicts"])
                 if event.author == "DISPATCHER":
                     reply_parts.extend(
                         part.text for part in event.content.parts if part.text
@@ -132,6 +145,15 @@ class ChatService:
                 "session_id": session.id,
             }
         )
+
+        if verdicts:
+            yield _line(
+                {
+                    "type": "verdicts",
+                    "verdicts": verdicts,
+                    "session_id": session.id,
+                }
+            )
 
         updated = await self._session_service.get_session(
             app_name=APP_NAME, user_id=uid, session_id=session.id

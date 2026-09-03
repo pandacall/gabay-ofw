@@ -48,9 +48,19 @@ logger = logging.getLogger(__name__)
 # The allowlist — pure data, code-owned.
 # ---------------------------------------------------------------------------
 
-#: The only tools DISPATCHER may reach. Anything else is refused
-#: before it runs (fail closed).
-ALLOWED_TOOLS = frozenset({"office_directory", "action_card", "safe_floor_card"})
+#: The only tools any agent may reach. Anything else is refused before it
+#: runs (fail closed). DEBUNKER is the specialist sub-agent auto-wrapped
+#: as a tool on DISPATCHER (ADR-0004); search_corpus is DEBUNKER's own
+#: deterministic classifier tool — both cross this guard like any other.
+ALLOWED_TOOLS = frozenset(
+    {
+        "office_directory",
+        "action_card",
+        "safe_floor_card",
+        "DEBUNKER",
+        "search_corpus",
+    }
+)
 
 _GULF_PERMITTED = frozenset(
     {Channel.MWO, Channel.EMBASSY_ATN, Channel.OWWA_1348, Channel.DMW_HOTLINE}
