@@ -110,6 +110,22 @@
       <span class="urgent-dot" aria-hidden="true"></span>
       <span data-copy="needHelp"></span>
     </button>
+
+    <!-- EMERGENCY (issue #41, #64): always reachable regardless of screen,
+         because #emergency-controls lives outside #screen's per-route
+         templates. Renders POST /api/emergency/button's cached action
+         card with zero model calls, so it works even when chat/model is
+         down. "Mark safe" only appears once the Imminent Danger predicate
+         (case.emergency.active) is on. -->
+    <div id="emergency-controls" class="emergency-controls">
+      <button id="emergency-button" class="emergency-button" type="button" data-action="emergency-button">
+        <span class="urgent-dot" aria-hidden="true"></span>
+        <span data-copy="emergencyButton"></span>
+      </button>
+      <button id="mark-safe-button" class="mark-safe-button hidden" type="button" data-action="mark-safe">
+        <span data-copy="markSafeButton"></span>
+      </button>
+    </div>
   </div>
 
   <dialog id="first-run-dialog" class="disclaimer-dialog">
@@ -124,6 +140,21 @@
       <div class="dialog-actions">
         <button class="button ink-button full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
         <button class="button urgent-button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- One authenticated tap, with a second confirming tap so a pocket-tap
+       (phone held by someone else) can't clear the predicate by accident
+       (PRD #34 user story 32). mark_safe clears the predicate only, never
+       the safety flag — see app/case.py:mark_safe. -->
+  <dialog id="mark-safe-dialog" class="disclaimer-dialog">
+    <form method="dialog">
+      <h2 data-copy="markSafeConfirmTitle"></h2>
+      <p data-copy="markSafeConfirmBody"></p>
+      <div class="dialog-actions">
+        <button class="button urgent-button full-width" type="button" data-action="mark-safe-confirm" data-copy="markSafeConfirm"></button>
+        <button class="button full-width" type="button" data-action="mark-safe-cancel" data-copy="markSafeCancel"></button>
       </div>
     </form>
   </dialog>

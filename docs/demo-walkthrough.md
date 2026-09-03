@@ -25,8 +25,9 @@ of the two passes.
 - Use the chat entry point from the dashboard (not the older "Crisis
   Help" card — that is a separate, pre-v6 feature; every step below
   exercises DISPATCHER, the v6 single-conversation agent from PRD #34).
-- Nothing below requires more than one signed-in browser tab. Steps 7–8
-  need the browser's DevTools Network tab once — instructions are inline.
+- Nothing below requires more than one signed-in browser tab, or DevTools
+  — every step, including EMERGENCY/mark_safe (7) and panic_wipe (8), is
+  exercised through a real UI control.
 - Type messages in whatever language feels natural — DISPATCHER mirrors
   your language from your second message onward (turn 1's acknowledgement
   is always fixed English, by design; see `app/agent.py`'s
@@ -213,69 +214,42 @@ try means starting over, at 1am, with less trust left.
 
 ---
 
-## 7. EMERGENCY button, offline (zero model calls) + mark_safe
-
-> **Known gap, tracked separately as
-> [#64](https://github.com/pandacall/gabay-ofw/issues/64), not silently
-> skipped:** the hardcoded EMERGENCY button and the `mark_safe` tap (PRD
-> user story 28; issue #41) are fully implemented and tested at the API
-> layer (`POST /api/emergency/button`, `POST /api/mark-safe/nonce` +
-> `POST /api/mark-safe`), but **no frontend button is wired to either
-> endpoint yet** (`static/app.js` has no `data-action` for them). Exercise
-> them directly against the deployed URL as follows.
+## 7. EMERGENCY button (zero model calls) + mark_safe
 
 **Do:**
-1. Sign in normally in the browser and open any chat turn so a request to
-   `/api/chat` fires.
-2. Open DevTools → Network tab, click that request, and copy its
-   `Authorization` request header value (starts with `Bearer `). This is
-   your own live Firebase ID token — a normal, supported way to inspect
-   your own authenticated requests, nothing bypassed.
-3. In the DevTools Console, on the same page (so you share the deployed
-   origin and CORS is a non-issue), run:
-
-   ```js
-   const AUTH = "Bearer <paste the token here>";
-   const r = await fetch("/api/emergency/button", {
-     method: "POST",
-     headers: { Authorization: AUTH },
-   });
-   console.log(r.status, await r.text());
-   ```
+1. Sign in normally in the browser. The red **EMERGENCY** button is always
+   visible in the top-left corner, on every screen — dashboard, chat,
+   Crisis Help, and Profile alike (issue #64). Tap it.
+2. Watch how fast the action card renders — it should feel instant, not
+   like a normal chat turn. This path (`POST /api/emergency/button`) never
+   touches Gemini; it renders a fixed, cached MWO/OWWA action card and
+   trips the Imminent Danger predicate with zero model latency.
+3. Once EMERGENCY has been pressed, an **"I'm safe now"** button appears
+   next to it (this is the mark_safe affordance — PRD user story 28/33; it
+   only shows while `case.emergency.active` is true). Tap it.
+4. A confirmation dialog appears ("Confirm you are safe") — this is the
+   deliberate second tap so a coerced pocket-tap on the visible button
+   alone can't clear the predicate (user story 32). Tap **"Yes, I am
+   safe"**.
 
 **Expected:**
-- HTTP 200, and the streamed NDJSON body's `card` line renders a fixed
-  action card (MWO/OWWA contacts, dialability-filtered for whatever
-  country your Case currently records) — with **zero** added latency
-  from a model call; this path never touches Gemini.
-- Confirm from the Network tab timing (or just how instantly it returns)
-  that this is materially faster than a normal chat turn.
+- The action card renders immediately after step 1 — MWO/OWWA contacts,
+  dialability-filtered for whatever country your Case currently records —
+  with **zero** added latency from a model call.
+- After step 4, a status toast confirms you were marked safe, and the
+  "I'm safe now" button disappears (the predicate is cleared).
+- Any safety flag you'd disclosed earlier in the same conversation (e.g.
+  `PASSPORT_WITHHELD`) is still present in the Case panel afterward —
+  `mark_safe` clears the predicate, **never** the flag itself (PRD user
+  story 33).
+- Tapping "I'm safe now" and then **Cancel** in the confirmation dialog
+  must not clear anything — the button stays visible and no request is
+  sent, proving the second tap is load-bearing, not decorative.
 
-**Then, mark_safe:**
-
-```js
-const nonceResp = await fetch("/api/mark-safe/nonce", { method: "POST", headers: { Authorization: AUTH } });
-const { nonce } = await nonceResp.json();
-const r2 = await fetch("/api/mark-safe", {
-  method: "POST",
-  headers: { Authorization: AUTH, "Content-Type": "application/json" },
-  body: JSON.stringify({ nonce }),
-});
-console.log(r2.status, await r2.json());
-```
-
-**Expected:**
-- HTTP 200, `marked_safe: true`, and the returned `case.emergency.active`
-  is `false` — the predicate cleared.
-- Any safety flag you'd disclosed earlier (e.g. `PASSPORT_WITHHELD`) is
-  still present in the returned Case — `mark_safe` clears the predicate,
-  **never** the flag itself (PRD user story 33).
-- Replaying the same nonce a second time returns 403 (single-use).
-
-**Suggested follow-up (not blocking this PR):** filed as
-[#64](https://github.com/pandacall/gabay-ofw/issues/64) — wire a visible
-EMERGENCY button and a "mark safe" tap into `static/app.js` so a judge
-exercises this path through the UI rather than DevTools.
+**Why this matters:** PRD user story 28 — help has to survive a dead
+model, a dead session store, or a dead connection; user story 32 — a
+coerced tap can't erase her disclosure or a pocket-tap can't fake her
+safety.
 
 ---
 
