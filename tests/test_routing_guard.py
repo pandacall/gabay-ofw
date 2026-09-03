@@ -159,7 +159,7 @@ class TestNeverEmptyDict:
                 is None
             )
         refused = guard_before_tool(
-            tool=FakeTool("transfer_to_agent"), args={}, tool_context=None
+            tool=FakeTool("some_unlisted_tool"), args={}, tool_context=None
         )
         assert refused is not None
         assert refused != {}

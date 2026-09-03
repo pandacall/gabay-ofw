@@ -6,6 +6,30 @@ before-agent callback, strictly before DISPATCHER's turn, never parallel;
 its CaseDelta is merged deterministically into ``state["case"]`` by
 ``merge_case``. The App is constructed with ``App(plugins=[...])``, never
 ``Runner(plugins=...)``. The dev UI is never deployed.
+
+DEBUNKER and PROOF_BUILDER are single-turn specialist sub-agents
+(ADR-0004): google-adk 2.8.0 auto-wraps each ``mode='single_turn'``
+sub-agent as a tool named after the agent, with its typed
+``input_schema`` as the parameters — no ``AgentTool``, and no free-text
+request parameter anywhere. Their tool calls cross ROUTING_GUARD like
+DISPATCHER's own.
+
+EMERGENCY (issue #41): the ONLY LLM transfer target in this topology. A
+sub-agent of DISPATCHER with ``disallow_transfer_to_parent=True`` and no
+``mode`` declared (mode=None auto-promotes to 'chat' in google-adk==2.8.0,
+so it stays a transfer target — never 'single_turn'). It converses,
+decides what to ask and when to stop; exit is a UI tap (mark_safe) only,
+never something EMERGENCY itself decides or a model infers from her words.
+
+Because ``disallow_transfer_to_parent=True`` also makes
+``_is_transferable_across_agent_tree`` return False for EMERGENCY (verified
+against the pinned 2.8.0 wheel), ADK's own "resume last active sub-agent"
+routing does NOT keep her in EMERGENCY on the next turn — the fallback is
+``root_agent`` (DISPATCHER). So DISPATCHER's own instruction re-transfers
+to EMERGENCY, unconditionally, on every turn while the Imminent Danger
+predicate is active on her Case — the predicate the app itself owns
+(``app.case.is_imminent_danger``), never a fact EMERGENCY's own words are
+trusted to set or clear.
 """
 
 from __future__ import annotations
@@ -19,7 +43,7 @@ from google.adk.agents.readonly_context import ReadonlyContext
 from google.adk.apps import App
 from google.adk.models import BaseLlm
 
-from app.case import merge_case
+from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
 from app.debunker import build_debunker
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
@@ -59,6 +83,34 @@ def _dispatcher_instruction(readonly_context: ReadonlyContext) -> str:
         if extraction_failed
         else ""
     )
+    if is_imminent_danger(case):
+        if readonly_context.state.get("temp:resume_check"):
+            # A long silence has passed while the predicate was active.
+            # Re-ask once instead of silently resuming deep inside
+            # EMERGENCY, as if the gap never happened.
+            return """\
+You are DISPATCHER for Gabay OFW. The Imminent Danger predicate is still
+ACTIVE for this user, but a long silence has passed since her last
+message. Do NOT call any tool and do NOT transfer yet. Reply warmly in
+her language, check in once — ask simply how she is doing right now —
+and let her answer before anything else happens. Do this only this one
+turn.
+"""
+        # The Imminent Danger predicate is code-owned (app.case), never a
+        # fact this instruction asks the model to judge. While it is
+        # active, EVERY turn transfers to EMERGENCY immediately — ADK does
+        # not resume a disallow_transfer_to_parent sub-agent across turns
+        # on its own (verified against google-adk==2.8.0), so this
+        # instruction is what keeps her in EMERGENCY, turn after turn,
+        # until a UI tap (mark_safe) clears the predicate.
+        return """\
+You are DISPATCHER for Gabay OFW. The Imminent Danger predicate is
+currently ACTIVE for this user. You must NOT reply to her yourself and
+you must NOT call any tool. Your only action this turn is to call
+transfer_to_agent with agent_name="EMERGENCY". Do this immediately,
+every time, for every message, until the app tells you the predicate is
+no longer active.
+"""
     return f"""\
 You are DISPATCHER for Gabay OFW, the only voice a Filipino overseas worker
 in the Gulf hears. She may be in crisis, writing at night, in any order and
@@ -140,6 +192,36 @@ missing.
 """
 
 
+def _emergency_instruction(readonly_context: ReadonlyContext) -> str:
+    case = readonly_context.state.get("case") or {}
+    case_block = json.dumps(case, ensure_ascii=False) if case else "{}"
+    return f"""\
+You are EMERGENCY for Gabay OFW. DISPATCHER has just transferred this
+conversation to you because the Imminent Danger predicate is active: an
+acute safety disclosure or her own tap on the emergency button. You are
+now the only voice she hears until she taps "I'm safe" in the app — you
+never decide when this conversation ends, and you never tell her to say
+a phrase to exit; exit is a UI tap only, never something you infer from
+her words. A textual "I'm okay" does NOT end this conversation.
+
+Converse with her. Decide what to ask and when to stop asking, one
+gentle question at a time. Stay warm, calm, and concrete; never lecture,
+never promise an outcome, never invent phone numbers, deadlines, laws,
+or amounts, and never direct her to local police. Reply in the language
+of her current message — Tagalog in, Tagalog out; Taglish in, Taglish
+out; Cebuano in, Cebuano out; English in, English out.
+
+What the app has understood so far (her Case, structured facts with
+provenance):
+{case_block}
+
+If she needs contact numbers, they must come only from office_directory
+and action_card — never from memory. Never attempt to transfer this
+conversation anywhere; you have no way back to DISPATCHER and none is
+needed — the app itself decides when she has left EMERGENCY.
+"""
+
+
 def make_absorb_narrative_callback(llm: BaseLlm):
     """The root before-agent callback: read_narrative -> merge_case.
 
@@ -150,6 +232,25 @@ def make_absorb_narrative_callback(llm: BaseLlm):
     """
 
     async def absorb_narrative(*, callback_context: CallbackContext) -> None:
+        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        case = callback_context.state.get("case")
+        if is_imminent_danger(case):
+            # Long-gap resume (issue #41): decide, BEFORE narrative
+            # reading, whether DISPATCHER should re-ask once rather than
+            # silently resuming inside EMERGENCY. Recorded here (not in
+            # the instruction) so the once-only latch is set exactly
+            # when this turn is actually processed.
+            resume_check = needs_resume_check(case, now=now)
+            callback_context.state["temp:resume_check"] = resume_check
+            callback_context.state["case"] = record_emergency_turn(
+                case, now=now, resume_check_issued=resume_check
+            )
+            if resume_check:
+                # Still record the narrative for the Case, but the
+                # re-ask itself is DISPATCHER's job this turn — not
+                # EMERGENCY's — so no further absorb_narrative behavior
+                # changes; the instruction reads temp:resume_check.
+                pass
         content = callback_context.user_content
         text = "".join(
             part.text
@@ -163,7 +264,6 @@ def make_absorb_narrative_callback(llm: BaseLlm):
             callback_context.state["temp:extraction_failed"] = True
             return None
         case = callback_context.state.get("case")
-        now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         callback_context.state["case"] = merge_case(
             case, delta, source="extraction", now=now
         )
@@ -173,15 +273,42 @@ def make_absorb_narrative_callback(llm: BaseLlm):
 
 
 def build_adk_app(llm: BaseLlm) -> App:
-    """Builds the ADK App with DISPATCHER as the chat-mode root agent.
+    """Builds the ADK App: DISPATCHER as the chat-mode root agent, with
+    FILING_SEQUENCER, DEBUNKER, and PROOF_BUILDER as single-turn
+    specialist sub-agents (ADR-0004) and EMERGENCY as its one and only
+    LLM transfer sub-agent (issue #41).
 
-    Specialists are single-turn sub-agents (ADR-0004): google-adk 2.8.0
-    auto-wraps each ``mode='single_turn'`` sub-agent as a tool named
-    after the agent, with its typed ``input_schema`` as the parameters —
-    no ``AgentTool``, and no free-text request parameter anywhere. Their
-    tool calls cross ROUTING_GUARD like DISPATCHER's own.
+    Specialists are single-turn sub-agents: google-adk 2.8.0 auto-wraps
+    each ``mode='single_turn'`` sub-agent as a tool named after the
+    agent, with its typed ``input_schema`` as the parameters — no
+    ``AgentTool``, and no free-text request parameter anywhere. Their
+    tool calls cross ROUTING_GUARD like DISPATCHER's own. EMERGENCY is
+    not single_turn, so it stays a regular sub-agent and a valid
+    transfer_to_agent target instead of being auto-wrapped as a tool.
     """
     filing_sequencer = build_filing_sequencer(llm)
+    emergency = LlmAgent(
+        name="EMERGENCY",
+        # No mode declared: mode=None auto-promotes to 'chat' in
+        # google-adk==2.8.0, which is required to remain a transfer
+        # target for transfer_to_agent — 'single_turn' would not.
+        model=llm,
+        description=(
+            "The Imminent Danger conversation. DISPATCHER transfers here"
+            " whenever the app's Imminent Danger predicate is active; exit"
+            " is a UI tap (mark_safe) only."
+        ),
+        instruction=_emergency_instruction,
+        # disallow_transfer_to_parent=True is the one-way door: EMERGENCY
+        # can never transfer_to_agent back to DISPATCHER itself. This also
+        # means ADK will not resume EMERGENCY automatically on the next
+        # turn (see module docstring) — DISPATCHER's own instruction is
+        # what re-transfers every subsequent turn while the predicate
+        # holds.
+        disallow_transfer_to_parent=True,
+        tools=[office_directory, action_card],
+        before_tool_callback=guard_before_tool,
+    )
     dispatcher = LlmAgent(
         name="DISPATCHER",
         mode="chat",
@@ -195,10 +322,14 @@ def build_adk_app(llm: BaseLlm) -> App:
         # auto-wraps it into a single tool of this same name and appends it
         # to DISPATCHER's tools itself. No AgentTool(...) here (PRD #34).
         # DEBUNKER and PROOF_BUILDER (issues #47/#45) are wired the same way.
+        # EMERGENCY (issue #41) is different: it is NOT single_turn, so it
+        # stays a normal sub-agent and a valid transfer_to_agent target
+        # instead of being auto-wrapped into a tool.
         sub_agents=[
             filing_sequencer,
             build_debunker(llm),
             build_proof_builder(llm),
+            emergency,
         ],
         # ROUTING_GUARD's second, independent rail (the first is the App
         # plugin below): the tool allowlist holds even if the plugin list

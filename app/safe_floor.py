@@ -17,35 +17,30 @@ Two render paths:
   ``safe_floor_card`` tool; the card itself is fixed and streams to the
   UI as structured data outside the LLM text (ADR-0002's principle).
 
-The Imminent Danger predicate proper is issue #41's scope; this module
-ships the conservative, code-owned hook it will replace.
+The Imminent Danger predicate itself lives in ``app.case`` (issue #41):
+acute flag OR the EMERGENCY button, cleared only by ``mark_safe``, never
+by the clock. This module re-exports it for callers that only need the
+Safe Floor surface.
 """
 
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
+from app.case import ACUTE_SAFETY_FLAGS, is_imminent_danger
 from app.directory import Country, resolve_keys
 
-# ---------------------------------------------------------------------------
-# Imminent Danger stub (issue #41 owns the real predicate).
-# ---------------------------------------------------------------------------
-
-#: Acuteness is a property of the enum member itself, a frozenset in code
-#: — never a side table (PRD #34). Conservative stub: under possible
-#: acute danger, suppressing the stay-put line is the safe direction.
-#: CONFINED and PASSPORT_WITHHELD are chronic (the Gulf baseline).
-ACUTE_SAFETY_FLAGS = frozenset({"PHYSICAL_ASSAULT_ONGOING", "THREAT_OF_HARM"})
-
-
-def is_imminent_danger(case: Optional[dict[str, Any]]) -> bool:
-    """Conservative code-owned hook — issue #41 replaces this with the
-    full predicate (EMERGENCY button, mark_safe, long-gap re-ask)."""
-    if not case:
-        return False
-    flags = case.get("safety_flags") or {}
-    return any(flag in ACUTE_SAFETY_FLAGS for flag in flags)
+__all__ = [
+    "ACUTE_SAFETY_FLAGS",
+    "is_imminent_danger",
+    "SafeFloorReason",
+    "REASON_LINES",
+    "HOLD_LINE",
+    "build_card",
+    "CACHED_CARDS",
+    "cached_card",
+]
 
 
 # ---------------------------------------------------------------------------

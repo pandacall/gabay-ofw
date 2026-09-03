@@ -21,14 +21,20 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from datetime import datetime, timezone
 from typing import AsyncIterator
+from uuid import uuid4
 
+from google.adk.events import Event, EventActions
 from google.adk.models import BaseLlm
 from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, Session
 from google.genai import types
 
 from app.agent import APP_NAME, acknowledgement_for, build_adk_app
+from app.case import mark_safe as case_mark_safe
+from app.case import press_emergency_button as case_press_emergency_button
 from app.directory import Country, resolve_case_country
 from app.safe_floor import cached_card, is_imminent_danger
 
@@ -96,6 +102,85 @@ class ChatService:
             app_name=APP_NAME, user_id=uid, session_id=session_id
         )
 
+    async def _most_recent_session(self, *, uid: str) -> Session | None:
+        """The uid's most-recently-updated session, or None with no
+        sessions yet. Used by the button and mark_safe paths, which act
+        on "the" session for a uid rather than one named on the request
+        (a nonce is per-uid, not per-session)."""
+        response = await self._session_service.list_sessions(
+            app_name=APP_NAME, user_id=uid
+        )
+        sessions = list(response.sessions or [])
+        if not sessions:
+            return None
+        return max(sessions, key=lambda session: session.last_update_time)
+
+    async def _mutate_case(
+        self, *, uid: str, mutate
+    ) -> tuple[str, dict | None]:
+        """Loads (or creates) the uid's current session, applies a pure
+        Case-mutating function outside the Runner's turn flow, and
+        persists the delta as a hand-built Event — the same append_event
+        path a normal turn uses, without running the model at all.
+        Returns ``(session_id, new_case)``."""
+        session = await self._most_recent_session(uid=uid)
+        if session is None:
+            session = await self._session_service.create_session(
+                app_name=APP_NAME, user_id=uid
+            )
+        now_wall = time.time()
+        now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
+        case = session.state.get("case")
+        new_case = mutate(case, now=now_iso)
+        event = Event(
+            id=Event.new_id(),
+            invocation_id=f"emergency-{uuid4().hex}",
+            author="system",
+            timestamp=now_wall,
+            actions=EventActions(state_delta={"case": new_case}),
+        )
+        await self._session_service.append_event(session, event)
+        return session.id, new_case
+
+    async def press_emergency_button(self, *, uid: str) -> AsyncIterator[str]:
+        """The hardcoded EMERGENCY button: renders the cached action card
+        with ZERO model calls, UNCONDITIONALLY — first, before anything
+        else runs, and never gated on the session store succeeding (PRD
+        #34 user story 28: "help survives a dead model, a dead session
+        store, or a dead connection"). Recording the press (Imminent
+        Danger predicate on, so DISPATCHER honors it starting next turn)
+        is attempted afterward as a best-effort side effect; if the
+        session store is down, that failure is surfaced but never
+        retracts the card she already has.
+        """
+        try:
+            session = await self._most_recent_session(uid=uid)
+            country = resolve_case_country(session.state.get("case") if session else None)
+        except Exception:
+            logger.exception("press_emergency_button: could not read country")
+            country = Country.UNKNOWN
+        yield _line(
+            {"type": "card", "card": cached_card(country, imminent_danger=True)}
+        )
+
+        try:
+            session_id, case = await self._mutate_case(
+                uid=uid, mutate=case_press_emergency_button
+            )
+        except Exception:
+            logger.exception("press_emergency_button: could not record the press")
+            yield _line({"type": "error", "detail": "session store unavailable"})
+            return
+        yield _line(
+            {"type": "case", "case": case or {}, "session_id": session_id}
+        )
+
+    async def apply_mark_safe(self, *, uid: str) -> dict:
+        """Clears the Imminent Danger PREDICATE (never the safety flag)
+        on the uid's current session. Returns the updated Case."""
+        _, case = await self._mutate_case(uid=uid, mutate=case_mark_safe)
+        return case or {}
+
     async def stream_turn(
         self, *, uid: str, session: Session, text: str
     ) -> AsyncIterator[str]:
@@ -148,7 +233,11 @@ class ChatService:
                         response.get("scope_limit"), str
                     ):
                         proof_gaps.append(response)
-                if event.author == "DISPATCHER":
+                # DISPATCHER is the only voice in normal turns; EMERGENCY
+                # (issue #41) is the sole exception — the only other agent
+                # whose text is her reply, since a transfer hands the
+                # conversation to it, not DISPATCHER.
+                if event.author in ("DISPATCHER", "EMERGENCY"):
                     reply_parts.extend(
                         part.text for part in event.content.parts if part.text
                     )

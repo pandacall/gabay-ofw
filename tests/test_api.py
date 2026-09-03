@@ -7,14 +7,31 @@ dependency overrides — no internals of the app are mocked.
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
+from google.adk.models import BaseLlm, LlmResponse
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
 
 from app.auth import get_current_uid
 from app import main
+from app.agent import GEMINI_MODEL
+from app.chat import ChatService
 from app.deletion import DeletionReason, DeletionResult, get_user_deleter
 from app.main import create_app
 from app.nonces import InMemoryNonceStore, get_nonce_store
 from app.notes import NotesStore, get_notes_store
 from app.retention import get_retention_sweeper
+
+
+class _NeverCalledLlm(BaseLlm):
+    """mark_safe never runs the model (app.chat.apply_mark_safe mutates
+    the Case directly, outside the Runner) — this fake fails the test
+    if it is ever asked to generate."""
+
+    model: str = GEMINI_MODEL
+
+    async def generate_content_async(self, llm_request, stream: bool = False):
+        raise AssertionError("mark_safe must never invoke the model")
+        yield LlmResponse(content=types.Content(role="model", parts=[]))
 
 
 class InMemoryNotesStore(NotesStore):
@@ -77,7 +94,10 @@ def sweeper():
 
 @pytest.fixture()
 def client(store, deleter, sweeper):
-    app = create_app(verifier=FakeVerifier())
+    chat_service = ChatService(
+        session_service=InMemorySessionService(), llm=_NeverCalledLlm()
+    )
+    app = create_app(verifier=FakeVerifier(), chat_service=chat_service)
     nonce_store = InMemoryNonceStore()
     app.dependency_overrides[get_notes_store] = lambda: store
     app.dependency_overrides[get_user_deleter] = lambda: deleter
@@ -202,8 +222,9 @@ class TestPanicWipe:
         assert r.status_code == 200
 
 
-class TestMarkSafeScaffold:
-    """Endpoint scaffold only: predicate semantics land with issue #41."""
+class TestMarkSafe:
+    """mark_safe (issue #41): nonce-gated, clears the Imminent Danger
+    PREDICATE only, never the safety flag, and never runs the model."""
 
     def test_requires_auth(self, client):
         assert client.post("/api/mark-safe/nonce").status_code == 401
@@ -215,16 +236,38 @@ class TestMarkSafeScaffold:
         )
         assert r.status_code == 403
 
-    def test_valid_nonce_reaches_the_unimplemented_scaffold(self, client, deleter):
+    def test_valid_nonce_clears_the_predicate_with_zero_model_calls(
+        self, client, deleter
+    ):
+        button = client.post("/api/emergency/button", headers=auth("alice"))
+        assert button.status_code == 200
+        lines = [line for line in button.text.splitlines() if line]
+        assert lines  # the card streamed, zero model calls (_NeverCalledLlm)
+
         nonce = client.post(
             "/api/mark-safe/nonce", headers=auth("alice")
         ).json()["nonce"]
         r = client.post(
             "/api/mark-safe", json={"nonce": nonce}, headers=auth("alice")
         )
-        assert r.status_code == 501
+        assert r.status_code == 200
+        assert r.json()["marked_safe"] is True
+        assert r.json()["case"]["emergency"]["active"] is False
         # mark_safe never deletes anything.
         assert deleter.calls == []
+
+    def test_nonce_is_single_use(self, client):
+        nonce = client.post(
+            "/api/mark-safe/nonce", headers=auth("alice")
+        ).json()["nonce"]
+        first = client.post(
+            "/api/mark-safe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        replay = client.post(
+            "/api/mark-safe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert first.status_code == 200
+        assert replay.status_code == 403
 
 
 class TestRetentionSweep:
