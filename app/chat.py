@@ -20,12 +20,22 @@ from google.adk.sessions import BaseSessionService, Session
 from google.genai import types
 
 from app.agent import APP_NAME, acknowledgement_for, build_adk_app
+from app.directory import Country, resolve_case_country
+from app.safe_floor import cached_card, is_imminent_danger
 
 logger = logging.getLogger(__name__)
 
 
 def _line(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
+
+
+async def stream_stateless_fallback() -> AsyncIterator[str]:
+    """The hard fallback when the session store is down: the cached Safe
+    Floor card, zero model calls, nothing read or written anywhere."""
+    yield _line({"type": "ack", "text": acknowledgement_for(None)})
+    yield _line({"type": "card", "card": cached_card(Country.UNKNOWN)})
+    yield _line({"type": "error", "detail": "session store unavailable"})
 
 
 class ChatService:
@@ -69,6 +79,7 @@ class ChatService:
         )
 
         reply_parts: list[str] = []
+        cards: list[dict] = []
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -79,14 +90,40 @@ class ChatService:
             ):
                 if event.partial or not event.content or not event.content.parts:
                     continue
+                # Tool results carrying a card render outside the LLM text
+                # (ADR-0002): the card is fixed data, DISPATCHER only frames it.
+                for function_response in event.get_function_responses():
+                    response = function_response.response
+                    if isinstance(response, dict) and isinstance(
+                        response.get("card"), dict
+                    ):
+                        cards.append(response["card"])
                 if event.author == "DISPATCHER":
                     reply_parts.extend(
                         part.text for part in event.content.parts if part.text
                     )
         except Exception:
             logger.exception("DISPATCHER turn failed")
+            # The hard fallback: her country's cached Safe Floor card,
+            # rendered with zero further model calls — surfaced, not
+            # swallowed (the error line still follows).
+            yield _line(
+                {
+                    "type": "card",
+                    "card": cached_card(
+                        resolve_case_country(case),
+                        imminent_danger=is_imminent_danger(case),
+                    ),
+                    "session_id": session.id,
+                }
+            )
             yield _line({"type": "error", "session_id": session.id})
             return
+
+        for card in cards:
+            yield _line(
+                {"type": "card", "card": card, "session_id": session.id}
+            )
 
         yield _line(
             {

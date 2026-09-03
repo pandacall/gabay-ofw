@@ -617,7 +617,39 @@ function profileTemplate() {
   </section>`;
 }
 
+function contactCardHtml(card) {
+  const contacts = (card.contacts || [])
+    .map((contact) => {
+      const phone = escapeHtml(contact.phone || "");
+      const label = escapeHtml(contact.label || "");
+      if (contact.dial_mode === "dialable") {
+        return `<li class="card-contact dialable">
+          <span class="card-contact-label">${label}</span>
+          <a class="card-contact-phone" href="tel:${phone.replaceAll(" ", "")}">${phone}</a>
+        </li>`;
+      }
+      return `<li class="card-contact relay">
+        <span class="card-contact-label">${label}</span>
+        <span class="card-contact-phone">${phone}</span>
+        <span class="card-contact-note">${escapeHtml(contact.note || "")}</span>
+      </li>`;
+    })
+    .join("");
+  const holdLine = card.hold_line
+    ? `<p class="card-hold-line">${escapeHtml(card.hold_line)}</p>`
+    : "";
+  return `<div class="chat-message agent contact-card" data-card-type="${escapeHtml(card.type || "")}">
+    ${card.title ? `<h3 class="card-title">${escapeHtml(card.title)}</h3>` : ""}
+    ${card.reason_line ? `<p class="card-reason">${escapeHtml(card.reason_line)}</p>` : ""}
+    <ul class="card-contacts">${contacts}</ul>
+    ${holdLine}
+  </div>`;
+}
+
 function chatMessageHtml(message) {
+  if (message.kind === "card") {
+    return contactCardHtml(message.card || {});
+  }
   if (message.role === "user") {
     return `<div class="chat-message user">${escapeHtml(message.text)}</div>`;
   }
@@ -742,6 +774,9 @@ function handleChatLine(line) {
     chatThread.push({ role: "agent", kind: "ack", text: line.text });
   } else if (line.type === "reply") {
     if (line.text) chatThread.push({ role: "agent", text: line.text });
+  } else if (line.type === "card") {
+    // The card is fixed app data rendered outside the LLM text (ADR-0002).
+    if (line.card) chatThread.push({ role: "agent", kind: "card", card: line.card });
   } else if (line.type === "case") {
     chatCase = line.case || {};
   } else if (line.type === "error") {

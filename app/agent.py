@@ -21,6 +21,8 @@ from google.adk.models import BaseLlm
 
 from app.case import merge_case
 from app.extraction import read_narrative
+from app.guard import RoutingGuardPlugin, guard_before_tool
+from app.tools import action_card, office_directory, safe_floor_card
 
 # Exact pins (PRD #34): google-adk==2.8.0 in requirements.txt, and the
 # Gemini model string pinned exactly — never a -latest alias.
@@ -76,6 +78,15 @@ Ask at most one question per reply, and only for the single most useful
 missing fact. Never invent phone numbers, deadlines, laws, or amounts.
 Never promise an outcome. If she is in immediate danger, tell her plainly
 that the app's emergency help is the fastest path.
+
+Contact numbers come ONLY from your tools — never from memory. Use
+office_directory to list the real offices for her country, and
+action_card with the row keys to hand her a card. When she needs a plan
+you cannot verify — you don't know the right filing order, her country's
+sequence isn't verified, or her facts changed — call safe_floor_card
+with the fitting reason instead of guessing; the app shows her the card
+itself, so frame it warmly in your own words without repeating the
+numbers. Never direct her to local police.
 """
 
 
@@ -120,5 +131,12 @@ def build_adk_app(llm: BaseLlm) -> App:
         description="The only voice: absorbs the story, replies warmly.",
         instruction=_dispatcher_instruction,
         before_agent_callback=make_absorb_narrative_callback(llm),
+        tools=[office_directory, action_card, safe_floor_card],
+        # ROUTING_GUARD's second, independent rail (the first is the App
+        # plugin below): the tool allowlist holds even if the plugin list
+        # is ever mishandled. Returns None to allow — never {}.
+        before_tool_callback=guard_before_tool,
     )
-    return App(name=APP_NAME, root_agent=dispatcher, plugins=[])
+    return App(
+        name=APP_NAME, root_agent=dispatcher, plugins=[RoutingGuardPlugin()]
+    )
