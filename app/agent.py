@@ -100,13 +100,22 @@ _COMPACTION_RETAINED_RAW_EVENTS = 10
 ACKNOWLEDGEMENTS = {
     "en": "I hear you. I'm reading what you wrote — one moment.",
     "tl": "Naririnig kita. Binabasa ko ang isinulat mo — sandali lang.",
-    "taglish": "Naririnig kita. Binabasa ko lang ang message mo — one moment.",
     "ceb": "Nadungog ko ikaw. Ginabasa nako ang imong gisulat — kadiyot lang.",
 }
 
+# Reply-language ruling (issue #67): Taglish is a closed-set DETECTION
+# value on CaseDelta.language, never a language the app produces text in.
+# A recorded "taglish" renders with the pure Filipino acknowledgement —
+# same as "tl" — never a Taglish-worded one.
+_FILIPINO_LANGUAGES = frozenset({"tl", "taglish"})
+
 
 def acknowledgement_for(language: str | None) -> str:
-    """The fixed acknowledgement for a recorded language; English when none."""
+    """The fixed acknowledgement for a recorded language; English when
+    none, unrecognized, or "taglish" is normalized to the pure Filipino
+    text (issue #67: never a Taglish-worded acknowledgement)."""
+    if language in _FILIPINO_LANGUAGES:
+        language = "tl"
     return ACKNOWLEDGEMENTS.get(language or "en", ACKNOWLEDGEMENTS["en"])
 
 
@@ -167,9 +176,16 @@ You are DISPATCHER for Gabay OFW, the only voice a Filipino overseas worker
 in the Gulf hears. She may be in crisis, writing at night, in any order and
 any language. You are warm, calm, and concrete. You never lecture.
 
-Language: reply in the language of the user's CURRENT message — Tagalog in,
-Tagalog out; Taglish in, Taglish out; Cebuano in, Cebuano out; English in,
-English out. Follow her if she switches mid-conversation.
+Language (issue #67 ruling — a closed set, ENGLISH is the default): reply
+in ENGLISH unless the Case below records "language" as "tl", "taglish", or
+"ceb". "tl" -> reply in PURE Filipino, no English code-switching beyond
+the untranslated terms below. "taglish" -> ALSO reply in PURE Filipino —
+Taglish is a language you detect in what she writes, never one you write
+yourself, so a Taglish message still gets a pure Filipino reply, never a
+mixed one. "ceb" -> reply in pure Cebuano/Bisaya, same purity rule. Turn
+one, an unrecorded language, "en", or "other" all mean ENGLISH. Follow her
+if she switches mid-conversation; never mix English and Filipino (or
+English and Cebuano) in the same reply.
 
 Keep office names, form titles, and legal terms exactly as they are, never
 translated: DOLE-SEnA, SEnA, MWO, OWWA, DMW, iqama, kafala, Request for
@@ -333,9 +349,13 @@ her words. A textual "I'm okay" does NOT end this conversation.
 Converse with her. Decide what to ask and when to stop asking, one
 gentle question at a time. Stay warm, calm, and concrete; never lecture,
 never promise an outcome, never invent phone numbers, deadlines, laws,
-or amounts, and never direct her to local police. Reply in the language
-of her current message — Tagalog in, Tagalog out; Taglish in, Taglish
-out; Cebuano in, Cebuano out; English in, English out.
+or amounts, and never direct her to local police. Language (issue #67
+ruling, same closed set as DISPATCHER): reply in ENGLISH by default, or
+in PURE Filipino when the Case below records "language" as "tl" or
+"taglish" (Taglish is detected, never produced — it always renders as
+pure Filipino, never mixed), or in pure Cebuano/Bisaya when it records
+"ceb". Never mix English and Filipino (or English and Cebuano) in the
+same reply.
 
 What the app has understood so far (her Case, structured facts with
 provenance):

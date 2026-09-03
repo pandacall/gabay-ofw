@@ -150,7 +150,11 @@ class TestConversationSpine:
         assert lines[0]["type"] == "ack"
         assert lines[0]["text"] == ACKNOWLEDGEMENTS["en"]
 
-    def test_turn_two_ack_mirrors_recorded_language(self, client, fake_model):
+    def test_turn_two_ack_mirrors_recorded_language_as_pure_filipino(
+        self, client, fake_model
+    ):
+        # issue #67: a "taglish"-recorded turn renders the pure Filipino
+        # acknowledgement — never a Taglish-worded one.
         fake_model.extraction_results.append(TAGLISH_EXTRACTION)
         by_type, _ = turn(client, "Hindi ako nababayaran")
         session_id = by_type["reply"]["session_id"]
@@ -158,7 +162,7 @@ class TestConversationSpine:
         fake_model.extraction_results.append(TAGLISH_EXTRACTION)
         _, lines = turn(client, "Ano ang gagawin ko?", session_id=session_id)
         assert lines[0]["type"] == "ack"
-        assert lines[0]["text"] == ACKNOWLEDGEMENTS["taglish"]
+        assert lines[0]["text"] == ACKNOWLEDGEMENTS["tl"]
 
     def test_ack_streams_even_when_every_model_call_fails(self, client, fake_model):
         # The acknowledgement is fixed app code: it must not depend on any
