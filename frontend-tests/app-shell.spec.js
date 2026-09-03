@@ -127,6 +127,49 @@ test("optional profile accepts and retains any destination country", async ({
   await expect(page.getByLabel("Destination country (optional)")).toHaveValue("Iceland");
 });
 
+test("one tap wipes everything through the nonce-gated backend", async ({
+  page,
+}) => {
+  const requests = [];
+  await page.route("**/api/panic-wipe/nonce", (route) => {
+    requests.push({
+      url: "nonce",
+      auth: route.request().headers()["authorization"],
+    });
+    route.fulfill({ json: { nonce: "one-time-nonce" } });
+  });
+  await page.route("**/api/panic-wipe", (route) => {
+    requests.push({
+      url: "wipe",
+      auth: route.request().headers()["authorization"],
+      body: route.request().postDataJSON(),
+    });
+    route.fulfill({ json: { wiped: true, documents_deleted: 4 } });
+  });
+  await openAsSignedInUser(page);
+
+  await page.getByRole("button", { name: "Profile" }).click();
+  await page.getByRole("button", { name: "Delete everything now" }).click();
+
+  await expect(page.getByRole("status")).toContainText("Everything was deleted.");
+  expect(requests).toEqual([
+    { url: "nonce", auth: "Bearer valid-alice" },
+    { url: "wipe", auth: "Bearer valid-alice", body: { nonce: "one-time-nonce" } },
+  ]);
+});
+
+test("a failed wipe is reported, never silently swallowed", async ({ page }) => {
+  await page.route("**/api/panic-wipe/nonce", (route) =>
+    route.fulfill({ status: 503, json: { detail: "down" } }),
+  );
+  await openAsSignedInUser(page);
+
+  await page.getByRole("button", { name: "Profile" }).click();
+  await page.getByRole("button", { name: "Delete everything now" }).click();
+
+  await expect(page.getByRole("status")).toContainText("Could not delete right now.");
+});
+
 test("non-danger Crisis Help path omits the trafficking hotline", async ({
   page,
 }) => {

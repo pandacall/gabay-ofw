@@ -456,6 +456,8 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
 .profile-help-link { display: inline-flex; min-height: 48px; padding: 0 1rem; align-items: center; gap: 0.55rem; border: 1px solid rgba(168, 67, 31, 0.38); border-radius: var(--control-radius); color: var(--clay); background: transparent; font-weight: 700; }
 .profile-form { padding: clamp(1.5rem, 3vw, 2.3rem); border-top: 4px solid var(--ink); background: rgba(255, 255, 255, 0.68); }
 .profile-form-title { display: block; margin-bottom: 1.7rem; font-family: "Newsreader", Georgia, serif; font-size: 1.7rem; }
+.wipe-zone { grid-column: 2; margin-top: 1.2rem; border-top-color: var(--clay); }
+.wipe-zone p { margin: 0 0 1.4rem; max-width: 52ch; color: var(--body); line-height: 1.6; }
 .button {
   min-height: 56px;
   padding: 0.8rem 1.3rem;

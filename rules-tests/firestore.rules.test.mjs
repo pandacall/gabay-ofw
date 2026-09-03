@@ -135,6 +135,43 @@ describe("v6 session paths", () => {
   });
 });
 
+describe("retention field (ADR-0007)", () => {
+  it("denies the owner creating their profile with an expireAt", async () => {
+    await assertFails(
+      alice().doc("users/alice").set({ ok: true, expireAt: new Date() })
+    );
+  });
+
+  it("denies the owner changing the backend-managed expireAt", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("users/alice").set({ expireAt: new Date() });
+    });
+    await assertFails(
+      alice()
+        .doc("users/alice")
+        .set({ expireAt: new Date(Date.now() + 1e10) }, { merge: true })
+    );
+    // A full overwrite would drop expireAt — also denied.
+    await assertFails(alice().doc("users/alice").set({ ok: true }));
+  });
+
+  it("allows owner profile writes that leave expireAt untouched", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("users/alice").set({ expireAt: new Date() });
+    });
+    await assertSucceeds(
+      alice().doc("users/alice").set({ ok: true }, { merge: true })
+    );
+  });
+
+  it("denies the owner deleting the profile document from the client", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("users/alice").set({ expireAt: new Date() });
+    });
+    await assertFails(alice().doc("users/alice").delete());
+  });
+});
+
 describe("cross-user isolation", () => {
   it("denies another user reading any of the owner's paths", async () => {
     for (const p of paths("alice")) {

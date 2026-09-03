@@ -1,5 +1,7 @@
 """Gabay OFW FastAPI application."""
 
+import hmac
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -9,10 +11,22 @@ from pydantic import BaseModel, Field
 
 from app.auth import FirebaseTokenVerifier, TokenVerifier, get_current_uid
 from app.chat import ChatService
-from app.config import get_firebase_web_config, get_gemini_api_key
+from app.config import (
+    get_firebase_web_config,
+    get_gemini_api_key,
+    get_retention_sweep_token,
+)
+from app.deletion import DeletionReason, UserDataDeleter, get_user_deleter
+from app.nonces import NonceStore, get_nonce_store
 from app.notes import NotesStore, get_notes_store
+from app.retention import RetentionSweeper, get_retention_sweeper
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+# panic_wipe and mark_safe are nonce-gated backend HTTP endpoints, NEVER
+# agent tools; no agent may reach them (guard: tests/test_agent_tool_guard.py).
+_WIPE_ACTION = "panic_wipe"
+_MARK_SAFE_ACTION = "mark_safe"
 
 
 class NoteIn(BaseModel):
@@ -22,6 +36,10 @@ class NoteIn(BaseModel):
 class ChatTurnIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     session_id: str | None = None
+
+
+class NonceIn(BaseModel):
+    nonce: str = Field(min_length=1, max_length=200)
 
 
 def _production_chat_service() -> ChatService:
@@ -109,6 +127,71 @@ def create_app(
         store: NotesStore = Depends(get_notes_store),
     ):
         return {"notes": store.get_notes(uid)}
+
+    @app.post("/api/panic-wipe/nonce")
+    def panic_wipe_nonce(
+        uid: str = Depends(get_current_uid),
+        nonces: NonceStore = Depends(get_nonce_store),
+    ):
+        return {"nonce": nonces.issue(uid, _WIPE_ACTION)}
+
+    @app.post("/api/panic-wipe")
+    def panic_wipe(
+        body: NonceIn,
+        uid: str = Depends(get_current_uid),
+        nonces: NonceStore = Depends(get_nonce_store),
+        deleter: UserDataDeleter = Depends(get_user_deleter),
+    ):
+        """One authenticated action deletes the user's entire subtree.
+
+        Nonce-gated backend endpoint — never an agent tool. The deletion
+        itself is the single shared path in app.deletion.
+        """
+        if not nonces.consume(uid, _WIPE_ACTION, body.nonce):
+            raise HTTPException(status_code=403, detail="Invalid or expired nonce")
+        result = deleter.wipe(uid, reason=DeletionReason.PANIC_WIPE)
+        return {"wiped": True, "documents_deleted": result.documents_deleted}
+
+    @app.post("/api/mark-safe/nonce")
+    def mark_safe_nonce(
+        uid: str = Depends(get_current_uid),
+        nonces: NonceStore = Depends(get_nonce_store),
+    ):
+        return {"nonce": nonces.issue(uid, _MARK_SAFE_ACTION)}
+
+    @app.post("/api/mark-safe")
+    def mark_safe(
+        body: NonceIn,
+        uid: str = Depends(get_current_uid),
+        nonces: NonceStore = Depends(get_nonce_store),
+    ):
+        """Scaffold only: nonce gating lands here; the Imminent Danger
+        predicate semantics (clears predicate, never the flag) are issue #41.
+        Nonce-gated backend endpoint — never an agent tool."""
+        if not nonces.consume(uid, _MARK_SAFE_ACTION, body.nonce):
+            raise HTTPException(status_code=403, detail="Invalid or expired nonce")
+        raise HTTPException(
+            status_code=501, detail="mark_safe semantics land with issue #41"
+        )
+
+    @app.post("/api/internal/retention-sweep")
+    def retention_sweep(
+        request: Request,
+        sweeper: RetentionSweeper = Depends(get_retention_sweeper),
+    ):
+        """Scheduled recursive delete of expired subtrees (Cloud Scheduler).
+
+        Guarded by a shared secret header, not a user token: the sweep acts
+        across users. Silent by design — no notification is ever produced.
+        """
+        expected = get_retention_sweep_token()
+        if not expected:
+            raise HTTPException(status_code=503, detail="Sweep not configured")
+        provided = request.headers.get("X-Retention-Sweep-Token", "")
+        if not hmac.compare_digest(expected, provided):
+            raise HTTPException(status_code=403, detail="Invalid sweep token")
+        results = sweeper.sweep(now=datetime.now(timezone.utc))
+        return {"expired_users": len(results)}
 
     if _STATIC_DIR.is_dir():
 
