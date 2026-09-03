@@ -63,7 +63,9 @@ npm test
 ## Firestore security rules
 
 `firestore.rules` enforces `request.auth.uid == uid` on **every** path under
-`users/{uid}/...` (profile, notes, crisisSessions + messages). Everything
+`users/{uid}/...` (profile, notes, sessions + events (client read-only;
+the backend writes them via the Admin SDK), adkUserState, crisisSessions +
+messages). Everything
 outside the user tree is denied by default. Deploy with:
 
 ```bash
