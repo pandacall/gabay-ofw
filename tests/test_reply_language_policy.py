@@ -38,6 +38,24 @@ class _FakeReadonlyContext:
         self.state = state
 
 
+# Phrases that would mean an instruction tells the model to WRITE Taglish,
+# as opposed to merely naming it as a detection value. Shared by both
+# instruction suites below.
+FORBIDDEN_TAGLISH_OUTPUT_PHRASES = [
+    "reply in Taglish",
+    "reply in taglish",
+    "Taglish out",
+    "write in Taglish",
+    "output in Taglish",
+]
+
+
+def _assert_never_instructed_to_write_taglish(text: str) -> None:
+    assert "Taglish in, Taglish out" not in text
+    for phrase in FORBIDDEN_TAGLISH_OUTPUT_PHRASES:
+        assert phrase not in text
+
+
 class TestAcknowledgementMapping:
     def test_default_is_english(self):
         assert acknowledgement_for(None) == ACKNOWLEDGEMENTS["en"]
@@ -80,15 +98,7 @@ class TestDispatcherInstructionNeverProducesTaglish:
         text = self._instruction(case={"language": "taglish"})
         # The word "Taglish" may appear (naming the detection value), but
         # nowhere as an instruction to reply/write/output in it.
-        forbidden_phrases = [
-            "reply in Taglish",
-            "reply in taglish",
-            "Taglish out",
-            "write in Taglish",
-            "output in Taglish",
-        ]
-        for phrase in forbidden_phrases:
-            assert phrase not in text
+        _assert_never_instructed_to_write_taglish(text)
 
     def test_taglish_recorded_language_instructs_pure_filipino(self):
         text = self._instruction(case={"language": "taglish"})
@@ -105,6 +115,16 @@ class TestDispatcherInstructionNeverProducesTaglish:
         assert "Cebuano" in text
         assert "same purity rule" in text
 
+    def test_resume_check_branch_also_never_writes_taglish(self):
+        # The rare "long silence during Imminent Danger" branch (issue #67
+        # fix) must obey the same closed set as every other DISPATCHER
+        # reply, not the old ambiguous "reply warmly in her language".
+        case = {"language": "taglish", "emergency": {"active": True}}
+        text = self._instruction(case=case, **{"temp:resume_check": True})
+        _assert_never_instructed_to_write_taglish(text)
+        assert "PURE Filipino" in text
+        assert "ENGLISH" in text
+
 
 class TestEmergencyInstructionNeverProducesTaglish:
     def _instruction(self, **state) -> str:
@@ -112,16 +132,7 @@ class TestEmergencyInstructionNeverProducesTaglish:
 
     def test_no_instruction_tells_the_model_to_write_taglish(self):
         text = self._instruction(case={"language": "taglish"})
-        forbidden_phrases = [
-            "reply in Taglish",
-            "reply in taglish",
-            "Taglish out",
-            "write in Taglish",
-            "output in Taglish",
-        ]
-        for phrase in forbidden_phrases:
-            assert phrase not in text
-        assert "Taglish in, Taglish out" not in text
+        _assert_never_instructed_to_write_taglish(text)
 
     def test_taglish_recorded_language_instructs_pure_filipino(self):
         text = self._instruction(case={"language": "taglish"})

@@ -135,13 +135,17 @@ def _dispatcher_instruction(readonly_context: ReadonlyContext) -> str:
             # A long silence has passed while the predicate was active.
             # Re-ask once instead of silently resuming deep inside
             # EMERGENCY, as if the gap never happened.
-            return """\
+            recorded_language = case.get("language") or "unknown"
+            return f"""\
 You are DISPATCHER for Gabay OFW. The Imminent Danger predicate is still
 ACTIVE for this user, but a long silence has passed since her last
-message. Do NOT call any tool and do NOT transfer yet. Reply warmly in
-her language, check in once — ask simply how she is doing right now —
-and let her answer before anything else happens. Do this only this one
-turn.
+message. Do NOT call any tool and do NOT transfer yet. Reply warmly,
+check in once — ask simply how she is doing right now — and let her
+answer before anything else happens. Language (issue #67 ruling, same
+closed set as every DISPATCHER reply): her Case records "language" as
+{recorded_language!r} — ENGLISH by default ("unknown", "en", or "other"),
+PURE Filipino for "tl" or "taglish" (Taglish is detected, never
+produced), PURE Cebuano/Bisaya for "ceb". Do this only this one turn.
 """
         # The Imminent Danger predicate is code-owned (app.case), never a
         # fact this instruction asks the model to judge. While it is
@@ -295,9 +299,11 @@ safety flags — it never sees this conversation, only the typed
 arguments you give it. It fills forms, it NEVER submits anything.
 
 {COMPLAINT_DRAFTER_NAME} returns exactly one of three shapes; frame
-whichever one it returns warmly in her own language on screen, the same
-as every other specialist result — the fixed form fields and PDF stay
-in English, but how you tell her about them follows her language:
+whichever one it returns warmly in her language on screen (the closed
+set above — English by default, pure Filipino, or pure Cebuano; never
+Taglish), the same as every other specialist result — the fixed form
+fields and PDF stay in English, but how you tell her about them follows
+that same rule:
 - {{"draft": {{...}}}} — a red-team-cleared SEnA RFA (rendered as a
   PDF), an English MWO/ATN intake narrative, and (when a wage-loss
   figure was given) the Arabic arithmetic-only loss calculation. Tell
