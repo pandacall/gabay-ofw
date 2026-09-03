@@ -535,8 +535,8 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
 .emergency-button:active { transform: translateY(1px); }
 .mark-safe-button {
   display: flex;
-  min-height: 48px;
-  padding: 0.7rem 1.1rem;
+  min-height: 56px;
+  padding: 0.8rem 1.2rem;
   align-items: center;
   border: 1.5px solid var(--ink);
   border-radius: var(--control-radius);
@@ -621,8 +621,8 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
   .route-grid, .crisis-route-shell .route-grid { grid-template-columns: 1fr; }
   .global-help { right: 0.65rem; bottom: 0.65rem; min-height: 54px; font-size: 0.9rem; }
   .emergency-controls { top: 74px; left: 0.65rem; }
-  .emergency-button { min-height: 50px; padding: 0.7rem 1rem; font-size: 0.85rem; }
-  .mark-safe-button { min-height: 42px; padding: 0.55rem 0.85rem; font-size: 0.8rem; }
+  .emergency-button { min-height: 54px; padding: 0.75rem 1rem; font-size: 0.85rem; }
+  .mark-safe-button { min-height: 54px; padding: 0.65rem 0.95rem; font-size: 0.85rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

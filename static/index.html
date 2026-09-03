@@ -140,6 +140,12 @@
       <div class="dialog-actions">
         <button class="button ink-button full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
         <button class="button urgent-button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
+        <!-- EMERGENCY must stay reachable even before the disclaimer is
+             dismissed (issue #64: "a visible, always-reachable EMERGENCY
+             button") — showModal() makes the rest of the page inert, so
+             the escape hatch has to live inside the dialog itself, same
+             as #disclaimer-help above. -->
+        <button class="button emergency-button full-width" type="button" data-action="emergency-button" data-copy="emergencyButton"></button>
       </div>
     </form>
   </dialog>

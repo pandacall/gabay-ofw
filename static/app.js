@@ -1077,6 +1077,7 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (action === "emergency-button") {
+    if (dialog.open) dialog.close();
     button.disabled = true;
     pressEmergencyButton().finally(() => {
       button.disabled = false;
