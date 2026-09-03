@@ -73,8 +73,14 @@ language.
 Return ONLY the fields the message itself supports. Never guess or infer a
 value the writer did not state. Numeric fields are decimal strings.
 
-language: the language of THIS message ("taglish" when Tagalog and English
-are mixed in the same message).
+language: the language of THIS message — "en" when it is written in
+English, even if it names Filipino people, places, employers, or
+agencies (a proper noun is not a Tagalog word); "tl" for Tagalog/Filipino;
+"taglish" only when an actual Tagalog/Filipino word is mixed into an
+otherwise English message, not merely an English message about a
+Filipino worker; "ceb" for Cebuano/Bisaya; "other" for any other
+language. Default to "en" when in doubt — never "tl" or "taglish" for a
+message with no actual Tagalog words in it.
 
 safety_flags: only when the message states it. Tagalog verb aspect matters:
 "sinasaktan/sinasaktan niya ako" (ongoing) -> PHYSICAL_ASSAULT_ONGOING;

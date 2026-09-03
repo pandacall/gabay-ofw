@@ -22,6 +22,7 @@ from app.chat import ChatService
 from app.main import create_app
 
 DISPATCHER_REPLY = "Nandito ako para tumulong. Ilang buwan ka nang hindi nababayaran?"
+ENGLISH_DISPATCHER_REPLY = "I hear you. How many months has your employer not paid you?"
 
 TAGLISH_EXTRACTION = json.dumps(
     {
@@ -32,6 +33,19 @@ TAGLISH_EXTRACTION = json.dumps(
             "employer_name": {"value": "Al Rashid", "confidence": "medium"},
         },
         "safety_flags": ["PASSPORT_WITHHELD"],
+    }
+)
+
+# issue #67: English input must land on "en", not get over-classified as
+# tl/taglish, and must never nudge the pipeline toward a Filipino reply.
+ENGLISH_EXTRACTION = json.dumps(
+    {
+        "language": "en",
+        "claims": {
+            "country": {"value": "Saudi Arabia", "confidence": "high"},
+            "months_unpaid": {"value": "3", "confidence": "high"},
+        },
+        "safety_flags": [],
     }
 )
 
@@ -150,7 +164,11 @@ class TestConversationSpine:
         assert lines[0]["type"] == "ack"
         assert lines[0]["text"] == ACKNOWLEDGEMENTS["en"]
 
-    def test_turn_two_ack_mirrors_recorded_language(self, client, fake_model):
+    def test_turn_two_ack_mirrors_recorded_language_as_pure_filipino(
+        self, client, fake_model
+    ):
+        # issue #67: a "taglish"-recorded turn renders the pure Filipino
+        # acknowledgement — never a Taglish-worded one.
         fake_model.extraction_results.append(TAGLISH_EXTRACTION)
         by_type, _ = turn(client, "Hindi ako nababayaran")
         session_id = by_type["reply"]["session_id"]
@@ -158,7 +176,38 @@ class TestConversationSpine:
         fake_model.extraction_results.append(TAGLISH_EXTRACTION)
         _, lines = turn(client, "Ano ang gagawin ko?", session_id=session_id)
         assert lines[0]["type"] == "ack"
-        assert lines[0]["text"] == ACKNOWLEDGEMENTS["taglish"]
+        assert lines[0]["text"] == ACKNOWLEDGEMENTS["tl"]
+
+    def test_english_input_records_en_and_passes_the_reply_through_untouched(
+        self, client, fake_model
+    ):
+        # issue #67 (default English, no Filipino default anywhere): English
+        # input must land on case["language"] == "en" — never over-recorded
+        # as "tl"/"taglish" — and an English-worded DISPATCHER reply must
+        # pass through the pipeline unchanged.
+        fake_model.extraction_results.append(ENGLISH_EXTRACTION)
+        fake_model.replies.append(ENGLISH_DISPATCHER_REPLY)
+        by_type, lines = turn(client, "I have not been paid for 3 months")
+
+        assert lines[0]["type"] == "ack"
+        assert lines[0]["text"] == ACKNOWLEDGEMENTS["en"]
+        assert by_type["reply"]["text"] == ENGLISH_DISPATCHER_REPLY
+        assert by_type["case"]["case"]["language"] == "en"
+
+    def test_turn_two_ack_mirrors_english_recorded_language(
+        self, client, fake_model
+    ):
+        # Closes the gap where only "taglish" mirroring was exercised at
+        # turn 2 — English must mirror the same way, not just default on
+        # turn 1.
+        fake_model.extraction_results.append(ENGLISH_EXTRACTION)
+        by_type, _ = turn(client, "I have not been paid for 3 months")
+        session_id = by_type["reply"]["session_id"]
+
+        fake_model.extraction_results.append(ENGLISH_EXTRACTION)
+        _, lines = turn(client, "What should I do?", session_id=session_id)
+        assert lines[0]["type"] == "ack"
+        assert lines[0]["text"] == ACKNOWLEDGEMENTS["en"]
 
     def test_ack_streams_even_when_every_model_call_fails(self, client, fake_model):
         # The acknowledgement is fixed app code: it must not depend on any

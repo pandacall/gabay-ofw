@@ -28,10 +28,14 @@ of the two passes.
 - Nothing below requires more than one signed-in browser tab, or DevTools
   — every step, including EMERGENCY/mark_safe (7) and panic_wipe (8), is
   exercised through a real UI control.
-- Type messages in whatever language feels natural — DISPATCHER mirrors
-  your language from your second message onward (turn 1's acknowledgement
-  is always fixed English, by design; see `app/agent.py`'s
-  `ACKNOWLEDGEMENTS` / `acknowledgement_for`).
+- Type messages in whatever language feels natural. The reply language is
+  a closed set (issue #67 ruling): English is the default — turn 1, before
+  a language is known, and for English input — while Tagalog/Filipino
+  input gets a pure Filipino reply and Cebuano/Bisaya input gets a pure
+  Cebuano reply. Taglish input is detected but never produced: it also
+  gets a pure Filipino reply, never a mixed one. See `app/agent.py`'s
+  `ACKNOWLEDGEMENTS` / `acknowledgement_for` and the DISPATCHER/EMERGENCY
+  instructions.
 - After each step, note the wall-clock time of the first character of the
   reply appearing. The Cloud Run service should now hold one warm
   instance (`--min-instances=1`, issue #49) — if any step's *first*
