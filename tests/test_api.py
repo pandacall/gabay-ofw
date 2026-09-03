@@ -10,8 +10,11 @@ from fastapi.testclient import TestClient
 
 from app.auth import get_current_uid
 from app import main
+from app.deletion import DeletionReason, DeletionResult, get_user_deleter
 from app.main import create_app
+from app.nonces import InMemoryNonceStore, get_nonce_store
 from app.notes import NotesStore, get_notes_store
+from app.retention import get_retention_sweeper
 
 
 class InMemoryNotesStore(NotesStore):
@@ -37,15 +40,49 @@ class FakeVerifier:
         return token.removeprefix("valid-")
 
 
+class FakeDeleter:
+    """Records wipe calls at the boundary; no Firestore involved."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, DeletionReason]] = []
+
+    def wipe(self, uid: str, *, reason: DeletionReason) -> DeletionResult:
+        self.calls.append((uid, reason))
+        return DeletionResult(uid=uid, reason=reason, documents_deleted=4)
+
+
+class FakeSweeper:
+    def __init__(self):
+        self.calls = []
+
+    def sweep(self, *, now):
+        self.calls.append(now)
+        return []
+
+
 @pytest.fixture()
 def store():
     return InMemoryNotesStore()
 
 
 @pytest.fixture()
-def client(store):
+def deleter():
+    return FakeDeleter()
+
+
+@pytest.fixture()
+def sweeper():
+    return FakeSweeper()
+
+
+@pytest.fixture()
+def client(store, deleter, sweeper):
     app = create_app(verifier=FakeVerifier())
+    nonce_store = InMemoryNonceStore()
     app.dependency_overrides[get_notes_store] = lambda: store
+    app.dependency_overrides[get_user_deleter] = lambda: deleter
+    app.dependency_overrides[get_retention_sweeper] = lambda: sweeper
+    app.dependency_overrides[get_nonce_store] = lambda: nonce_store
     return TestClient(app)
 
 
@@ -102,3 +139,115 @@ class TestNotesRoundTrip:
     def test_missing_text_rejected(self, client):
         r = client.post("/api/notes", json={}, headers=auth("alice"))
         assert r.status_code == 422
+
+
+def wipe_nonce(client, uid: str) -> str:
+    return client.post("/api/panic-wipe/nonce", headers=auth(uid)).json()["nonce"]
+
+
+class TestPanicWipe:
+    """panic_wipe is a nonce-gated backend endpoint (never an agent tool)."""
+
+    def test_requires_auth(self, client, deleter):
+        assert client.post("/api/panic-wipe/nonce").status_code == 401
+        assert client.post("/api/panic-wipe", json={"nonce": "x"}).status_code == 401
+        assert deleter.calls == []
+
+    def test_rejects_a_nonce_it_never_issued(self, client, deleter):
+        r = client.post(
+            "/api/panic-wipe", json={"nonce": "forged"}, headers=auth("alice")
+        )
+        assert r.status_code == 403
+        assert deleter.calls == []
+
+    def test_wipes_the_subtree_with_the_panic_wipe_reason(self, client, deleter):
+        nonce = wipe_nonce(client, "alice")
+        r = client.post(
+            "/api/panic-wipe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert r.status_code == 200
+        assert r.json()["wiped"] is True
+        assert deleter.calls == [("alice", DeletionReason.PANIC_WIPE)]
+
+    def test_nonce_is_single_use(self, client, deleter):
+        nonce = wipe_nonce(client, "alice")
+        first = client.post(
+            "/api/panic-wipe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        replay = client.post(
+            "/api/panic-wipe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert first.status_code == 200
+        assert replay.status_code == 403
+        assert len(deleter.calls) == 1
+
+    def test_nonce_is_bound_to_the_issuing_user(self, client, deleter):
+        nonce = wipe_nonce(client, "alice")
+        r = client.post(
+            "/api/panic-wipe", json={"nonce": nonce}, headers=auth("bob")
+        )
+        assert r.status_code == 403
+        assert deleter.calls == []
+
+    def test_wipe_nonce_is_not_valid_for_mark_safe(self, client, deleter):
+        nonce = wipe_nonce(client, "alice")
+        r = client.post(
+            "/api/mark-safe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert r.status_code == 403
+        # And the wipe nonce still works for its own action.
+        r = client.post(
+            "/api/panic-wipe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert r.status_code == 200
+
+
+class TestMarkSafeScaffold:
+    """Endpoint scaffold only: predicate semantics land with issue #41."""
+
+    def test_requires_auth(self, client):
+        assert client.post("/api/mark-safe/nonce").status_code == 401
+        assert client.post("/api/mark-safe", json={"nonce": "x"}).status_code == 401
+
+    def test_rejects_an_unissued_nonce(self, client):
+        r = client.post(
+            "/api/mark-safe", json={"nonce": "forged"}, headers=auth("alice")
+        )
+        assert r.status_code == 403
+
+    def test_valid_nonce_reaches_the_unimplemented_scaffold(self, client, deleter):
+        nonce = client.post(
+            "/api/mark-safe/nonce", headers=auth("alice")
+        ).json()["nonce"]
+        r = client.post(
+            "/api/mark-safe", json={"nonce": nonce}, headers=auth("alice")
+        )
+        assert r.status_code == 501
+        # mark_safe never deletes anything.
+        assert deleter.calls == []
+
+
+class TestRetentionSweep:
+    def test_unconfigured_sweep_is_disabled(self, client, sweeper, monkeypatch):
+        monkeypatch.delenv("RETENTION_SWEEP_TOKEN", raising=False)
+        assert client.post("/api/internal/retention-sweep").status_code == 503
+        assert sweeper.calls == []
+
+    def test_rejects_a_wrong_token(self, client, sweeper, monkeypatch):
+        monkeypatch.setenv("RETENTION_SWEEP_TOKEN", "sweep-secret")
+        r = client.post(
+            "/api/internal/retention-sweep",
+            headers={"X-Retention-Sweep-Token": "wrong"},
+        )
+        assert r.status_code == 403
+        assert sweeper.calls == []
+
+    def test_runs_the_sweep_with_the_shared_secret(self, client, sweeper, monkeypatch):
+        monkeypatch.setenv("RETENTION_SWEEP_TOKEN", "sweep-secret")
+        r = client.post(
+            "/api/internal/retention-sweep",
+            headers={"X-Retention-Sweep-Token": "sweep-secret"},
+        )
+        assert r.status_code == 200
+        assert r.json() == {"expired_users": 0}
+        assert len(sweeper.calls) == 1

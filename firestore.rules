@@ -5,9 +5,20 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == uid;
     }
 
-    // Profile document.
+    // Profile document. The backend-managed retention field expireAt
+    // (ADR-0007) is never client-writable: a coerced device must not be
+    // able to stretch or shrink the retention promise. Client deletes are
+    // refused because deletion goes through the backend single deletion
+    // path (panic_wipe), which cascades to subcollections; a client-side
+    // document delete would orphan them.
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && !request.resource.data.keys().hasAny(['expireAt']);
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data)
+          .affectedKeys().hasAny(['expireAt']);
+      allow delete: if false;
     }
 
     // Walking-skeleton notes.

@@ -33,6 +33,12 @@ def get_gemini_api_key() -> str | None:
     return os.environ.get("GEMINI_API_KEY")
 
 
+def get_retention_sweep_token() -> str | None:
+    """Shared secret for the scheduled retention sweep endpoint; the sweep
+    is disabled (503) until it is configured."""
+    return os.environ.get("RETENTION_SWEEP_TOKEN") or None
+
+
 def get_firebase_web_config() -> dict | None:
     """Public Firebase web-app config (apiKey etc. are not secrets), from env."""
     import json

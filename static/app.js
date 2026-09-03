@@ -88,6 +88,11 @@ const copy = {
     profileSaved: "Profile saved on this device.",
     deleteData: "Delete local profile",
     localProfileDeleted: "Local profile deleted.",
+    wipeTitle: "Delete everything",
+    wipeBody: "One tap permanently deletes your conversations and case from Gabay OFW. Nothing is kept anywhere, and it cannot be undone.",
+    wipeEverything: "Delete everything now",
+    wipeDone: "Everything was deleted.",
+    wipeFailed: "Could not delete right now. Try again.",
     otherCountry: "Other",
     signInFailed: (message) => `Sign-in failed: ${message}`,
     notConfigured: "Firebase sign-in is not configured yet.",
@@ -184,6 +189,11 @@ const copy = {
     profileSaved: "Na-save ang profile sa device na ito.",
     deleteData: "Burahin ang local profile",
     localProfileDeleted: "Nabura ang local profile.",
+    wipeTitle: "Burahin ang lahat",
+    wipeBody: "Isang tap ang permanenteng bubura sa lahat ng usapan at case mo sa Gabay OFW. Walang matitira kahit saan, at hindi na ito maibabalik.",
+    wipeEverything: "Burahin lahat ngayon",
+    wipeDone: "Nabura na ang lahat.",
+    wipeFailed: "Hindi nabura ngayon. Subukan muli.",
     otherCountry: "Ibang bansa",
     signInFailed: (message) => `Hindi nagtagumpay ang sign-in: ${message}`,
     notConfigured: "Hindi pa naka-configure ang Firebase sign-in.",
@@ -280,6 +290,11 @@ const copy = {
     profileSaved: "Na-save ang profile sa device.",
     deleteData: "Papasa ang local profile",
     localProfileDeleted: "Napapas ang local profile.",
+    wipeTitle: "Papasa ang tanan",
+    wipeBody: "Usa ka tap mopapas sa tanan nimong panag-istorya ug case sa Gabay OFW. Walay mabilin bisan asa, ug dili na kini mabalik.",
+    wipeEverything: "Papasa tanan karon",
+    wipeDone: "Napapas na ang tanan.",
+    wipeFailed: "Wala mapapas karon. Sulayi pag-usab.",
     otherCountry: "Ubang nasod",
     signInFailed: (message) => `Wala molampos ang sign-in: ${message}`,
     notConfigured: "Wala pa ma-configure ang Firebase sign-in.",
@@ -593,6 +608,11 @@ function profileTemplate() {
         <button class="button" type="button" data-action="delete-profile">${t("deleteData")}</button>
       </div>
       </form>
+      <section class="profile-form wipe-zone">
+        <h2 class="profile-form-title">${t("wipeTitle")}</h2>
+        <p>${t("wipeBody")}</p>
+        <button class="button urgent-button" type="button" data-action="panic-wipe">${t("wipeEverything")}</button>
+      </section>
     </div>
   </section>`;
 }
@@ -768,6 +788,34 @@ function showStatus(message) {
   window.setTimeout(() => status.classList.add("hidden"), 2600);
 }
 
+// panic_wipe: nonce-gated backend endpoint. One tap deletes the entire
+// server-side subtree; local traces are cleared and the session ends so
+// the next visit starts clean.
+async function panicWipe() {
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    const nonceResponse = await fetch("/api/panic-wipe/nonce", { method: "POST", headers });
+    if (!nonceResponse.ok) throw new Error("nonce");
+    const { nonce } = await nonceResponse.json();
+    const wipeResponse = await fetch("/api/panic-wipe", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ nonce }),
+    });
+    if (!wipeResponse.ok) throw new Error("wipe");
+    localStorage.removeItem(`gabay-profile:${userId}`);
+    localStorage.removeItem(`gabay-disclaimer-accepted:${userId}`);
+    showStatus(t("wipeDone"));
+    await signOut(auth);
+  } catch {
+    showStatus(t("wipeFailed"));
+  }
+}
+
 document.addEventListener("click", (event) => {
   const opener = event.target.closest("[data-opener]");
   if (opener) {
@@ -783,6 +831,13 @@ document.addEventListener("click", (event) => {
   const action = button.dataset.action;
   if (action === "crisis-country") {
     crisisDanger = button.dataset.danger === "true";
+  }
+  if (action === "panic-wipe") {
+    button.disabled = true;
+    panicWipe().finally(() => {
+      button.disabled = false;
+    });
+    return;
   }
   if (action === "delete-profile") {
     localStorage.removeItem(`gabay-profile:${userId}`);

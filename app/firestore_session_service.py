@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -35,6 +36,9 @@ from google.adk.sessions.base_session_service import (
 )
 from google.adk.sessions.state import State
 from google.cloud import firestore
+
+from app.retention import touch_expire_at
+from app.deletion import delete_document_tree
 
 _STALE_SESSION_ERROR_MESSAGE = (
     "The session has been modified in storage since it was loaded. "
@@ -91,6 +95,17 @@ class FirestoreSessionService(BaseSessionService):
     def _app_state_ref(self, app_name: str):
         return self._db.collection("adkAppState").document(app_name)
 
+    async def _touch_retention(self, user_id: str, activity_ts: float) -> None:
+        """Extends users/{uid}.expireAt for this activity (ADR-0007).
+
+        Deadlines are supplied by the Plan-publishing path when it lands;
+        touch_expire_at is monotonic, so an activity-only touch can never
+        shrink a deadline-backed expiry already stored."""
+        last_activity = datetime.fromtimestamp(activity_ts, tz=timezone.utc)
+        await asyncio.to_thread(
+            touch_expire_at, self._db, user_id, last_activity=last_activity
+        )
+
     async def create_session(
         self,
         *,
@@ -137,6 +152,7 @@ class FirestoreSessionService(BaseSessionService):
             return create_txn(transaction)
 
         stored_app, stored_user = await asyncio.to_thread(persist)
+        await self._touch_retention(user_id, now)
         session = Session(
             app_name=app_name,
             user_id=user_id,
@@ -230,13 +246,9 @@ class FirestoreSessionService(BaseSessionService):
         self, *, app_name: str, user_id: str, session_id: str
     ) -> None:
         ref = self._session_ref(user_id, session_id)
-
-        def delete_documents() -> None:
-            for event in ref.collection("events").stream():
-                event.reference.delete()
-            ref.delete()
-
-        await asyncio.to_thread(delete_documents)
+        # Same recursive tree delete the wipe/expiry path is built on —
+        # a session delete must never orphan its events subcollection.
+        await asyncio.to_thread(delete_document_tree, ref)
 
     def _read_revision(self, session_ref) -> int:
         """Re-reads the stored revision when retrying a stale append."""
@@ -338,6 +350,7 @@ class FirestoreSessionService(BaseSessionService):
             # Surface the concurrent turn's writes in the in-memory session.
             session.state.update(stored_state)
 
+        await self._touch_retention(session.user_id, event.timestamp)
         await super().append_event(session, event)
         session.last_update_time = event.timestamp
         session._storage_update_marker = str(new_revision)
