@@ -117,6 +117,15 @@ const copy = {
     caseSourceDocument: "a document said",
     caseSourceDebunker: "checked",
     caseUpdateFailed: "Could not save your correction. Try again.",
+    emergencyButton: "EMERGENCY",
+    emergencyFailed: "Could not reach the emergency card right now. Try again, or call OWWA 1348 directly.",
+    markSafeButton: "I'm safe now",
+    markSafeConfirmTitle: "Confirm you are safe",
+    markSafeConfirmBody: "This clears the emergency alert on your account, but keeps what you already disclosed on record. Only confirm if you can tap freely right now and no one is watching your phone.",
+    markSafeConfirm: "Yes, I am safe",
+    markSafeCancel: "Cancel",
+    markSafeDone: "Marked safe. The emergency alert is cleared.",
+    markSafeFailed: "Could not confirm right now. Try again.",
   },
   tl: {
     languageName: "Filipino",
@@ -227,6 +236,15 @@ const copy = {
     caseSourceDocument: "sinabi ng dokumento",
     caseSourceDebunker: "na-check",
     caseUpdateFailed: "Hindi na-save ang pagtatama mo. Subukan muli.",
+    emergencyButton: "EMERGENCY",
+    emergencyFailed: "Hindi naabot ang emergency card ngayon. Subukan muli, o tumawag mismo sa OWWA 1348.",
+    markSafeButton: "Ligtas na ako ngayon",
+    markSafeConfirmTitle: "Kumpirmahin na ligtas ka na",
+    markSafeConfirmBody: "Aalisin nito ang emergency alert sa account mo, pero mananatiling nakatala ang naibahagi mo na. Kumpirma lamang kung malaya kang makaka-tap ngayon at walang nagbabantay sa phone mo.",
+    markSafeConfirm: "Oo, ligtas na ako",
+    markSafeCancel: "Kanselahin",
+    markSafeDone: "Na-mark na ligtas. Naalis na ang emergency alert.",
+    markSafeFailed: "Hindi na-kumpirma ngayon. Subukan muli.",
   },
   ceb: {
     languageName: "Bisaya",
@@ -337,6 +355,15 @@ const copy = {
     caseSourceDocument: "gisulti sa dokumento",
     caseSourceDebunker: "gi-check",
     caseUpdateFailed: "Wala ma-save ang imong pagtul-id. Sulayi pag-usab.",
+    emergencyButton: "EMERGENCY",
+    emergencyFailed: "Wala naabot ang emergency card karon. Sulayi pag-usab, o tawagi dayon ang OWWA 1348.",
+    markSafeButton: "Luwas na ko karon",
+    markSafeConfirmTitle: "Kumpirmaha nga luwas ka na",
+    markSafeConfirmBody: "Kini mopapas sa emergency alert sa imong account, apan magpabilin nga naka-record ang imong gipaambit na. Kumpirma lang kung gawasnon kang maka-tap karon ug walay nagbantay sa imong phone.",
+    markSafeConfirm: "Oo, luwas na ko",
+    markSafeCancel: "Kanselaha",
+    markSafeDone: "Na-mark nga luwas. Napapas na ang emergency alert.",
+    markSafeFailed: "Wala na-kumpirma karon. Sulayi pag-usab.",
   },
 };
 
@@ -406,6 +433,8 @@ const dialog = document.getElementById("first-run-dialog");
 const languageSelects = document.querySelectorAll(".language-select");
 const modeSwitcher = document.querySelector(".mode-switcher");
 const globalHelp = document.getElementById("global-help");
+const markSafeButton = document.getElementById("mark-safe-button");
+const markSafeDialog = document.getElementById("mark-safe-dialog");
 const status = document.getElementById("status");
 
 const supportedLanguages = Object.keys(copy);
@@ -795,6 +824,7 @@ function chatTemplate() {
 }
 
 function refreshChatScreen() {
+  refreshEmergencyControls();
   if (currentScreen !== "chat") return;
   const thread = document.getElementById("chat-thread");
   if (thread) {
@@ -807,6 +837,34 @@ function refreshChatScreen() {
   if (openersBlock && chatThread.length) openersBlock.remove();
   const sendButton = document.querySelector('.chat-composer button[type="submit"]');
   if (sendButton) sendButton.disabled = chatBusy;
+}
+
+// The Imminent Danger predicate (case.emergency.active) is global app
+// state, not chat-screen state — the "mark safe" affordance must show or
+// hide no matter which screen she is looking at (issue #64).
+function refreshEmergencyControls() {
+  if (markSafeButton) {
+    markSafeButton.classList.toggle("hidden", !chatCase?.emergency?.active);
+  }
+}
+
+// Shared NDJSON line-delimited stream reader for both /api/chat and the
+// EMERGENCY button's one-shot response — same wire format, same handling.
+async function readNdjsonLines(response, onLine) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (value) buffer += decoder.decode(value, { stream: true });
+    let newline;
+    while ((newline = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, newline).trim();
+      buffer = buffer.slice(newline + 1);
+      if (line) onLine(JSON.parse(line));
+    }
+    if (done) break;
+  }
 }
 
 async function sendChatTurn(text) {
@@ -822,20 +880,7 @@ async function sendChatTurn(text) {
       body: JSON.stringify({ text, session_id: chatSessionId }),
     });
     if (!response.ok || !response.body) throw new Error(`chat failed: ${response.status}`);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (value) buffer += decoder.decode(value, { stream: true });
-      let newline;
-      while ((newline = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (line) handleChatLine(JSON.parse(line));
-      }
-      if (done) break;
-    }
+    await readNdjsonLines(response, handleChatLine);
   } catch {
     chatThread.push({ role: "agent", kind: "error", text: t("chatError") });
   } finally {
@@ -951,6 +996,63 @@ async function panicWipe() {
   }
 }
 
+// EMERGENCY (issue #41, #64): the hardcoded exit. POST /api/emergency/button
+// renders the cached action card with ZERO model turns, so it is reachable
+// even when the model or chat path is down (PRD #34 user story 28) — a
+// dedicated one-shot renderer, not a /api/chat turn, sharing only the NDJSON
+// card/case line handling with sendChatTurn via handleChatLine. Switches to
+// the chat screen synchronously (never navigate()'s animated transition —
+// an emergency exit does not wait on a decorative delay) so the rendered
+// card is visible immediately.
+async function pressEmergencyButton() {
+  if (!auth?.currentUser) return;
+  if (currentScreen !== "chat") renderScreen("chat");
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/emergency/button", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok || !response.body) throw new Error(`emergency failed: ${response.status}`);
+    await readNdjsonLines(response, handleChatLine);
+  } catch {
+    chatThread.push({ role: "agent", kind: "error", text: t("emergencyFailed") });
+    refreshChatScreen();
+  }
+}
+
+// mark_safe (issue #41, #64): clears the Imminent Danger PREDICATE only —
+// never the safety flag itself (PRD #34 user story 33). Nonce-gated
+// backend endpoint, same shape as panic_wipe. The confirmation dialog
+// (#mark-safe-dialog) is the deliberate second tap: a coerced pocket-tap
+// on the visible button alone can't clear the predicate (user story 32).
+async function applyMarkSafe() {
+  if (!auth?.currentUser) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    };
+    const nonceResponse = await fetch("/api/mark-safe/nonce", { method: "POST", headers });
+    if (!nonceResponse.ok) throw new Error("nonce");
+    const { nonce } = await nonceResponse.json();
+    const response = await fetch("/api/mark-safe", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ nonce }),
+    });
+    if (!response.ok) throw new Error("mark-safe");
+    const data = await response.json();
+    chatCase = data.case || chatCase;
+    showStatus(t("markSafeDone"));
+  } catch {
+    showStatus(t("markSafeFailed"));
+  } finally {
+    refreshChatScreen();
+  }
+}
+
 document.addEventListener("click", (event) => {
   const opener = event.target.closest("[data-opener]");
   if (opener) {
@@ -970,6 +1072,30 @@ document.addEventListener("click", (event) => {
   if (action === "panic-wipe") {
     button.disabled = true;
     panicWipe().finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
+  if (action === "emergency-button") {
+    if (dialog.open) dialog.close();
+    button.disabled = true;
+    pressEmergencyButton().finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
+  if (action === "mark-safe") {
+    markSafeDialog.showModal();
+    return;
+  }
+  if (action === "mark-safe-cancel") {
+    markSafeDialog.close();
+    return;
+  }
+  if (action === "mark-safe-confirm") {
+    markSafeDialog.close();
+    button.disabled = true;
+    applyMarkSafe().finally(() => {
       button.disabled = false;
     });
     return;
@@ -1076,6 +1202,8 @@ if (auth) {
       chatThread = [];
       chatCase = {};
       editingCaseField = null;
+      if (markSafeDialog.open) markSafeDialog.close();
+      refreshEmergencyControls();
       return;
     }
     userName = user.displayName || user.email || "";

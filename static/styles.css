@@ -504,6 +504,49 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
   font-weight: 700;
 }
 
+/* EMERGENCY (issue #64): a serious, always-visible control, never tucked
+   inside a per-screen template — deliberately more insistent than
+   .global-help so it reads as the "hardcoded button", not a chat feature. */
+.emergency-controls {
+  position: fixed;
+  top: clamp(96px, 14vh, 112px);
+  left: clamp(1rem, 3vw, 2rem);
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.emergency-button {
+  display: flex;
+  min-height: 58px;
+  padding: 0.9rem 1.3rem;
+  align-items: center;
+  gap: 0.6rem;
+  border: 2px solid var(--dawn-base);
+  border-radius: var(--control-radius);
+  color: var(--on-clay);
+  background: var(--clay-dark);
+  box-shadow: 0 9px 26px rgba(150,60,25,0.3);
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.emergency-button:active { transform: translateY(1px); }
+.mark-safe-button {
+  display: flex;
+  min-height: 56px;
+  padding: 0.8rem 1.2rem;
+  align-items: center;
+  border: 1.5px solid var(--ink);
+  border-radius: var(--control-radius);
+  color: var(--dawn-base);
+  background: var(--ink);
+  font-weight: 700;
+  box-shadow: var(--soft-shadow);
+}
+.mark-safe-button:active { transform: translateY(1px); }
+
 .disclaimer-dialog { width: min(560px, calc(100% - 2rem)); padding: 0; border: 1px solid var(--sand-border); border-radius: var(--card-radius); color: var(--ink); background: var(--dawn-surface); box-shadow: var(--shadow); }
 .disclaimer-dialog::backdrop { background: rgba(63, 41, 23, 0.58); backdrop-filter: blur(5px); }
 .disclaimer-dialog form { padding: clamp(1.5rem, 5vw, 2.7rem); }
@@ -577,6 +620,9 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
   .profile-form { padding: 1.3rem; }
   .route-grid, .crisis-route-shell .route-grid { grid-template-columns: 1fr; }
   .global-help { right: 0.65rem; bottom: 0.65rem; min-height: 54px; font-size: 0.9rem; }
+  .emergency-controls { top: 74px; left: 0.65rem; }
+  .emergency-button { min-height: 54px; padding: 0.75rem 1rem; font-size: 0.85rem; }
+  .mark-safe-button { min-height: 54px; padding: 0.65rem 0.95rem; font-size: 0.85rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
