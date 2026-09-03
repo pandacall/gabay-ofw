@@ -24,6 +24,7 @@ from app.debunker import build_debunker
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
 from app.proof.agent import build_proof_builder
+from app.sequencer_agent import FILING_SEQUENCER_NAME, build_filing_sequencer
 from app.tools import action_card, office_directory, safe_floor_card
 
 # Exact pins (PRD #34): google-adk==2.8.0 in requirements.txt, and the
@@ -113,6 +114,29 @@ exactly the ONE ask it returned (or, if it returned none, state what the
 bundle covers and what it will not support). If she says she cannot get
 something, call PROOF_BUILDER again with that artifact listed as
 unobtainable — never proceed as if she had it.
+
+When she has told you enough to know her country, her tenure situation
+(still working there, left the employer but still in-country, or already
+departed), and at least one concrete grievance (unpaid wages, passport
+withheld, physical danger, a retaliatory status action, or a blocked
+exit), call {FILING_SEQUENCER_NAME} with exactly those three facts — it
+never sees this conversation, only the typed arguments you give it. Do
+not call it on a guess; ask your one question first if a fact is still
+missing.
+
+{FILING_SEQUENCER_NAME} returns exactly one of three shapes:
+- {{"plan": {{...}}}} — a verified, cited filing Plan. Walk her through
+  its steps in order, in your own warm words, always naming the citation
+  each step carries. A step whose citation says "the MWO can confirm"
+  must be presented as something to confirm with the MWO, never as a
+  flat fact, and never as a countdown.
+- {{"held_refusal": {{...}}}} — her country has no verified filing
+  sequence yet. Say so plainly and warmly, give her the card's MWO
+  contact and 1348, and tell her not to leave before speaking to the
+  MWO. Never invent a sequence to fill the gap.
+- {{"no_verified_plan": true}} — the app could not build a plan it can
+  stand behind. Call safe_floor_card yourself instead; never repeat the
+  call to {FILING_SEQUENCER_NAME} hoping for a different result.
 """
 
 
@@ -157,6 +181,7 @@ def build_adk_app(llm: BaseLlm) -> App:
     no ``AgentTool``, and no free-text request parameter anywhere. Their
     tool calls cross ROUTING_GUARD like DISPATCHER's own.
     """
+    filing_sequencer = build_filing_sequencer(llm)
     dispatcher = LlmAgent(
         name="DISPATCHER",
         mode="chat",
@@ -165,11 +190,20 @@ def build_adk_app(llm: BaseLlm) -> App:
         instruction=_dispatcher_instruction,
         before_agent_callback=make_absorb_narrative_callback(llm),
         tools=[office_directory, action_card, safe_floor_card],
+        # FILING_SEQUENCER (issue #42) is NOT listed in tools=[...]: as a
+        # mode='single_turn' sub_agent, google-adk's LlmAgent.model_post_init
+        # auto-wraps it into a single tool of this same name and appends it
+        # to DISPATCHER's tools itself. No AgentTool(...) here (PRD #34).
+        # DEBUNKER and PROOF_BUILDER (issues #47/#45) are wired the same way.
+        sub_agents=[
+            filing_sequencer,
+            build_debunker(llm),
+            build_proof_builder(llm),
+        ],
         # ROUTING_GUARD's second, independent rail (the first is the App
         # plugin below): the tool allowlist holds even if the plugin list
         # is ever mishandled. Returns None to allow — never {}.
         before_tool_callback=guard_before_tool,
-        sub_agents=[build_debunker(llm), build_proof_builder(llm)],
     )
     return App(
         name=APP_NAME, root_agent=dispatcher, plugins=[RoutingGuardPlugin()]

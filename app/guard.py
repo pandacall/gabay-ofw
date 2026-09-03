@@ -51,8 +51,15 @@ logger = logging.getLogger(__name__)
 #: The only tools any agent may reach. Anything else is refused before it
 #: runs (fail closed). DEBUNKER and PROOF_BUILDER are specialist
 #: sub-agents auto-wrapped as tools on DISPATCHER (ADR-0004);
-#: search_corpus is DEBUNKER's own deterministic classifier tool — all
-#: cross this guard like any other.
+#: search_corpus is DEBUNKER's own deterministic classifier tool.
+#: ``FILING_SEQUENCER`` (issue #42) is the single wrapped tool name
+#: google-adk exposes to DISPATCHER for the whole mode='single_turn'
+#: sub-agent. ROUTING_GUARD's plugin callbacks apply to EVERY tool call
+#: in the tree, including calls made from inside FILING_SEQUENCER's own
+#: turn — so its four internal pure-function tools are allowlisted here
+#: too (their results, e.g. a HELD refusal's MWO contacts, still pass
+#: through the same channel filtering below). All cross this guard like
+#: any other.
 ALLOWED_TOOLS = frozenset(
     {
         "office_directory",
@@ -61,6 +68,11 @@ ALLOWED_TOOLS = frozenset(
         "DEBUNKER",
         "search_corpus",
         "PROOF_BUILDER",
+        "FILING_SEQUENCER",
+        "sequencer_jurisdiction_rules",
+        "sequencer_sequence_actions",
+        "sequencer_compute_deadlines",
+        "sequencer_verify_plan",
     }
 )
 

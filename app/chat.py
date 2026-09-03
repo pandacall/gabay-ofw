@@ -39,6 +39,30 @@ def _line(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
+#: Every key under a tool result whose dict value is fixed, non-model data
+#: to render as a card, never framed as free text (ADR-0002). ``card`` is
+#: the original convention (office_directory/action_card/safe_floor_card);
+#: ``held_refusal`` and ``plan`` are FILING_SEQUENCER's own result shapes
+#: (issue #42) — a HELD-jurisdiction refusal and a verified Plan, each
+#: already typed as its own ``"type"`` for the UI to render directly.
+_CARD_KEYS = ("card", "held_refusal", "plan")
+
+
+def _cards_in(response: object) -> list[dict]:
+    """Every card-shaped value in one tool-call result, in a fixed key
+    order. A verified Plan carries no ``"type"`` of its own (ADR-0006's
+    Plan shape), so one is added here rather than by the caller."""
+    if not isinstance(response, dict):
+        return []
+    found: list[dict] = []
+    for key in _CARD_KEYS:
+        value = response.get(key)
+        if not isinstance(value, dict):
+            continue
+        found.append(value if key != "plan" else {"type": "plan", **value})
+    return found
+
+
 async def stream_stateless_fallback() -> AsyncIterator[str]:
     """The hard fallback when the session store is down: the cached Safe
     Floor card, zero model calls, nothing read or written anywhere."""
@@ -105,10 +129,9 @@ class ChatService:
                 # (ADR-0002): the card is fixed data, DISPATCHER only frames it.
                 for function_response in event.get_function_responses():
                     response = function_response.response
+                    cards.extend(_cards_in(response))
                     if not isinstance(response, dict):
                         continue
-                    if isinstance(response.get("card"), dict):
-                        cards.append(response["card"])
                     # search_corpus results — already guard-filtered by
                     # ROUTING_GUARD's after-tool rail — are the code-owned
                     # verdicts payload the UI renders (ADR-0002).
