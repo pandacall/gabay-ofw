@@ -36,7 +36,28 @@ const writes = (uid) => [
   [`users/${uid}/crisisSessions/s1`, { expireAt: new Date(Date.now() + 48 * 3600 * 1000) }],
   [`users/${uid}/crisisSessions/s1/messages/m1`, { ok: true }],
 ];
-const paths = (uid) => writes(uid).map(([p]) => p);
+// v6 session paths (ADR-0003): backend-written via the Admin SDK, which
+// bypasses rules. Clients may only read their own; never write.
+const readOnlyPaths = (uid) => [
+  `users/${uid}/sessions/v6s1`,
+  `users/${uid}/sessions/v6s1/events/e1`,
+  `users/${uid}/adkUserState/gabay-ofw`,
+];
+const paths = (uid) => [...writes(uid).map(([p]) => p), ...readOnlyPaths(uid)];
+
+const seedSessionPaths = async (uid) => {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db.doc(`users/${uid}/sessions/v6s1`).set({
+      appName: "gabay-ofw",
+      state: { case_country: "SA" },
+      revision: 1,
+      lastUpdateTime: 1,
+    });
+    await db.doc(`users/${uid}/sessions/v6s1/events/e1`).set({ timestamp: 1 });
+    await db.doc(`users/${uid}/adkUserState/gabay-ofw`).set({ preferred_language: "tl" });
+  });
+};
 
 describe("owner access", () => {
   it("allows the owner to write and read every user-scoped path", async () => {
@@ -65,6 +86,52 @@ describe("crisis session TTL invariant", () => {
     await assertFails(
       alice().doc("users/alice/crisisSessions/s4").set({ expireAt: "never" })
     );
+  });
+});
+
+describe("v6 session paths", () => {
+  beforeEach(() => seedSessionPaths("alice"));
+
+  it("allows the owner to read the session doc, events, and user state", async () => {
+    for (const p of readOnlyPaths("alice")) {
+      await assertSucceeds(alice().doc(p).get());
+    }
+  });
+
+  it("denies the owner writing any session path (backend-only writes)", async () => {
+    for (const p of readOnlyPaths("alice")) {
+      await assertFails(alice().doc(p).set({ hacked: true }));
+      await assertFails(alice().doc(p).set({ revision: 999 }, { merge: true }));
+    }
+  });
+
+  it("denies the owner deleting session documents from the client", async () => {
+    for (const p of readOnlyPaths("alice")) {
+      await assertFails(alice().doc(p).delete());
+    }
+  });
+
+  it("denies a session state update that would clear a safety flag", async () => {
+    await assertFails(
+      alice().doc("users/alice/sessions/v6s1").set(
+        { state: { case_country: "SA", safety_flag: null } },
+        { merge: true }
+      )
+    );
+  });
+
+  it("denies another user reading the session paths", async () => {
+    for (const p of readOnlyPaths("alice")) {
+      await assertFails(bob().doc(p).get());
+    }
+  });
+
+  it("denies all client access to app-scoped state", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc("adkAppState/gabay-ofw").set({ config: 1 });
+    });
+    await assertFails(alice().doc("adkAppState/gabay-ofw").get());
+    await assertFails(alice().doc("adkAppState/gabay-ofw").set({ x: 1 }));
   });
 });
 

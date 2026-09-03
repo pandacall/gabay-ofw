@@ -15,6 +15,30 @@ service cloud.firestore {
       allow read, write: if isOwner(uid);
     }
 
+    // v6 conversation sessions (ADR-0003): written only by the backend via
+    // the Admin SDK (which bypasses rules), so a coerced device can never
+    // alter session state or clear a safety flag from the client. The owner
+    // may read their own transcript; deletion goes through the backend
+    // (panic_wipe is a nonce-gated endpoint and must cascade to events),
+    // never a client-side document delete.
+    match /users/{uid}/sessions/{sessionId} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+      match /events/{eventId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+    }
+
+    // ADK user-scoped state (`user:` keys), kept off the session document.
+    // Backend-written only, owner-readable. App-scoped state (`app:` keys)
+    // lives in the top-level adkAppState collection, which has no match
+    // block and is therefore denied to all clients by default.
+    match /users/{uid}/adkUserState/{appName} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
     // Crisis sessions: every create/update must carry an expireAt timestamp
     // so the Firestore TTL policy can auto-delete the transcript (48-72h).
     match /users/{uid}/crisisSessions/{sessionId} {
