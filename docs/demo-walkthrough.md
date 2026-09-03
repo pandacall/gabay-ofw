@@ -29,7 +29,8 @@ of the two passes.
   need the browser's DevTools Network tab once — instructions are inline.
 - Type messages in whatever language feels natural — DISPATCHER mirrors
   your language from your second message onward (turn 1's acknowledgement
-  is always fixed English, by design; see CONTEXT.md).
+  is always fixed English, by design; see `app/agent.py`'s
+  `ACKNOWLEDGEMENTS` / `acknowledgement_for`).
 - After each step, note the wall-clock time of the first character of the
   reply appearing. The Cloud Run service should now hold one warm
   instance (`--min-instances=1`, issue #49) — if any step's *first*
@@ -61,7 +62,7 @@ unpaid, whether you're still with the employer).
   citation is a bug, not a demo detail to skip past.
 - The reply text never states a bare date or phone number that isn't
   also shown in a step or a card (DISPATCHER's after-model voice
-  whitelist, ADR/CONTEXT "Voice integrity").
+  whitelist — see `tests/test_voice_whitelist.py`).
 
 **Why this matters:** the ordering *is* the product (PRD #34) — this is
 the core "verified Plan" promise, not a chatbot answer.
@@ -214,10 +215,11 @@ try means starting over, at 1am, with less trust left.
 
 ## 7. EMERGENCY button, offline (zero model calls) + mark_safe
 
-> **Known gap, tracked separately, not silently skipped:** the hardcoded
-> EMERGENCY button and the `mark_safe` tap (PRD user story 28; issue #41)
-> are fully implemented and tested at the API layer
-> (`POST /api/emergency/button`, `POST /api/mark-safe/nonce` +
+> **Known gap, tracked separately as
+> [#64](https://github.com/pandacall/gabay-ofw/issues/64), not silently
+> skipped:** the hardcoded EMERGENCY button and the `mark_safe` tap (PRD
+> user story 28; issue #41) are fully implemented and tested at the API
+> layer (`POST /api/emergency/button`, `POST /api/mark-safe/nonce` +
 > `POST /api/mark-safe`), but **no frontend button is wired to either
 > endpoint yet** (`static/app.js` has no `data-action` for them). Exercise
 > them directly against the deployed URL as follows.
@@ -270,9 +272,10 @@ console.log(r2.status, await r2.json());
   **never** the flag itself (PRD user story 33).
 - Replaying the same nonce a second time returns 403 (single-use).
 
-**Suggested follow-up (not blocking this PR):** file an issue to wire a
-visible EMERGENCY button and a "mark safe" tap into `static/app.js` so a
-judge exercises this path through the UI rather than DevTools.
+**Suggested follow-up (not blocking this PR):** filed as
+[#64](https://github.com/pandacall/gabay-ofw/issues/64) — wire a visible
+EMERGENCY button and a "mark safe" tap into `static/app.js` so a judge
+exercises this path through the UI rather than DevTools.
 
 ---
 

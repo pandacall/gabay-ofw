@@ -11,12 +11,10 @@ someone later wires the dev UI in rather than needing a live deploy to
 catch it.
 """
 
-import importlib
-import pkgutil
 from pathlib import Path
 
-import app as app_package
 from app.main import create_app
+from tests.conftest import iter_app_modules
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,17 +30,11 @@ _DEV_UI_MARKERS = (
 )
 
 
-def _app_modules():
-    yield app_package
-    for info in pkgutil.walk_packages(app_package.__path__, "app."):
-        yield importlib.import_module(info.name)
-
-
 def test_no_app_module_imports_or_names_the_dev_ui():
     import inspect
 
     checked = 0
-    for module in _app_modules():
+    for module in iter_app_modules():
         if getattr(module, "__file__", None) is None:
             continue  # namespace package, no source of its own to scan
         try:

@@ -82,6 +82,18 @@ from app.tools import (
 GEMINI_MODEL = "gemini-2.5-flash"
 APP_NAME = "gabay-ofw"
 
+# Bounded context growth (issue #49): compaction trigger policy for
+# build_events_compaction_config below. Two independent triggers, either
+# of which fires compaction — a sliding invocation-count window (every N
+# new user-initiated turns, keeping some overlap for continuity across
+# the summary boundary) and a token-threshold safety net for a single
+# turn that grows unusually large (e.g. a long FILING_SEQUENCER or
+# COMPLAINT_DRAFTER return value replayed into DISPATCHER's context).
+_COMPACTION_INVOCATION_INTERVAL = 6
+_COMPACTION_OVERLAP_INVOCATIONS = 2
+_COMPACTION_TOKEN_THRESHOLD = 6000
+_COMPACTION_RETAINED_RAW_EVENTS = 10
+
 # The fixed acknowledgement the app streams before any model runs. Turn 1
 # is English by design (neutral among Philippine languages); from turn 2 it
 # mirrors the language recorded on the previous turn's CaseDelta.
@@ -517,19 +529,17 @@ def build_events_compaction_config(llm: BaseLlm) -> EventsCompactionConfig:
     """Bounds per-turn replay cost as a crisis conversation grows long.
 
     Two independent triggers (issue #49), either of which fires compaction:
-    a sliding window by invocation count (every 6 new user-initiated turns,
-    keeping 2 turns of overlap for continuity) and a token-threshold safety
-    net for a single turn that grows unusually large (e.g. a long
-    FILING_SEQUENCER or COMPLAINT_DRAFTER return value), which keeps the
-    last 10 raw events uncompacted once triggered. ``LlmEventSummarizer``
+    a sliding window by invocation count and a token-threshold safety net
+    for a single turn that grows unusually large (e.g. a long
+    FILING_SEQUENCER or COMPLAINT_DRAFTER return value). ``LlmEventSummarizer``
     is the wheel's only built-in summarizer (google-adk==2.8.0); a
     ``None`` summarizer would make ``App.events_compaction_config`` a
     no-op (verified against ``google/adk/apps/compaction.py``).
     """
     return EventsCompactionConfig(
         summarizer=LlmEventSummarizer(llm=llm),
-        compaction_interval=6,
-        overlap_size=2,
-        token_threshold=6000,
-        event_retention_size=10,
+        compaction_interval=_COMPACTION_INVOCATION_INTERVAL,
+        overlap_size=_COMPACTION_OVERLAP_INVOCATIONS,
+        token_threshold=_COMPACTION_TOKEN_THRESHOLD,
+        event_retention_size=_COMPACTION_RETAINED_RAW_EVENTS,
     )

@@ -21,12 +21,18 @@ def _dockerfile() -> str:
     return (_REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
 
-def test_google_adk_is_exact_pinned_in_requirements_txt():
-    lines = [
+def _non_comment_lines(text: str) -> list[str]:
+    """Requirement lines with comments and blank lines stripped, shared
+    by every check below that reads a requirements-style file."""
+    return [
         line.strip()
-        for line in _requirements_txt().splitlines()
+        for line in text.splitlines()
         if line.strip() and not line.strip().startswith("#")
     ]
+
+
+def test_google_adk_is_exact_pinned_in_requirements_txt():
+    lines = _non_comment_lines(_requirements_txt())
     adk_lines = [line for line in lines if line.split("==")[0].strip() == "google-adk"]
     assert adk_lines == ["google-adk==2.8.0"], (
         "google-adk must be exact-pinned (==), never a range: "
@@ -38,22 +44,13 @@ def test_no_requirement_uses_an_unpinned_or_ranged_adk_or_genai_package():
     # google-genai (the Gemini client) is allowed a floor (>=) today per
     # requirements.txt, but must never resolve to a moving "-latest" style
     # marker string, and google-adk itself must stay exact.
-    lines = [
-        line.strip()
-        for line in _requirements_txt().splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    ]
+    lines = _non_comment_lines(_requirements_txt())
     for line in lines:
         assert "-latest" not in line.lower(), f"-latest alias in requirements.txt: {line!r}"
 
 
 def test_a_full_lockfile_is_committed_and_pins_the_same_adk_version():
-    lock_text = _requirements_lock_txt()
-    lock_lines = [
-        line.strip()
-        for line in lock_text.splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    ]
+    lock_lines = _non_comment_lines(_requirements_lock_txt())
     # Every resolved dependency in a `pip freeze`-style lockfile is
     # exact-pinned by construction (`==`); assert that shape holds so a
     # hand-edit can't quietly reintroduce a range into the deployed lock.
