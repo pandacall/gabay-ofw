@@ -45,11 +45,20 @@ from google.adk.models import BaseLlm
 
 from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
 from app.debunker import build_debunker
+from app.directory import resolve_case_country
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
 from app.proof.agent import build_proof_builder
+from app.rules import Jurisdiction
+from app.sequencer import Plan, SequencerIn
 from app.sequencer_agent import FILING_SEQUENCER_NAME, build_filing_sequencer
-from app.tools import action_card, office_directory, safe_floor_card
+from app.staleness import apply_step_expiry, is_input_stale
+from app.tools import (
+    action_card,
+    mark_plan_step_done,
+    office_directory,
+    safe_floor_card,
+)
 
 # Exact pins (PRD #34): google-adk==2.8.0 in requirements.txt, and the
 # Gemini model string pinned exactly — never a -latest alias.
@@ -111,6 +120,19 @@ transfer_to_agent with agent_name="EMERGENCY". Do this immediately,
 every time, for every message, until the app tells you the predicate is
 no longer active.
 """
+    plan_active = readonly_context.state.get("plan_active")
+    stale_block = (
+        "\nHer previously verified Plan just went inactive because"
+        " something she told you changed (ADR-0006, issue #43) — the app"
+        " is already showing her the Safe Floor. In your reply, name the"
+        " specific fact from her Case above that changed (\"this needs"
+        " updating because you told me X\") rather than a generic"
+        " apology. Do not describe the old plan's steps as current; if"
+        " you now have her country, tenure, and grievances, call"
+        f" {FILING_SEQUENCER_NAME} again to try to verify a replacement.\n"
+        if plan_active is False
+        else ""
+    )
     return f"""\
 You are DISPATCHER for Gabay OFW, the only voice a Filipino overseas worker
 in the Gulf hears. She may be in crisis, writing at night, in any order and
@@ -133,7 +155,7 @@ never silently pick one. If a claim relevant to her country, tenure
 situation, or a grievance carries a conflict, that IS your one question
 this turn: name the two values plainly and ask which is right:
 {case_block}
-{failure_block}
+{failure_block}{stale_block}
 Ask at most one question per reply, and only for the single most useful
 missing fact. Never invent phone numbers, deadlines, laws, or amounts.
 Never promise an outcome. If she is in immediate danger, tell her plainly
@@ -200,7 +222,25 @@ missing.
   her. Do not call {FILING_SEQUENCER_NAME} again until she has.
 - {{"no_verified_plan": true}} — the app could not build a plan it can
   stand behind. Call safe_floor_card yourself instead; never repeat the
-  call to {FILING_SEQUENCER_NAME} hoping for a different result.
+  call to {FILING_SEQUENCER_NAME} hoping for a different result. If this
+  response ALSO carries "regeneration_failed": true (issue #43: her
+  previously verified plan's replacement failed to verify after her
+  facts changed), ALSO call action_card with her country's MWO and OWWA
+  contact keys — she needs the Safe Floor PLUS a concrete action card
+  here, never the Safe Floor alone, and never the failed replacement or
+  her old plan presented as current.
+
+If a "delta" accompanies a plan (issue #43: it was regenerated from a
+prior one), tell her plainly what changed — which steps are new, which
+no longer apply — and, if any of her earlier steps carried over as
+already done, say so instead of walking her through them again. Never
+silently reorder her plan without saying what changed.
+
+When she tells you she has already completed one of her Plan's steps
+(she already filed the SEnA request, she already reported it), call
+mark_plan_step_done with that Plan's plan_id and the step's id, both
+exactly as shown to her. The app re-renders the updated plan itself;
+acknowledge it warmly, and never mark a step done on a guess.
 """
 
 
@@ -234,8 +274,58 @@ needed — the app itself decides when she has left EMERGENCY.
 """
 
 
+def _recheck_plan_staleness(callback_context: CallbackContext) -> None:
+    """Runs both ADR-0006 staleness checks every turn, unconditionally —
+    never DISPATCHER's judgement (issue #43).
+
+    Step expiry (``apply_step_expiry``) is wall-clock-only and always
+    re-applied to the persisted plan, independent of anything DISPATCHER
+    does this turn. The input-hash check compares this turn's Case
+    against the ``SequencerIn`` the persisted plan was published from,
+    substituting in the country freshly resolved from the Case: a
+    country correction is a genuine change to a real ``SequencerIn``
+    field, so this is a faithful (if partial — tenure and grievances are
+    free-text DISPATCHER interprets, not stored as Case claims) instance
+    of ``hash(current_sequencer_in) != plan.input_hash``. A mismatch
+    marks the plan inactive; ``chat.py`` renders the Safe Floor from
+    that flag with zero reliance on DISPATCHER calling any tool.
+    """
+    raw_plan = callback_context.state.get("plan")
+    if not raw_plan:
+        return None
+    plan = Plan.model_validate(raw_plan)
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    voided = apply_step_expiry(plan, now=now)
+    if voided is not plan:
+        callback_context.state["plan"] = voided.model_dump(mode="json")
+        plan = voided
+
+    raw_seq_in = callback_context.state.get("plan_seq_in")
+    if not raw_seq_in:
+        return None
+    case = callback_context.state.get("case")
+    country = resolve_case_country(case)
+    try:
+        jurisdiction = Jurisdiction(country.value)
+    except ValueError:
+        # UNKNOWN/PH: no country signal to compare against — leave the
+        # existing plan_active as-is (nothing derivable changed).
+        return None
+    current_seq_in = SequencerIn.model_validate(
+        {**raw_seq_in, "country": jurisdiction.value}
+    )
+    # plan_active is the single source of truth chat.py reads to decide
+    # whether to render the inactive-plan Safe Floor; there is only one
+    # reason today (a fact changed) so no separate reason key is kept —
+    # add one back if a second reason is ever introduced.
+    callback_context.state["plan_active"] = not is_input_stale(plan, current_seq_in)
+    return None
+
+
 def make_absorb_narrative_callback(llm: BaseLlm):
-    """The root before-agent callback: read_narrative -> merge_case.
+    """The root before-agent callback: read_narrative -> merge_case, then
+    the plan-staleness recheck.
 
     Runs strictly before DISPATCHER's turn. On extraction failure the Case
     is left unchanged and a ``temp:`` marker (never persisted) lets the
@@ -269,16 +359,16 @@ def make_absorb_narrative_callback(llm: BaseLlm):
             for part in (content.parts if content and content.parts else [])
             if part.text
         )
-        if not text.strip():
-            return None
-        delta = await read_narrative(llm=llm, text=text)
-        if delta is None:
-            callback_context.state["temp:extraction_failed"] = True
-            return None
-        case = callback_context.state.get("case")
-        callback_context.state["case"] = merge_case(
-            case, delta, source="extraction", now=now
-        )
+        if text.strip():
+            delta = await read_narrative(llm=llm, text=text)
+            if delta is None:
+                callback_context.state["temp:extraction_failed"] = True
+            else:
+                case = callback_context.state.get("case")
+                callback_context.state["case"] = merge_case(
+                    case, delta, source="extraction", now=now
+                )
+        _recheck_plan_staleness(callback_context)
         return None
 
     return absorb_narrative
@@ -328,7 +418,7 @@ def build_adk_app(llm: BaseLlm) -> App:
         description="The only voice: absorbs the story, replies warmly.",
         instruction=_dispatcher_instruction,
         before_agent_callback=make_absorb_narrative_callback(llm),
-        tools=[office_directory, action_card, safe_floor_card],
+        tools=[office_directory, action_card, safe_floor_card, mark_plan_step_done],
         # FILING_SEQUENCER (issue #42) is NOT listed in tools=[...]: as a
         # mode='single_turn' sub_agent, google-adk's LlmAgent.model_post_init
         # auto-wraps it into a single tool of this same name and appends it

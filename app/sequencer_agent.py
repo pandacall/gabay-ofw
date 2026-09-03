@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from google.adk.agents import LlmAgent
@@ -40,6 +41,7 @@ from google.adk.tools import ToolContext
 from pydantic import BaseModel
 
 from app.case import unresolved_sequencer_conflict
+from app.directory import resolve_case_country
 from app.rules import Grievance, Jurisdiction, JurisdictionStatus, TenureBucket
 from app.sequencer import (
     JurisdictionHeldError,
@@ -56,6 +58,7 @@ from app.sequencer import (
     sequence_actions,
     verify_plan,
 )
+from app.staleness import apply_step_expiry, is_input_stale, reconcile_plan
 
 logger = logging.getLogger(__name__)
 
@@ -118,18 +121,41 @@ def sequencer_sequence_actions(
     ``tenure_months`` — see ``app.case.SEQUENCER_FIELDS``): a wrong
     jurisdiction or a disputed tenure duration would build a
     verified-looking Plan around a fact she hasn't confirmed (issue #44)
-    — DISPATCHER never even reaches ``sequence_actions`` in that state. On
-    success, stores the built ``SequencerIn`` and its rows in session
-    state (``temp:``, this turn only) so ``compute_deadlines`` and
-    ``verify_plan`` can be called without the model re-transmitting the
-    full row payload.
+    — DISPATCHER never even reaches ``sequence_actions`` in that state.
+    Also refuses, code-owned, when the supplied ``country`` disagrees
+    with her Case's own resolved country (issue #43): staleness
+    detection can mark a plan inactive because her country changed, but
+    that guarantee is only real if DISPATCHER is also refused from
+    republishing a plan built on the OLD country it might still be
+    holding onto — this check is what makes that refusal happen in code
+    rather than depending on the model noticing and re-deriving country
+    itself. On success, stores the built ``SequencerIn`` and its rows in
+    session state (``temp:``, this turn only) so ``compute_deadlines``
+    and ``verify_plan`` can be called without the model re-transmitting
+    the full row payload.
     """
-    blocked_field = unresolved_sequencer_conflict(tool_context.state.get("case"))
+    case = tool_context.state.get("case")
+    blocked_field = unresolved_sequencer_conflict(case)
     if blocked_field:
         return {
             "ok": False,
             "reason": "UNRESOLVED_CONFLICT",
             "field": blocked_field,
+        }
+
+    case_country = resolve_case_country(case)
+    try:
+        case_jurisdiction: Optional[Jurisdiction] = Jurisdiction(case_country.value)
+    except ValueError:
+        case_jurisdiction = None  # UNKNOWN/PH: no known-jurisdiction signal to check.
+    if case_jurisdiction is not None and case_jurisdiction.value != country:
+        return {
+            "ok": False,
+            "reason": "CASE_COUNTRY_MISMATCH",
+            "detail": (
+                f"supplied country {country!r} disagrees with the Case's "
+                f"own resolved country {case_jurisdiction.value!r}"
+            ),
         }
 
     try:
@@ -177,8 +203,6 @@ def sequencer_compute_deadlines(tool_context: ToolContext) -> dict[str, Any]:
     ``notes`` instead, so a Saudi exit-visa timing note renders
     confirm-first, never as a countdown.
     """
-    from datetime import datetime, timezone
-
     from app.rules import RuleRow
 
     raw_rows = tool_context.state.get("temp:filing_sequencer_rows")
@@ -222,6 +246,22 @@ def sequencer_verify_plan(
     a hash ``verify_plan`` has just cleared for this exact content. If
     violations remain, no sequence is returned — the caller must fall
     back to Safe Floor, never render a partially-cited plan.
+
+    Staleness (issue #43, ADR-0006) is handled here too, against the
+    session's PERSISTED prior plan (``state["plan"]``, never the
+    ``temp:`` scratch this turn's rows live in): ``is_input_stale`` is
+    the pure check of whether this turn's ``SequencerIn`` still hashes to
+    the persisted plan's ``input_hash``; regardless of the answer,
+    ``reconcile_plan`` carries any DONE step forward onto the freshly
+    built plan by step id (never a silent renumber) and surfaces the
+    delta. If the reconciled plan then fails ``verify_plan`` AFTER an
+    actual stale-triggered regeneration, the persisted plan is cleared
+    rather than left standing — ADR-0006: ship no sequence, neither the
+    stale original nor the unverified replacement. A verify failure that
+    was NOT preceded by a staleness mismatch (the persisted plan, if any,
+    was never actually stale) leaves that persisted plan untouched — this
+    call simply failed to build a plan, it did not invalidate an existing
+    good one.
     """
     raw_seq_in = tool_context.state.get("temp:filing_sequencer_seq_in")
     raw_steps = tool_context.state.get("temp:filing_sequencer_steps")
@@ -236,14 +276,32 @@ def sequencer_verify_plan(
 
     seq_in = SequencerIn.model_validate(raw_seq_in)
     steps = tuple(PlanStep.model_validate(step) for step in raw_steps)
-    plan = build_plan(seq_in, steps, plan_id=plan_id)
+
+    raw_old_plan = tool_context.state.get("plan")
+    old_plan = Plan.model_validate(raw_old_plan) if raw_old_plan else None
+    was_stale = old_plan is not None and is_input_stale(old_plan, seq_in)
+    version = (old_plan.version + 1) if old_plan is not None else 1
+
+    fresh_plan = build_plan(seq_in, steps, plan_id=plan_id, version=version)
+    plan, delta = reconcile_plan(old_plan, fresh_plan)
+    plan = apply_step_expiry(plan, now=datetime.now(timezone.utc))
+
+    def _invalidate_persisted_plan() -> None:
+        # Ship NO sequence: neither the now-stale original nor the
+        # unverified replacement is ever presented as current (ADR-0006).
+        tool_context.state["plan"] = None
+        tool_context.state["plan_seq_in"] = None
+        tool_context.state["plan_active"] = False
 
     result = verify_plan(plan)
     if not result.ok:
+        if was_stale:
+            _invalidate_persisted_plan()
         return {
             "ok": False,
             "reason": "VERIFY_FAILED",
             "violations": list(result.violations),
+            "regeneration_failed": was_stale,
         }
 
     cleared_hashes = frozenset({plan_hash(plan)})
@@ -251,9 +309,31 @@ def sequencer_verify_plan(
         published = publish_plan(plan, cleared_hashes=cleared_hashes)
     except PlanNotVerifiedError as exc:  # defensive: should be unreachable
         logger.error("publish_plan refused a plan verify_plan cleared: %s", exc)
+        if was_stale:
+            _invalidate_persisted_plan()
         return {"ok": False, "reason": "PUBLISH_REFUSED", "detail": str(exc)}
 
-    return {"ok": True, "plan": json.loads(published.model_dump_json())}
+    tool_context.state["plan"] = published.model_dump(mode="json")
+    tool_context.state["plan_seq_in"] = seq_in.model_dump(mode="json")
+    tool_context.state["plan_active"] = True
+
+    response: dict[str, Any] = {
+        "ok": True,
+        "plan": json.loads(published.model_dump_json()),
+    }
+    if was_stale:
+        response["was_stale"] = True
+    # A "delta" is only meaningful relative to a PRIOR plan — a brand-new
+    # plan with nothing to regenerate from is never reported as if it
+    # were a regeneration (every step being "added" would be trivially
+    # true and misleading).
+    if old_plan is not None and (delta.changed or delta.carried_done):
+        response["delta"] = {
+            "added": list(delta.added),
+            "removed": list(delta.removed),
+            "carried_done": list(delta.carried_done),
+        }
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -271,13 +351,26 @@ class FilingSequencerOut(BaseModel):
     ``unresolved_conflict`` (issue #44) is distinct from
     ``no_verified_plan``: it names the contested field so DISPATCHER can
     make resolving it — via the one-tap correction — the turn's one
-    question, rather than falling back to the Safe Floor.
+    question, rather than falling back to the Safe Floor. ``delta`` and
+    ``was_stale`` (issue #43, ADR-0006) ride alongside a published
+    ``plan`` only when it replaced a prior one: ``was_stale`` marks that
+    the replacement was triggered by an input-hash mismatch, and
+    ``delta`` is the added/removed/carried-DONE step ids
+    ``reconcile_plan`` computed — surfaced explicitly rather than a
+    silent renumber. ``regeneration_failed`` rides alongside
+    ``no_verified_plan`` for the same reason: ADR-0006 requires this
+    specific failure — a stale plan's replacement that itself failed
+    ``verify_plan`` — to render the Safe Floor PLUS an action card,
+    never the Safe Floor alone as a generic "no plan yet".
     """
 
     plan: Optional[dict[str, Any]] = None
     held_refusal: Optional[dict[str, Any]] = None
     unresolved_conflict: Optional[dict[str, Any]] = None
     no_verified_plan: bool = False
+    delta: Optional[dict[str, Any]] = None
+    was_stale: bool = False
+    regeneration_failed: bool = False
 
 
 _FILING_SEQUENCER_INSTRUCTION = """\
@@ -294,16 +387,25 @@ grievances she reported. Call your tools in this order:
    reason is UNRESOLVED_CONFLICT (her Case has an unresolved disagreement
    on that field — never a fabricated resolution, never a retry), or
    {"no_verified_plan": true} for any other failure (NO_VERIFIED_PLAN,
-   INVALID_INPUT). Never retry with different values to force a result.
+   INVALID_INPUT, CASE_COUNTRY_MISMATCH — the country you supplied no
+   longer matches her Case; re-derive it from her Case above and call
+   sequence_actions again with the corrected country instead of
+   retrying the same one). Never retry with the SAME values to force a
+   result.
 3. compute_deadlines() — attaches each step's deadline. Takes no
    arguments; it reads the rows sequence_actions just built.
 4. verify_plan(plan_id) — builds, verifies, and (only if verification
    passes) publishes the Plan in one call. Choose plan_id yourself (a
    short unique string). If ok is false, respond with
-   {"no_verified_plan": true} — never retry to force a passing plan.
+   {"no_verified_plan": true}, and if that result's "regeneration_failed"
+   is true, copy it into your response verbatim too — never retry to
+   force a passing plan.
 
-If verify_plan returns ok=true, respond with exactly
-{"plan": <the returned plan object, unchanged>}.
+If verify_plan returns ok=true, respond with {"plan": <the returned plan
+object, unchanged>}. If that result also carries a "delta" and/or
+"was_stale" key, copy them into your response verbatim alongside "plan"
+— never drop them and never invent either when the tool result did not
+return them.
 
 Never fabricate a citation, a deadline, or a step. Never call verify_plan
 before compute_deadlines, and never call compute_deadlines before

@@ -41,8 +41,8 @@ from app.agent import APP_NAME, acknowledgement_for, build_adk_app
 from app.case import mark_safe as case_mark_safe
 from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
-from app.directory import Country, resolve_case_country
-from app.safe_floor import cached_card, is_imminent_danger
+from app.directory import Country, resolve_case_country, resolve_keys
+from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card, is_imminent_danger
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +59,20 @@ def _line(payload: dict) -> str:
 #: already typed as its own ``"type"`` for the UI to render directly.
 _CARD_KEYS = ("card", "held_refusal", "plan")
 
+#: Card types that already tell her the state of her Plan (or its
+#: replacement, per ADR-0006) — the auto-rendered inactive-plan Safe
+#: Floor (below) is skipped when one of these already streamed this turn,
+#: so she never sees two contradicting cards.
+_PLAN_STATUS_CARD_TYPES = frozenset({"plan", "safe_floor", "held_refusal"})
+
 
 def _cards_in(response: object) -> list[dict]:
     """Every card-shaped value in one tool-call result, in a fixed key
     order. A verified Plan carries no ``"type"`` of its own (ADR-0006's
-    Plan shape), so one is added here rather than by the caller."""
+    Plan shape), so one is added here rather than by the caller. A
+    regenerated plan's ``delta`` / ``was_stale`` (issue #43) ride
+    alongside it on the SAME response dict, never nested inside the plan
+    itself — they are folded onto the rendered card here."""
     if not isinstance(response, dict):
         return []
     found: list[dict] = []
@@ -71,8 +80,33 @@ def _cards_in(response: object) -> list[dict]:
         value = response.get(key)
         if not isinstance(value, dict):
             continue
-        found.append(value if key != "plan" else {"type": "plan", **value})
+        if key != "plan":
+            found.append(value)
+            continue
+        card = {"type": "plan", **value}
+        if isinstance(response.get("delta"), dict):
+            card["delta"] = response["delta"]
+        if response.get("was_stale"):
+            card["was_stale"] = True
+        found.append(card)
     return found
+
+
+def _default_action_card(country: Country) -> dict:
+    """A fixed, code-owned action card of her country's MWO/OWWA contacts
+    (issue #43): guarantees the "Safe Floor plus action card" consequence
+    ADR-0006 requires for a failed regeneration is real even if DISPATCHER
+    never calls the ``action_card`` tool itself. Reuses the same curated,
+    dialability-filtered key list ``safe_floor.build_card`` renders from —
+    this is deliberately the same contacts a Safe Floor card would show,
+    just packaged as its own ``action_card`` alongside it.
+    """
+    keys = list(CARD_KEYS.get(country, CARD_KEYS[Country.UNKNOWN]))
+    return {
+        "type": "action_card",
+        "country": country.value,
+        "contacts": resolve_keys(keys, country),
+    }
 
 
 async def stream_stateless_fallback() -> AsyncIterator[str]:
@@ -235,7 +269,6 @@ class ChatService:
         )
         return updated_case
 
-
     async def stream_turn(
         self, *, uid: str, session: Session, text: str
     ) -> AsyncIterator[str]:
@@ -255,6 +288,7 @@ class ChatService:
         cards: list[dict] = []
         verdicts: list[dict] = []
         proof_gaps: list[dict] = []
+        regeneration_failed = False
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -288,6 +322,15 @@ class ChatService:
                         response.get("scope_limit"), str
                     ):
                         proof_gaps.append(response)
+                    # FILING_SEQUENCER's own structured answer (issue #43,
+                    # ADR-0006): a failed regeneration must ship the Safe
+                    # Floor PLUS an action card, guaranteed in code rather
+                    # than left to DISPATCHER remembering to call
+                    # action_card itself.
+                    if function_response.name == "FILING_SEQUENCER" and response.get(
+                        "regeneration_failed"
+                    ):
+                        regeneration_failed = True
                 # DISPATCHER is the only voice in normal turns; EMERGENCY
                 # (issue #41) is the sole exception — the only other agent
                 # whose text is her reply, since a transfer hands the
@@ -319,6 +362,47 @@ class ChatService:
                 {"type": "card", "card": card, "session_id": session.id}
             )
 
+        updated = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        updated_case = (updated.state.get("case") if updated else None) or {}
+
+        # An inactive Plan (issue #43, ADR-0006 — an input-hash mismatch
+        # detected by pure code every turn, never DISPATCHER's judgement)
+        # gets the Safe Floor rendered here, unconditionally, unless a
+        # plan/safe_floor/held_refusal card already streamed above this
+        # turn (e.g. DISPATCHER regenerated a replacement itself).
+        plan_inactive = bool(updated) and updated.state.get("plan_active") is False
+        already_shown = any(
+            card.get("type") in _PLAN_STATUS_CARD_TYPES for card in cards
+        )
+        if plan_inactive and not already_shown:
+            yield _line(
+                {
+                    "type": "card",
+                    "card": build_card(
+                        resolve_case_country(updated_case),
+                        reason=SafeFloorReason.FACTS_CHANGED,
+                        imminent_danger=is_imminent_danger(updated_case),
+                    ),
+                    "session_id": session.id,
+                }
+            )
+
+        # ADR-0006: a failed regeneration ships the Safe Floor PLUS an
+        # action card — guaranteed here in code (not just DISPATCHER's
+        # instruction) unless DISPATCHER already rendered one itself.
+        if regeneration_failed and not any(
+            card.get("type") == "action_card" for card in cards
+        ):
+            yield _line(
+                {
+                    "type": "card",
+                    "card": _default_action_card(resolve_case_country(updated_case)),
+                    "session_id": session.id,
+                }
+            )
+
         yield _line(
             {
                 "type": "reply",
@@ -345,13 +429,10 @@ class ChatService:
                 }
             )
 
-        updated = await self._session_service.get_session(
-            app_name=APP_NAME, user_id=uid, session_id=session.id
-        )
         yield _line(
             {
                 "type": "case",
-                "case": (updated.state.get("case") if updated else None) or {},
+                "case": updated_case,
                 "session_id": session.id,
             }
         )
