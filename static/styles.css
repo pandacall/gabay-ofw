@@ -709,6 +709,59 @@ h3 { font-size: 1.45rem; line-height: 1.18; }
   padding: 0.25rem 0.7rem;
   font-size: 0.82rem;
 }
+.case-value { display: flex; align-items: center; gap: 0.4rem; }
+.case-edit-trigger {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0.1rem 0.2rem;
+}
+.case-edit-trigger:hover, .case-edit-trigger:focus-visible { color: var(--ink); }
+.case-edit-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.case-edit-input {
+  flex: 1;
+  min-width: 6rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--sand-border);
+  border-radius: var(--control-radius);
+  background: var(--dawn-surface);
+  color: var(--ink);
+}
+.case-edit-cancel {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+/* A first-class Conflict (issue #44): both values shown with provenance,
+   resolved only by her tap — never a bare "corrected" text. */
+.case-claim.has-conflict {
+  border: 1px solid var(--clay);
+  border-radius: var(--control-radius);
+  padding: 0.6rem 0.7rem;
+  gap: 0.4rem;
+}
+.case-conflict-prompt { font-size: 0.85rem; color: var(--clay-dark); margin: 0; }
+.case-conflict-options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.case-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  border: 1px solid var(--sand-border);
+  border-radius: var(--control-radius);
+  background: var(--dawn-surface);
+  color: var(--ink);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+.case-option:hover, .case-option:focus-visible { border-color: var(--clay); }
+.case-option-value { font-weight: 600; }
+.case-option-source { color: var(--muted); font-size: 0.75rem; }
 @media (max-width: 860px) {
   .chat-layout { grid-template-columns: 1fr; }
   .chat-case { position: static; }

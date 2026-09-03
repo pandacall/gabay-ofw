@@ -39,6 +39,7 @@ from google.adk.models import BaseLlm
 from google.adk.tools import ToolContext
 from pydantic import BaseModel
 
+from app.case import unresolved_sequencer_conflict
 from app.rules import Grievance, Jurisdiction, JurisdictionStatus, TenureBucket
 from app.sequencer import (
     JurisdictionHeldError,
@@ -112,11 +113,24 @@ def sequencer_sequence_actions(
     RAISES no exception to the model: a HELD jurisdiction (KW, AE) or a
     situation with no sourced rule row returns a ``held`` /
     ``no_verified_plan`` refusal result instead of rows — never an
-    invented sequence. On success, stores the built ``SequencerIn`` and
-    its rows in session state (``temp:``, this turn only) so
-    ``compute_deadlines`` and ``verify_plan`` can be called without the
-    model re-transmitting the full row payload.
+    invented sequence. Refuses first, code-owned, when the Case carries
+    an unresolved Conflict on a SequencerIn-mapped field (country, tenure,
+    grievances): a wrong jurisdiction or contested grievance would build a
+    verified-looking Plan around a fact she hasn't confirmed (issue #44) —
+    DISPATCHER never even reaches ``sequence_actions`` in that state. On
+    success, stores the built ``SequencerIn`` and its rows in session
+    state (``temp:``, this turn only) so ``compute_deadlines`` and
+    ``verify_plan`` can be called without the model re-transmitting the
+    full row payload.
     """
+    blocked_field = unresolved_sequencer_conflict(tool_context.state.get("case"))
+    if blocked_field:
+        return {
+            "ok": False,
+            "reason": "UNRESOLVED_CONFLICT",
+            "field": blocked_field,
+        }
+
     try:
         seq_in = SequencerIn(
             country=Jurisdiction(country),
@@ -249,14 +263,19 @@ def sequencer_verify_plan(
 class FilingSequencerOut(BaseModel):
     """FILING_SEQUENCER's single-turn structured result.
 
-    Exactly one of ``plan``, ``held_refusal``, or ``no_verified_plan`` is
-    set — DISPATCHER's instruction renders whichever is present, never
-    inventing a plan when none of the three fired (fails closed to
-    ``no_verified_plan`` framing by omission).
+    Exactly one of ``plan``, ``held_refusal``, ``unresolved_conflict``, or
+    ``no_verified_plan`` is set — DISPATCHER's instruction renders
+    whichever is present, never inventing a plan when none of the four
+    fired (fails closed to ``no_verified_plan`` framing by omission).
+    ``unresolved_conflict`` (issue #44) is distinct from
+    ``no_verified_plan``: it names the contested field so DISPATCHER can
+    make resolving it — via the one-tap correction — the turn's one
+    question, rather than falling back to the Safe Floor.
     """
 
     plan: Optional[dict[str, Any]] = None
     held_refusal: Optional[dict[str, Any]] = None
+    unresolved_conflict: Optional[dict[str, Any]] = None
     no_verified_plan: bool = False
 
 
@@ -270,9 +289,11 @@ grievances she reported. Call your tools in this order:
    any other tool for a HELD jurisdiction.
 2. sequence_actions(country, tenure, grievances) — if ok is false, stop:
    respond with {"held_refusal": <card>} when reason is
-   JURISDICTION_HELD, or {"no_verified_plan": true} for any other
-   failure (NO_VERIFIED_PLAN, INVALID_INPUT). Never retry with different
-   values to force a result.
+   JURISDICTION_HELD, {"unresolved_conflict": {"field": <field>}} when
+   reason is UNRESOLVED_CONFLICT (her Case has an unresolved disagreement
+   on that field — never a fabricated resolution, never a retry), or
+   {"no_verified_plan": true} for any other failure (NO_VERIFIED_PLAN,
+   INVALID_INPUT). Never retry with different values to force a result.
 3. compute_deadlines() — attaches each step's deadline. Takes no
    arguments; it reads the rows sequence_actions just built.
 4. verify_plan(plan_id) — builds, verifies, and (only if verification

@@ -108,6 +108,15 @@ const copy = {
     caseTitle: "What Gabay has understood",
     caseEmpty: "Facts you share will appear here so you never have to repeat yourself.",
     caseFlagsTitle: "Safety notes",
+    caseConflictPrompt: "You and a document don't agree. Which is right?",
+    caseCorrectLabel: "Correct this",
+    caseConfirm: "Confirm",
+    caseCancel: "Cancel",
+    caseSourceUser: "you confirmed",
+    caseSourceExtraction: "you said",
+    caseSourceDocument: "a document said",
+    caseSourceDebunker: "checked",
+    caseUpdateFailed: "Could not save your correction. Try again.",
   },
   tl: {
     languageName: "Filipino",
@@ -209,6 +218,15 @@ const copy = {
     caseTitle: "Ang naiintindihan ni Gabay",
     caseEmpty: "Lalabas dito ang mga detalyeng ibinahagi mo para hindi mo na kailangang ulitin.",
     caseFlagsTitle: "Mga paalala sa kaligtasan",
+    caseConflictPrompt: "Hindi magkatugma ang sinabi mo at ang isang dokumento. Alin ang tama?",
+    caseCorrectLabel: "Itama ito",
+    caseConfirm: "Kumpirmahin",
+    caseCancel: "Kanselahin",
+    caseSourceUser: "kinumpirma mo",
+    caseSourceExtraction: "sinabi mo",
+    caseSourceDocument: "sinabi ng dokumento",
+    caseSourceDebunker: "na-check",
+    caseUpdateFailed: "Hindi na-save ang pagtatama mo. Subukan muli.",
   },
   ceb: {
     languageName: "Bisaya",
@@ -310,6 +328,15 @@ const copy = {
     caseTitle: "Ang nasabtan ni Gabay",
     caseEmpty: "Mogawas dinhi ang mga detalye nga imong gipaambit aron dili na nimo balikon.",
     caseFlagsTitle: "Mga pahinumdom sa kaluwasan",
+    caseConflictPrompt: "Wala magtugma ang imong gisulti ug ang usa ka dokumento. Hain ang husto?",
+    caseCorrectLabel: "Tul-ira kini",
+    caseConfirm: "Kumpirma",
+    caseCancel: "Kanselaha",
+    caseSourceUser: "imong gikumpirma",
+    caseSourceExtraction: "imong gisulti",
+    caseSourceDocument: "gisulti sa dokumento",
+    caseSourceDebunker: "gi-check",
+    caseUpdateFailed: "Wala ma-save ang imong pagtul-id. Sulayi pag-usab.",
   },
 };
 
@@ -402,6 +429,7 @@ let chatSessionId = null;
 let chatThread = [];
 let chatCase = {};
 let chatBusy = false;
+let editingCaseField = null;
 
 const t = (key, ...args) => {
   const value = copy[language][key] ?? copy.en[key];
@@ -667,20 +695,68 @@ function caseFieldLabel(field) {
   return field.replaceAll("_", " ");
 }
 
+function caseProvenanceLabel(source) {
+  const key = {
+    user: "caseSourceUser",
+    extraction: "caseSourceExtraction",
+    document: "caseSourceDocument",
+    debunker: "caseSourceDebunker",
+  }[source];
+  return key ? t(key) : source;
+}
+
+// One-tap correction (issue #44): a claim with unresolved conflicts[] is
+// rendered as a first-class choice between every candidate value with its
+// provenance, never silently resolved — her tap is the only thing that
+// resolves it (POST /api/case/correct, source="user"). An uncontested
+// claim gets a lightweight edit affordance so ANY fact stays correctable
+// in one tap, not only a contested one.
+function caseClaimHtml(field, claim) {
+  const conflicts = Array.isArray(claim.conflicts) ? claim.conflicts : [];
+  if (conflicts.length) {
+    const candidates = [
+      { value: claim.value, source: claim.source },
+      ...conflicts.map((conflict) => ({ value: conflict.value, source: conflict.source })),
+    ];
+    const options = candidates
+      .map(
+        (candidate) => `<button type="button" class="case-option" data-action="correct-case" data-field="${escapeHtml(field)}" data-value="${escapeHtml(String(candidate.value))}">
+          <span class="case-option-value">${escapeHtml(String(candidate.value))}</span>
+          <small class="case-option-source">${escapeHtml(caseProvenanceLabel(candidate.source))}</small>
+        </button>`,
+      )
+      .join("");
+    return `<li class="case-claim has-conflict">
+      <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
+      <p class="case-conflict-prompt">${t("caseConflictPrompt")}</p>
+      <div class="case-conflict-options">${options}</div>
+    </li>`;
+  }
+  if (editingCaseField === field) {
+    return `<li class="case-claim">
+      <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
+      <form class="case-edit-form" data-form="case-edit" data-field="${escapeHtml(field)}">
+        <input type="text" class="case-edit-input" value="${escapeHtml(String(claim.value))}" maxlength="2000" required />
+        <button type="submit" class="button ink-button case-edit-confirm">${t("caseConfirm")}</button>
+        <button type="button" class="case-edit-cancel" data-action="cancel-case-edit">${t("caseCancel")}</button>
+      </form>
+    </li>`;
+  }
+  return `<li class="case-claim">
+    <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
+    <span class="case-value">${escapeHtml(String(claim.value))}
+      <button type="button" class="case-edit-trigger" data-action="edit-case-claim" data-field="${escapeHtml(field)}" aria-label="${escapeHtml(t("caseCorrectLabel"))}">&#9998;</button>
+    </span>
+  </li>`;
+}
+
 function chatCaseHtml() {
   const claims = Object.entries(chatCase.claims || {});
   const flags = Object.keys(chatCase.safety_flags || {});
   if (!claims.length && !flags.length) {
     return `<p class="case-empty">${t("caseEmpty")}</p>`;
   }
-  const rows = claims
-    .map(
-      ([field, claim]) => `<li>
-        <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
-        <span class="case-value">${escapeHtml(String(claim.value))}</span>
-      </li>`,
-    )
-    .join("");
+  const rows = claims.map(([field, claim]) => caseClaimHtml(field, claim)).join("");
   const flagRows = flags
     .map((flag) => `<li class="case-flag">${escapeHtml(flag.replaceAll("_", " ").toLowerCase())}</li>`)
     .join("");
@@ -785,6 +861,30 @@ function handleChatLine(line) {
   refreshChatScreen();
 }
 
+// One-tap correction (issue #44): POST /api/case/correct, source="user" —
+// wins outright, sets user_confirmed, and resolves any Conflict a prior
+// turn raised on this field. Never a conversation turn, never an agent
+// tool; an authenticated per-user write like every other endpoint here.
+async function correctCaseField(field, value) {
+  if (!auth?.currentUser || !chatSessionId) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/case/correct", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: chatSessionId, field, value }),
+    });
+    if (!response.ok) throw new Error(`correct failed: ${response.status}`);
+    const data = await response.json();
+    chatCase = data.case || chatCase;
+  } catch {
+    showStatus(t("caseUpdateFailed"));
+  } finally {
+    editingCaseField = null;
+    refreshChatScreen();
+  }
+}
+
 const templates = {
   dashboard: dashboardTemplate,
   chat: chatTemplate,
@@ -880,6 +980,23 @@ document.addEventListener("click", (event) => {
     showStatus(t("localProfileDeleted"));
     return;
   }
+  if (action === "edit-case-claim") {
+    editingCaseField = button.dataset.field;
+    refreshChatScreen();
+    return;
+  }
+  if (action === "cancel-case-edit") {
+    editingCaseField = null;
+    refreshChatScreen();
+    return;
+  }
+  if (action === "correct-case") {
+    button.disabled = true;
+    correctCaseField(button.dataset.field, button.dataset.value).finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
   navigate(action);
 });
 
@@ -893,6 +1010,11 @@ document.addEventListener("submit", async (event) => {
     if (!text) return;
     input.value = "";
     sendChatTurn(text);
+  } else if (form.dataset.form === "case-edit") {
+    const field = form.dataset.field;
+    const value = form.querySelector(".case-edit-input").value.trim();
+    if (!value) return;
+    correctCaseField(field, value);
   } else if (form.dataset.form === "crisis-country") {
     crisisCountry = document.getElementById("crisis-country").value;
     navigate("crisis-situation");
@@ -953,6 +1075,7 @@ if (auth) {
       chatSessionId = null;
       chatThread = [];
       chatCase = {};
+      editingCaseField = null;
       return;
     }
     userName = user.displayName || user.email || "";

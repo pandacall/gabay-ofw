@@ -15,6 +15,11 @@ ran, its schema-validated ProofGap crosses the same seam as a
 ``proof_gap`` line: the scope limit, the satisfied/outstanding rows, and
 the single next-artifact ask are shown by the UI from the typed payload,
 so the voice only frames them.
+
+``ChatService.correct_case`` (issue #44) is the one-tap correction seam:
+the Case streamed on the ``case`` line is rendered and correctable by the
+UI directly (never only narrated by DISPATCHER's prose), and a tap there
+calls this method instead of going through a conversation turn at all.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ from google.genai import types
 
 from app.agent import APP_NAME, acknowledgement_for, build_adk_app
 from app.case import mark_safe as case_mark_safe
+from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
 from app.directory import Country, resolve_case_country
 from app.safe_floor import cached_card, is_imminent_danger
@@ -180,6 +186,55 @@ class ChatService:
         on the uid's current session. Returns the updated Case."""
         _, case = await self._mutate_case(uid=uid, mutate=case_mark_safe)
         return case or {}
+
+    async def correct_case(
+        self, *, uid: str, session_id: str, field: str, value: str
+    ) -> dict | None:
+        """One-tap correction (issue #44): a ``user``-sourced claim.
+
+        Merged with ``source="user"`` so it wins outright, sets
+        ``user_confirmed``, and resolves any Conflict a prior turn raised
+        on this field — never silently reverted by a later extraction or
+        document (``merge_case``'s merge policy). Persisted the same way a
+        DISPATCHER turn persists its own state delta: one ``Event``
+        carrying the new Case as a session-state delta, appended through
+        the same session service the conversation spine uses.
+
+        Unlike ``press_emergency_button``/``apply_mark_safe`` above, this
+        acts on the specific ``session_id`` the UI is showing her — not
+        "the" most recent session for the uid — matching ``/api/chat``'s
+        own per-session contract (a correction always targets the Case
+        she is looking at).
+
+        Returns the updated Case, or ``None`` when the session does not
+        exist (or belongs to a different user — the caller renders 404,
+        matching ``/api/chat``'s session lookup).
+        """
+        session = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        if session is None:
+            return None
+        now_wall = time.time()
+        now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
+        updated_case = merge_case(
+            session.state.get("case"),
+            {"claims": {field: {"value": value, "confidence": "high"}}},
+            source="user",
+            now=now_iso,
+        )
+        await self._session_service.append_event(
+            session,
+            Event(
+                id=Event.new_id(),
+                invocation_id=f"correction-{uuid4().hex}",
+                author="user",
+                timestamp=now_wall,
+                actions=EventActions(state_delta={"case": updated_case}),
+            ),
+        )
+        return updated_case
+
 
     async def stream_turn(
         self, *, uid: str, session: Session, text: str

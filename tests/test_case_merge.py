@@ -11,6 +11,7 @@ import pytest
 from app.case import (
     ACUTE_SAFETY_FLAGS,
     SAFETY_FLAGS,
+    SEQUENCER_FIELDS,
     empty_case,
     is_imminent_danger,
     mark_safe,
@@ -18,6 +19,7 @@ from app.case import (
     needs_resume_check,
     press_emergency_button,
     record_emergency_turn,
+    unresolved_sequencer_conflict,
 )
 
 T1 = "2026-09-03T00:00:00+00:00"
@@ -76,6 +78,102 @@ class TestUserConfirmedWins:
         case = merge_case(case, {"claims": claims(monthly_salary="1200")}, source="document", now=T2)
         assert case["claims"]["monthly_salary"]["value"] == "1500"
         assert case["claims"]["monthly_salary"]["conflicts"][0]["source"] == "document"
+
+    def test_second_user_tap_resolves_earlier_conflict(self):
+        # A conflict raised before her tap must not haunt the claim forever
+        # (issue #44: a later correction wins outright and unblocks
+        # sequencing, so any Conflict a prior turn raised is resolved, not
+        # carried forward).
+        case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, source="user", now=T1)
+        case = merge_case(case, {"claims": claims(country="Kuwait")}, source="extraction", now=T2)
+        assert case["claims"]["country"]["conflicts"]
+        case = merge_case(case, {"claims": claims(country="Qatar")}, source="user", now=T2)
+        assert case["claims"]["country"]["value"] == "Qatar"
+        assert case["claims"]["country"]["conflicts"] == []
+
+
+class TestExtractionVsDocumentConflict:
+    """Issue #44: extraction-vs-document disagreement persists BOTH values
+    as a Conflict — the document is frequently the fraud (a substituted
+    contract), so it never silently outranks her narrative, and her
+    narrative never silently overwrites a document already on file either.
+    """
+
+    def test_document_disagreeing_with_narrative_becomes_conflict(self):
+        # Demoable fixture (PRD #34): payslip says 14 months, she said 11.
+        case = merge_case(None, {"claims": claims(months_unpaid="11")}, source="extraction", now=T1)
+        case = merge_case(case, {"claims": claims(months_unpaid="14")}, source="document", now=T2)
+        claim = case["claims"]["months_unpaid"]
+        assert claim["value"] == "11"
+        assert claim.get("user_confirmed") is not True
+        assert claim["conflicts"] == [
+            {"value": "14", "source": "document", "confidence": "high", "at": T2}
+        ]
+
+    def test_narrative_disagreeing_with_prior_document_becomes_conflict(self):
+        # The reverse order: a document lands first, her later narrative
+        # disagrees. Her narrative does not silently overwrite it either —
+        # only her tap resolves the disagreement.
+        case = merge_case(None, {"claims": claims(monthly_salary="1200")}, source="document", now=T1)
+        case = merge_case(case, {"claims": claims(monthly_salary="1500")}, source="extraction", now=T2)
+        claim = case["claims"]["monthly_salary"]
+        assert claim["value"] == "1200"
+        assert claim["conflicts"] == [
+            {"value": "1500", "source": "extraction", "confidence": "high", "at": T2}
+        ]
+
+    def test_only_her_tap_resolves_an_extraction_document_conflict(self):
+        case = merge_case(None, {"claims": claims(months_unpaid="11")}, now=T1)
+        case = merge_case(case, {"claims": claims(months_unpaid="14")}, source="document", now=T2)
+        case = merge_case(case, {"claims": claims(months_unpaid="11")}, source="user", now=T2)
+        claim = case["claims"]["months_unpaid"]
+        assert claim["value"] == "11"
+        assert claim["user_confirmed"] is True
+        assert claim["conflicts"] == []
+
+    def test_same_source_refinement_still_overwrites_directly(self):
+        # A same-source update (her narrative refining its own earlier
+        # reading) is progressive refinement, not a cross-source
+        # disagreement — it must keep overwriting directly.
+        case = merge_case(None, {"claims": claims(months_unpaid="2")}, source="extraction", now=T1)
+        case = merge_case(case, {"claims": claims(months_unpaid="3")}, source="extraction", now=T2)
+        assert case["claims"]["months_unpaid"]["value"] == "3"
+        assert case["claims"]["months_unpaid"]["conflicts"] == []
+
+
+class TestUnresolvedSequencerConflict:
+    """Issue #44: an unresolved Conflict on a SequencerIn-mapped field
+    (country, tenure, grievances) blocks FILING_SEQUENCER; a Conflict on
+    any other field is informational only and never blocks."""
+
+    def test_no_case_or_empty_case_is_none(self):
+        assert unresolved_sequencer_conflict(None) is None
+        assert unresolved_sequencer_conflict(empty_case()) is None
+
+    def test_uncontested_case_is_none(self):
+        case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, source="user", now=T1)
+        assert unresolved_sequencer_conflict(case) is None
+
+    def test_conflict_on_country_blocks(self):
+        case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, now=T1)
+        case = merge_case(case, {"claims": claims(country="Kuwait")}, source="document", now=T2)
+        assert unresolved_sequencer_conflict(case) == "country"
+
+    def test_conflict_on_non_sequencer_field_never_blocks(self):
+        case = merge_case(None, {"claims": claims(employer_name="Al Rashid")}, now=T1)
+        case = merge_case(case, {"claims": claims(employer_name="Al Fahad")}, source="document", now=T2)
+        assert case["claims"]["employer_name"]["conflicts"]
+        assert unresolved_sequencer_conflict(case) is None
+
+    def test_resolving_the_conflict_unblocks(self):
+        case = merge_case(None, {"claims": claims(country="Saudi Arabia")}, now=T1)
+        case = merge_case(case, {"claims": claims(country="Kuwait")}, source="document", now=T2)
+        assert unresolved_sequencer_conflict(case) == "country"
+        case = merge_case(case, {"claims": claims(country="Saudi Arabia")}, source="user", now=T2)
+        assert unresolved_sequencer_conflict(case) is None
+
+    def test_sequencer_fields_matches_documented_set(self):
+        assert SEQUENCER_FIELDS == {"country", "tenure", "grievances"}
 
 
 class TestSafetyFlagsAddOnly:

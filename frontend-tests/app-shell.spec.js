@@ -278,3 +278,80 @@ test("profile and crisis entry remain available on a small screen", async ({
   await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
   await expect(page.locator(".crisis-card")).toBeVisible();
 });
+
+test("a Case conflict is shown with both values and resolved by one tap", async ({
+  page,
+}) => {
+  // Demoable fixture (PRD #34, issue #44): payslip says 14 months, she
+  // said 11 — both shown with provenance, her tap resolves it.
+  await openAsSignedInUser(page);
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        [
+          JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
+          JSON.stringify({ type: "reply", text: "Salamat sa pagsabi.", session_id: "s1" }),
+          JSON.stringify({
+            type: "case",
+            case: {
+              claims: {
+                months_unpaid: {
+                  value: "11",
+                  source: "extraction",
+                  confidence: "high",
+                  conflicts: [
+                    { value: "14", source: "document", confidence: "high", at: "2026-09-03T00:00:00Z" },
+                  ],
+                },
+              },
+              safety_flags: {},
+              language: "en",
+            },
+            session_id: "s1",
+          }),
+        ].join("\n") + "\n",
+    }),
+  );
+
+  await page.locator(".chat-card").click();
+  await page.locator("#chat-input").fill("Hindi ako nababayaran ng 11 months");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  const conflict = page.locator(".case-claim.has-conflict");
+  await expect(conflict).toBeVisible();
+  await expect(conflict).toContainText("11");
+  await expect(conflict).toContainText("14");
+
+  let correctBody;
+  await page.route("**/api/case/correct", (route) => {
+    correctBody = route.request().postDataJSON();
+    route.fulfill({
+      json: {
+        case: {
+          claims: {
+            months_unpaid: {
+              value: "11",
+              source: "user",
+              confidence: "high",
+              user_confirmed: true,
+              conflicts: [],
+            },
+          },
+          safety_flags: {},
+          language: "en",
+        },
+      },
+    });
+  });
+
+  await conflict.locator(".case-option", { hasText: "11" }).click();
+
+  await expect(page.locator(".case-claim.has-conflict")).toHaveCount(0);
+  await expect(page.locator(".case-claims")).toContainText("11");
+  expect(correctBody).toMatchObject({
+    session_id: "s1",
+    field: "months_unpaid",
+    value: "11",
+  });
+});
