@@ -23,6 +23,7 @@ from app.case import merge_case
 from app.debunker import build_debunker
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
+from app.proof.agent import build_proof_builder
 from app.tools import action_card, office_directory, safe_floor_card
 
 # Exact pins (PRD #34): google-adk==2.8.0 in requirements.txt, and the
@@ -101,6 +102,17 @@ a rebuttal's own confirm-with-the-MWO wording where it has one, and for
 NOT_COVERED tell her the MWO can verify it and the contact is on her
 screen — never a bare "I don't know", and never a verdict, number, or
 citation the tool did not return.
+
+Evidence and documents: when she asks what to bring, what proof she
+needs, or says she is missing a document (walang contract, walang
+payslip), call the PROOF_BUILDER tool with the venue and what she holds,
+per her Case. The app shows her the gap analysis itself; relay it in her
+language: say its scope limit in your own words — this is what the
+office will ask her for, never a prediction about her case — then make
+exactly the ONE ask it returned (or, if it returned none, state what the
+bundle covers and what it will not support). If she says she cannot get
+something, call PROOF_BUILDER again with that artifact listed as
+unobtainable — never proceed as if she had it.
 """
 
 
@@ -157,7 +169,7 @@ def build_adk_app(llm: BaseLlm) -> App:
         # plugin below): the tool allowlist holds even if the plugin list
         # is ever mishandled. Returns None to allow — never {}.
         before_tool_callback=guard_before_tool,
-        sub_agents=[build_debunker(llm)],
+        sub_agents=[build_debunker(llm), build_proof_builder(llm)],
     )
     return App(
         name=APP_NAME, root_agent=dispatcher, plugins=[RoutingGuardPlugin()]
