@@ -8,7 +8,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.auth import FirebaseTokenVerifier, TokenVerifier, get_current_uid
 from app.chat import ChatService, stream_stateless_fallback
@@ -18,6 +18,7 @@ from app.config import (
     get_retention_sweep_token,
 )
 from app.deletion import DeletionReason, UserDataDeleter, get_user_deleter
+from app.extraction import NarrativeClaims
 from app.nonces import NonceStore, get_nonce_store
 from app.notes import NotesStore, get_notes_store
 from app.retention import RetentionSweeper, get_retention_sweeper
@@ -29,6 +30,11 @@ _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 _WIPE_ACTION = "panic_wipe"
 _MARK_SAFE_ACTION = "mark_safe"
 
+#: The closed set of Case claim fields a one-tap correction may write —
+#: exactly the fields extraction itself may assert (NarrativeClaims),
+#: so a correction can never inject an arbitrary state key.
+_CORRECTABLE_FIELDS = frozenset(NarrativeClaims.model_fields)
+
 
 class NoteIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
@@ -37,6 +43,19 @@ class NoteIn(BaseModel):
 class ChatTurnIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
     session_id: str | None = None
+
+
+class CaseCorrectionIn(BaseModel):
+    session_id: str = Field(min_length=1)
+    field: str
+    value: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("field")
+    @classmethod
+    def _known_field(cls, value: str) -> str:
+        if value not in _CORRECTABLE_FIELDS:
+            raise ValueError(f"Unknown Case field: {value!r}")
+        return value
 
 
 class NonceIn(BaseModel):
@@ -130,6 +149,29 @@ def create_app(
             service.stream_turn(uid=uid, session=session, text=turn.text),
             media_type="application/x-ndjson",
         )
+
+    @app.post("/api/case/correct")
+    async def correct_case(
+        body: CaseCorrectionIn,
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """One-tap correction (issue #44): an authenticated write of a
+        single Case claim, source="user" — wins outright, sets
+        user_confirmed, and resolves any Conflict a prior turn raised on
+        this field, per app.case.merge_case's merge policy. Session
+        lookup mirrors /api/chat's: an unknown or another user's session
+        id is 404, never a leak of its existence.
+        """
+        updated = await service.correct_case(
+            uid=uid,
+            session_id=body.session_id,
+            field=body.field,
+            value=body.value,
+        )
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {"case": updated}
 
     @app.get("/api/notes")
     def list_notes(

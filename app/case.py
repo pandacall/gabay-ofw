@@ -5,7 +5,23 @@ recorded per claim, user-confirmed values are never reverted by a later
 extraction (a disagreement becomes a Conflict on the claim), and safety
 flags sit outside precedence entirely — a delta may ADD a flag and may
 NEVER clear one. There is deliberately no code path that removes a flag:
-only an authenticated UI action clears (out of scope for this slice).
+only an authenticated UI action clears (out of scope for this slice;
+issue #44's one-tap correction endpoint only ever writes a claim, never a
+flag).
+
+A Conflict is a first-class Case object, never a UI event (issue #44):
+``{value, source, confidence, at}`` entries accumulate on
+``claim["conflicts"]``, resolved only by a later ``user``-sourced claim
+(the one-tap correction). Two rules produce a Conflict instead of an
+overwrite: a claim already ``user_confirmed`` is never reverted by any
+other source, and a claim contested across DIFFERENT non-user provenance
+(extraction vs document, in either order) is never silently resolved
+either — the document is frequently the fraud (a substituted contract),
+so it can never silently outrank her narrative, but her narrative also
+never silently overwrites a document already on file. Same-source
+updates (a later extraction refining an earlier one) still overwrite
+directly — that is progressive refinement within one channel, not a
+disagreement across sources.
 
 Everything stored in the Case is a JSON-serialisable plain dict so it can
 live in ADK session state and in Firestore unchanged.
@@ -37,7 +53,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 #: How long a silence must be, while the predicate is active, before the
 #: app re-asks once instead of resuming inside EMERGENCY.
@@ -188,6 +204,26 @@ def record_emergency_turn(
     return merged
 
 
+def _record_conflict(
+    claim: dict[str, Any], *, value: Any, source: str, confidence: str, now: str
+) -> None:
+    """Appends a Conflict entry to ``claim`` in place, deduping by
+    ``(value, source)``: a disagreement that recurs turn after turn (the
+    same document re-processed, the same fact re-extracted) updates the
+    existing entry's ``at``/``confidence`` instead of piling up duplicate
+    entries the UI would otherwise render as separate tappable options.
+    """
+    conflicts = claim.setdefault("conflicts", [])
+    for entry in conflicts:
+        if entry.get("value") == value and entry.get("source") == source:
+            entry["confidence"] = confidence
+            entry["at"] = now
+            return
+    conflicts.append(
+        {"value": value, "source": source, "confidence": confidence, "at": now}
+    )
+
+
 def merge_case(
     case: dict[str, Any] | None,
     delta: dict[str, Any],
@@ -204,6 +240,12 @@ def merge_case(
     * A ``user``-sourced value wins outright and sets ``user_confirmed``.
       A later disagreeing extraction or document is recorded as a Conflict
       on the claim — it never reverts the confirmed value.
+    * A claim contested across two DIFFERENT non-user sources (extraction
+      vs document, either order) is likewise never silently overwritten:
+      the disagreeing value is recorded as a Conflict and the existing
+      value stands until her tap resolves it. Only a same-source update
+      (extraction refining its own earlier reading, or a second document)
+      overwrites directly — that is refinement, not a disagreement.
     * Safety flags are add-only. A delta with no flags leaves existing
       flags untouched; no source — extraction or document — can clear one.
       Re-adding an existing flag keeps its original provenance.
@@ -236,26 +278,35 @@ def merge_case(
         confidence = incoming.get("confidence", "medium")
         existing = merged["claims"].get(field)
         if source == "user":
+            # Her tap IS the resolution: any Conflict a prior turn raised
+            # on this field is resolved by this write, never carried
+            # forward — otherwise a field could never unblock sequencing.
             merged["claims"][field] = {
                 "value": value,
                 "source": "user",
                 "confidence": "high",
                 "at": now,
                 "user_confirmed": True,
-                "conflicts": list(existing.get("conflicts", [])) if existing else [],
+                "conflicts": [],
             }
         elif existing and existing.get("user_confirmed"):
             if value != existing["value"]:
                 # A confirmed value is never reverted; the disagreement is
                 # kept as a first-class Conflict on the claim.
-                existing.setdefault("conflicts", []).append(
-                    {
-                        "value": value,
-                        "source": source,
-                        "confidence": confidence,
-                        "at": now,
-                    }
-                )
+                _record_conflict(existing, value=value, source=source, confidence=confidence, now=now)
+        elif (
+            existing
+            and existing.get("source") != source
+            and existing.get("value") != value
+        ):
+            # Cross-provenance disagreement with no user tap yet (e.g. her
+            # narrative said 11 months unpaid, a payslip says 14): neither
+            # side silently wins. The document is frequently the fraud, so
+            # it never outranks her narrative automatically — but her
+            # narrative doesn't silently overwrite a document already on
+            # file either. Both values persist; only a later ``user``
+            # correction (the one-tap resolution) picks one.
+            _record_conflict(existing, value=value, source=source, confidence=confidence, now=now)
         else:
             merged["claims"][field] = {
                 "value": value,
@@ -278,3 +329,45 @@ def merge_case(
                 merged["emergency"]["flag_triggered_at"] = now
 
     return merged
+
+
+# ---------------------------------------------------------------------------
+# Sequencer-blocking conflicts (issue #44, PRD #34 merge policy).
+# ---------------------------------------------------------------------------
+
+#: Case claim fields that feed FILING_SEQUENCER's typed input
+#: (``SequencerIn``: country, tenure, grievances). An unresolved Conflict
+#: on any of these blocks FILING_SEQUENCER — a wrong jurisdiction or a
+#: disputed tenure duration would build a Plan around a contested fact.
+#: Conflicts elsewhere (e.g. ``employer_name``) are informational only.
+#:
+#: Only fields that actually exist as Case claims today are listed:
+#: ``country`` maps 1:1 onto ``SequencerIn.country``, and
+#: ``tenure_months`` is the closest existing proxy for
+#: ``SequencerIn.tenure`` (extraction has no other tenure-shaped field).
+#: ``SequencerIn.grievances`` has no corresponding Case claim at all — it
+#: is derived by DISPATCHER's own judgment from the conversation, never
+#: written to ``case["claims"]`` with provenance — so it cannot be
+#: checked here; a real per-grievance Conflict mechanism is future work.
+SEQUENCER_FIELDS = frozenset({"country", "tenure_months"})
+
+
+
+def unresolved_sequencer_conflict(case: dict[str, Any] | None) -> Optional[str]:
+    """The first ``SEQUENCER_FIELDS`` claim carrying an unresolved Conflict.
+
+    Returns the field name to block on, or ``None`` when every
+    sequencer-relevant claim is uncontested. A Conflict is "unresolved" as
+    long as its ``conflicts`` list is non-empty — resolution only ever
+    happens by a ``user``-sourced claim replacing it (``merge_case``
+    clears the list for that field's next write, since a fresh dict
+    replaces the old one). Deterministic, no I/O.
+    """
+    if not case:
+        return None
+    claims = case.get("claims") or {}
+    for field in sorted(SEQUENCER_FIELDS):
+        claim = claims.get(field)
+        if isinstance(claim, dict) and claim.get("conflicts"):
+            return field
+    return None

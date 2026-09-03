@@ -95,6 +95,90 @@ class TestSequenceActionsToolRefusals:
         assert "temp:filing_sequencer_rows" in ctx.state
 
 
+class TestSequenceActionsBlocksOnUnresolvedConflict:
+    """Issue #44: an unresolved Conflict on a SequencerIn-mapped Case
+    field (country, tenure, grievances) blocks invocation before any rows
+    are built — code-owned, not left to DISPATCHER's judgment. A Conflict
+    on any other field is informational and never blocks.
+    """
+
+    def test_unresolved_country_conflict_blocks_before_sequencing(self):
+        ctx = _FakeToolContext()
+        ctx.state["case"] = {
+            "claims": {
+                "country": {
+                    "value": "Saudi Arabia",
+                    "source": "extraction",
+                    "confidence": "high",
+                    "at": "T1",
+                    "conflicts": [
+                        {
+                            "value": "Kuwait",
+                            "source": "document",
+                            "confidence": "high",
+                            "at": "T2",
+                        }
+                    ],
+                }
+            }
+        }
+        result = sequencer_sequence_actions(
+            "SA", "employed_in_country", ["unpaid_wages"], ctx
+        )
+        assert result == {
+            "ok": False,
+            "reason": "UNRESOLVED_CONFLICT",
+            "field": "country",
+        }
+        # Never proceeds to build rows or stash sequencer state.
+        assert "temp:filing_sequencer_seq_in" not in ctx.state
+        assert "temp:filing_sequencer_rows" not in ctx.state
+
+    def test_non_sequencer_field_conflict_never_blocks(self):
+        ctx = _FakeToolContext()
+        ctx.state["case"] = {
+            "claims": {
+                "employer_name": {
+                    "value": "Al Rashid",
+                    "source": "extraction",
+                    "confidence": "high",
+                    "at": "T1",
+                    "conflicts": [
+                        {
+                            "value": "Al Fahad",
+                            "source": "document",
+                            "confidence": "high",
+                            "at": "T2",
+                        }
+                    ],
+                }
+            }
+        }
+        result = sequencer_sequence_actions(
+            "SA", "employed_in_country", ["unpaid_wages"], ctx
+        )
+        assert result["ok"] is True
+
+    def test_resolved_conflict_no_longer_blocks(self):
+        ctx = _FakeToolContext()
+        ctx.state["case"] = {
+            "claims": {
+                "country": {
+                    "value": "Saudi Arabia",
+                    "source": "user",
+                    "confidence": "high",
+                    "at": "T1",
+                    "user_confirmed": True,
+                    "conflicts": [],
+                }
+            }
+        }
+        result = sequencer_sequence_actions(
+            "SA", "employed_in_country", ["unpaid_wages"], ctx
+        )
+        assert result["ok"] is True
+
+
 class TestComputeDeadlinesToolRequiresPriorState:
     def test_without_prior_sequence_actions_call_refuses(self):
         ctx = _FakeToolContext()

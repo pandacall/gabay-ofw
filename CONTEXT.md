@@ -57,3 +57,23 @@ The minimal structured object carried from an escalated Contract Check into a ne
 
 **Crisis Session**:
 A stored Crisis Help conversation under `users/{uid}/crisisSessions/`, auto-deleted by Firestore TTL via its `expireAt` field and manually deletable by the user.
+
+## v6 agent layer — Case pipeline
+
+Terms for the PRD #34 / ADR-0004 DISPATCHER topology (`app/case.py`,
+`app/agent.py`, `app/sequencer_agent.py`). These stand alongside, not in
+place of, the Contract Check / Crisis Help terms above.
+
+**Case**:
+The structured facts DISPATCHER has built from the conversation, deterministically merged by `merge_case` and rendered back to the user in the UI, correctable in one tap (issue #44). Every claim carries provenance: `{value, source, confidence, at, conflicts[]}`. Stored as a plain JSON-serialisable dict in ADK session state.
+_Avoid_: Claims (that name belongs to the retired Contract Check pipeline).
+
+**Conflict**:
+A first-class object on a Case claim, never a UI event — `claim["conflicts"]` accumulates `{value, source, confidence, at}` entries whenever a disagreeing value would otherwise silently overwrite one already on the claim: a user-confirmed value disagreeing with any later source, or two different non-user sources (extraction vs. document) disagreeing with each other. A document is frequently the fraud (a substituted contract), so it never automatically outranks her narrative — but her narrative doesn't silently overwrite a document already on file either. Resolved only by a `user`-sourced correction (the one-tap endpoint), which clears the list. An unresolved Conflict on a SequencerIn-mapped field (`country` or `tenure_months`; see `app.case.SEQUENCER_FIELDS`) blocks FILING_SEQUENCER and becomes the turn's one question; a Conflict elsewhere is informational only.
+
+**Safety Flag**:
+A named, closed-enum hazard on the Case (`PHYSICAL_ASSAULT_ONGOING`, `PHYSICAL_ASSAULT_PAST`, `THREAT_OF_HARM`, `CONFINED`, `PASSPORT_WITHHELD`). Add-only, outside Conflict precedence entirely: any source may add one, none may clear one — a document asserting "all is well" leaves every flag in place. Only an authenticated UI action clears (out of scope for the merge-policy slice).
+
+**One-tap correction**:
+The authenticated `POST /api/case/correct` endpoint: a `user`-sourced claim write that wins outright, sets `user_confirmed`, and resolves any Conflict on that field. Never an agent tool, never a conversation turn — the same house style as `mark_safe`/`panic_wipe`.
+
