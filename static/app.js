@@ -91,6 +91,18 @@ const copy = {
     otherCountry: "Other",
     signInFailed: (message) => `Sign-in failed: ${message}`,
     notConfigured: "Firebase sign-in is not configured yet.",
+    chatCardTitle: "Talk to Gabay",
+    chatCardBody: "Tell your story in any order, in any language. Gabay listens and builds your case with you.",
+    chatTitle: "Tell me what's happening",
+    chatBody: "Any language, any order. Office names like DOLE-SEnA, MWO, and OWWA stay as they are so you can match them against a sign or a website.",
+    chatStep: "Your conversation",
+    chatPlaceholder: "Type in any language...",
+    chatSend: "Send",
+    chatOpenersLabel: "You can start with one of these:",
+    chatError: "Something went wrong on our side. Nothing you wrote was lost - please send it again.",
+    caseTitle: "What Gabay has understood",
+    caseEmpty: "Facts you share will appear here so you never have to repeat yourself.",
+    caseFlagsTitle: "Safety notes",
   },
   tl: {
     languageName: "Filipino",
@@ -175,6 +187,18 @@ const copy = {
     otherCountry: "Ibang bansa",
     signInFailed: (message) => `Hindi nagtagumpay ang sign-in: ${message}`,
     notConfigured: "Hindi pa naka-configure ang Firebase sign-in.",
+    chatCardTitle: "Kausapin si Gabay",
+    chatCardBody: "Ikuwento mo sa kahit anong ayos, sa kahit anong wika. Nakikinig si Gabay at binubuo ninyo ang kaso mo.",
+    chatTitle: "Ikuwento mo kung ano ang nangyayari",
+    chatBody: "Kahit anong wika, kahit anong ayos. Mananatili ang mga pangalan ng opisina tulad ng DOLE-SEnA, MWO, at OWWA para maitugma mo sa karatula o website.",
+    chatStep: "Ang usapan ninyo",
+    chatPlaceholder: "Mag-type sa kahit anong wika...",
+    chatSend: "Ipadala",
+    chatOpenersLabel: "Puwede kang magsimula sa isa sa mga ito:",
+    chatError: "May nangyaring mali sa amin. Hindi nawala ang isinulat mo - pakisend ulit.",
+    caseTitle: "Ang naiintindihan ni Gabay",
+    caseEmpty: "Lalabas dito ang mga detalyeng ibinahagi mo para hindi mo na kailangang ulitin.",
+    caseFlagsTitle: "Mga paalala sa kaligtasan",
   },
   ceb: {
     languageName: "Bisaya",
@@ -259,6 +283,18 @@ const copy = {
     otherCountry: "Ubang nasod",
     signInFailed: (message) => `Wala molampos ang sign-in: ${message}`,
     notConfigured: "Wala pa ma-configure ang Firebase sign-in.",
+    chatCardTitle: "Istoryahi si Gabay",
+    chatCardBody: "Isulti sa bisan unsang han-ay, sa bisan unsang pinulongan. Maminaw si Gabay ug tukoron ninyo ang imong kaso.",
+    chatTitle: "Isulti unsay nahitabo",
+    chatBody: "Bisan unsang pinulongan, bisan unsang han-ay. Magpabilin ang ngalan sa opisina sama sa DOLE-SEnA, MWO, ug OWWA aron imong ikatandi sa karatula o website.",
+    chatStep: "Ang inyong istorya",
+    chatPlaceholder: "Pag-type sa bisan unsang pinulongan...",
+    chatSend: "Ipadala",
+    chatOpenersLabel: "Mahimo kang magsugod sa usa niini:",
+    chatError: "Adunay sayop sa among bahin. Wala mawala ang imong gisulat - palihug isend pag-usab.",
+    caseTitle: "Ang nasabtan ni Gabay",
+    caseEmpty: "Mogawas dinhi ang mga detalye nga imong gipaambit aron dili na nimo balikon.",
+    caseFlagsTitle: "Mga pahinumdom sa kaluwasan",
   },
 };
 
@@ -339,6 +375,19 @@ let userId = "";
 let crisisDanger = false;
 let crisisCountry = "";
 
+// Paired bilingual openers: showing both languages work is the point
+// ("Hindi ako nababayaran / I'm not being paid").
+const CHAT_OPENERS = [
+  "Hindi ako nababayaran / I'm not being paid",
+  "Kinuha nila ang passport ko / They took my passport",
+  "Gusto ko nang umuwi / I want to go home",
+  "Natatakot ako sa amo ko / I'm afraid of my employer",
+];
+let chatSessionId = null;
+let chatThread = [];
+let chatCase = {};
+let chatBusy = false;
+
 const t = (key, ...args) => {
   const value = copy[language][key] ?? copy.en[key];
   return typeof value === "function" ? value(...args) : value;
@@ -385,6 +434,16 @@ function dashboardTemplate() {
         <h1>${escapeHtml(t("greeting", firstName))}</h1>
       </header>
       <div class="service-grid">
+        <button class="mode-card chat-card" type="button" data-action="chat">
+          <svg class="service-icon" viewBox="0 0 48 48" aria-hidden="true">
+            <path d="M10 14h28v18H22l-8 7v-7h-4z"></path>
+            <path d="M17 21h14M17 26h9"></path>
+          </svg>
+          <span>
+            <h2>${t("chatCardTitle")}</h2>
+            <p>${t("chatCardBody")}</p>
+          </span>
+        </button>
         <button class="mode-card crisis-card" type="button" data-action="crisis">
           <svg class="service-icon" viewBox="0 0 48 48" aria-hidden="true">
             <circle cx="24" cy="24" r="18"></circle>
@@ -538,8 +597,142 @@ function profileTemplate() {
   </section>`;
 }
 
+function chatMessageHtml(message) {
+  if (message.role === "user") {
+    return `<div class="chat-message user">${escapeHtml(message.text)}</div>`;
+  }
+  const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : "";
+  return `<div class="chat-message agent${extra}">${escapeHtml(message.text)}</div>`;
+}
+
+function chatThreadHtml() {
+  const bubbles = chatThread.map(chatMessageHtml).join("");
+  const typing = chatBusy ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>' : "";
+  return bubbles + typing;
+}
+
+function caseFieldLabel(field) {
+  return field.replaceAll("_", " ");
+}
+
+function chatCaseHtml() {
+  const claims = Object.entries(chatCase.claims || {});
+  const flags = Object.keys(chatCase.safety_flags || {});
+  if (!claims.length && !flags.length) {
+    return `<p class="case-empty">${t("caseEmpty")}</p>`;
+  }
+  const rows = claims
+    .map(
+      ([field, claim]) => `<li>
+        <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
+        <span class="case-value">${escapeHtml(String(claim.value))}</span>
+      </li>`,
+    )
+    .join("");
+  const flagRows = flags
+    .map((flag) => `<li class="case-flag">${escapeHtml(flag.replaceAll("_", " ").toLowerCase())}</li>`)
+    .join("");
+  return `${claims.length ? `<ul class="case-claims">${rows}</ul>` : ""}
+    ${flags.length ? `<h3>${t("caseFlagsTitle")}</h3><ul class="case-flags">${flagRows}</ul>` : ""}`;
+}
+
+function chatTemplate() {
+  const openers = CHAT_OPENERS.map(
+    (opener) => `<button type="button" class="chat-opener" data-opener="${escapeHtml(opener)}">${escapeHtml(opener)}</button>`,
+  ).join("");
+  return `<section class="flow-shell chat-shell">
+    ${flowNav(t("chatStep"))}
+    <div class="chat-layout">
+      <div class="chat-main">
+        <header class="chat-heading">
+          <h1>${t("chatTitle")}</h1>
+          <p>${t("chatBody")}</p>
+        </header>
+        <div class="chat-thread" id="chat-thread" aria-live="polite">${chatThreadHtml()}</div>
+        ${chatThread.length ? "" : `<div class="chat-openers" id="chat-openers">
+          <p>${t("chatOpenersLabel")}</p>
+          <div class="opener-chips">${openers}</div>
+        </div>`}
+        <form class="chat-composer" data-form="chat">
+          <textarea id="chat-input" rows="2" maxlength="4000" required placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
+          <button class="button ink-button" type="submit" ${chatBusy ? "disabled" : ""}>${t("chatSend")}</button>
+        </form>
+      </div>
+      <aside class="chat-case" id="chat-case-panel">
+        <h2>${t("caseTitle")}</h2>
+        <div id="chat-case">${chatCaseHtml()}</div>
+      </aside>
+    </div>
+  </section>`;
+}
+
+function refreshChatScreen() {
+  if (currentScreen !== "chat") return;
+  const thread = document.getElementById("chat-thread");
+  if (thread) {
+    thread.innerHTML = chatThreadHtml();
+    thread.scrollTop = thread.scrollHeight;
+  }
+  const casePanel = document.getElementById("chat-case");
+  if (casePanel) casePanel.innerHTML = chatCaseHtml();
+  const openersBlock = document.getElementById("chat-openers");
+  if (openersBlock && chatThread.length) openersBlock.remove();
+  const sendButton = document.querySelector('.chat-composer button[type="submit"]');
+  if (sendButton) sendButton.disabled = chatBusy;
+}
+
+async function sendChatTurn(text) {
+  if (chatBusy || !auth?.currentUser) return;
+  chatBusy = true;
+  chatThread.push({ role: "user", text });
+  refreshChatScreen();
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ text, session_id: chatSessionId }),
+    });
+    if (!response.ok || !response.body) throw new Error(`chat failed: ${response.status}`);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (value) buffer += decoder.decode(value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (line) handleChatLine(JSON.parse(line));
+      }
+      if (done) break;
+    }
+  } catch {
+    chatThread.push({ role: "agent", kind: "error", text: t("chatError") });
+  } finally {
+    chatBusy = false;
+    refreshChatScreen();
+  }
+}
+
+function handleChatLine(line) {
+  if (line.session_id) chatSessionId = line.session_id;
+  if (line.type === "ack") {
+    chatThread.push({ role: "agent", kind: "ack", text: line.text });
+  } else if (line.type === "reply") {
+    if (line.text) chatThread.push({ role: "agent", text: line.text });
+  } else if (line.type === "case") {
+    chatCase = line.case || {};
+  } else if (line.type === "error") {
+    chatThread.push({ role: "agent", kind: "error", text: t("chatError") });
+  }
+  refreshChatScreen();
+}
+
 const templates = {
   dashboard: dashboardTemplate,
+  chat: chatTemplate,
   crisis: crisisQuestionTemplate,
   "crisis-country": crisisCountryTemplate,
   "crisis-situation": crisisSituationTemplate,
@@ -576,6 +769,15 @@ function showStatus(message) {
 }
 
 document.addEventListener("click", (event) => {
+  const opener = event.target.closest("[data-opener]");
+  if (opener) {
+    const input = document.getElementById("chat-input");
+    if (input) {
+      input.value = opener.dataset.opener;
+      input.focus();
+    }
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action;
@@ -595,7 +797,13 @@ document.addEventListener("submit", async (event) => {
   const form = event.target;
   if (!form.dataset.form) return;
   event.preventDefault();
-  if (form.dataset.form === "crisis-country") {
+  if (form.dataset.form === "chat") {
+    const input = document.getElementById("chat-input");
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    sendChatTurn(text);
+  } else if (form.dataset.form === "crisis-country") {
     crisisCountry = document.getElementById("crisis-country").value;
     navigate("crisis-situation");
   } else if (form.dataset.form === "crisis-situation") {
@@ -651,7 +859,12 @@ if (auth) {
     authLoading.classList.add("hidden");
     signedOut.classList.toggle("hidden", Boolean(user));
     app.classList.toggle("hidden", !user);
-    if (!user) return;
+    if (!user) {
+      chatSessionId = null;
+      chatThread = [];
+      chatCase = {};
+      return;
+    }
     userName = user.displayName || user.email || "";
     userId = user.uid || user.email || "signed-in-user";
     document.getElementById("account-name").textContent = userName;

@@ -1,4 +1,5 @@
 google-adk==2.8.0
+google-genai>=2.22
 fastapi>=0.115
 uvicorn[standard]>=0.30
 firebase-admin>=6.5

@@ -144,6 +144,43 @@ test("non-danger Crisis Help path omits the trafficking hotline", async ({
   await expect(page.getByRole("link", { name: "Call 1348" })).toBeVisible();
 });
 
+test("user can open the conversation from a paired bilingual opener", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        [
+          JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
+          JSON.stringify({ type: "reply", text: "Nandito ako para tumulong. Ilang buwan ka nang hindi nababayaran?", session_id: "s1" }),
+          JSON.stringify({
+            type: "case",
+            case: {
+              claims: { months_unpaid: { value: "3", source: "extraction" } },
+              safety_flags: { PASSPORT_WITHHELD: { source: "extraction" } },
+              language: "taglish",
+            },
+            session_id: "s1",
+          }),
+        ].join("\n") + "\n",
+    }),
+  );
+
+  await page.locator(".chat-card").click();
+  const opener = page.getByRole("button", { name: "Hindi ako nababayaran / I'm not being paid" });
+  await expect(opener).toBeVisible();
+  await opener.click();
+  await expect(page.locator("#chat-input")).toHaveValue("Hindi ako nababayaran / I'm not being paid");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");
+  await expect(page.locator(".chat-message.agent").last()).toContainText("Nandito ako para tumulong");
+  await expect(page.locator(".chat-case")).toContainText("months unpaid");
+  await expect(page.locator(".chat-case")).toContainText("passport withheld");
+});
+
 test("profile and crisis entry remain available on a small screen", async ({
   page,
 }) => {
