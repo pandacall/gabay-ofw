@@ -34,55 +34,20 @@ async function openApp(
   await page.route("**/api/notes", (route) =>
     route.fulfill({ json: { notes: [] } }),
   );
-  let contractTurn = 0;
-  await page.route("**/api/contract-checks", (route) => {
-    contractTurn += 1;
-    return route.fulfill({
-      status: 201,
-      json: {
-        id: "check-1",
-        status: "in_progress",
-        prompt: "Does your contract promise overtime pay?",
-        interrupt_id: "interrupt-1",
-      },
-    });
-  });
-  await page.route("**/api/contract-checks/check-1/messages", (route) => {
-    contractTurn += 1;
-    return route.fulfill({
-      json: {
-        id: "check-1",
-        status: "complete",
-        report: {
-          disclaimer:
-            "These findings appear to conflict with standard POEA/DMW rules. Verify them with DMW, OWWA, or a licensed lawyer.",
-          findings: [
-            {
-              issue: "Unpaid overtime",
-              rule: "Overtime must be compensated under the verified employment contract.",
-              severity: "concerning",
-            },
-          ],
-        },
-      },
-    });
-  });
   await page.goto("/");
 }
 
 const openAsSignedInUser = (page, options) => openApp(page, options);
 
-test("signed-in user explicitly chooses either mode from the dashboard", async ({
+test("signed-in user reaches Crisis Help from the dashboard", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
 
   await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Check my contract/ })).toBeVisible();
   await expect(page.locator(".crisis-card")).toBeVisible();
   await expect(page.locator(".crisis-card")).toHaveCSS("background-color", "rgb(168, 67, 31)");
-  await expect(page.locator(".contract-card")).toHaveCSS("background-color", "rgb(255, 255, 255)");
-  await expect(page.getByRole("button", { name: "They keep my passport" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "I cannot go out" })).toBeVisible();
 });
 
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
@@ -111,134 +76,6 @@ test("first-time user sees the service limits before using the app", async ({
   await expect(dialog).toContainText("Not an emergency service.");
   await dialog.getByRole("button", { name: "I understand" }).click();
   await expect(dialog).not.toBeVisible();
-});
-
-test("user completes a genuine multi-turn Contract Check", async ({ page }) => {
-  await openAsSignedInUser(page);
-
-  await page.getByRole("button", { name: /Check my contract/ }).click();
-  await expect(page.getByRole("heading", { name: "Check my contract" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "What you have told us" })).toHaveCount(0);
-  await expect(
-    page.getByText("Talk to us about what your contract says and what is actually happening."),
-  ).toBeVisible();
-  await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
-    "My contract promises a weekly rest day, but I work every day.",
-  );
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.locator(".message.user")).toHaveText(
-    "My contract promises a weekly rest day, but I work every day.",
-  );
-  await expect(page.getByRole("heading", { name: "What you have told us" })).toBeVisible();
-  await expect(page.getByText("Does your contract promise overtime pay?")).toBeVisible();
-  await page.getByRole("button", { name: "Not sure" }).click();
-  await expect(
-    page.getByLabel("Talk to us about what your contract says and what is actually happening."),
-  ).toHaveValue("Not sure");
-  await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Help now" })).toBeVisible();
-
-  await page.getByRole("button", { name: "Use voice" }).click();
-  await expect(page.getByRole("status")).toContainText("Nothing is being recorded");
-  await page.getByRole("button", { name: "Photograph my contract" }).click();
-  await expect(page.getByRole("status")).toContainText("Nothing was opened or uploaded");
-
-  await page.getByLabel("Talk to us about what your contract says and what is actually happening.").fill(
-    "It says overtime should be paid, but I have not received overtime pay.",
-  );
-  await page.getByRole("button", { name: "View Findings Report" }).click();
-  await expect(page.getByRole("heading", { name: "Your Findings Report" })).toBeVisible();
-  await expect(page.getByText("Unpaid overtime")).toBeVisible();
-  await expect(page.getByText(/Verify them with DMW, OWWA, or a licensed lawyer/)).toBeVisible();
-  await page.getByRole("button", { name: /Save a copy/ }).click();
-  await expect(page.getByRole("status")).toContainText("Nothing was downloaded");
-  await page.getByRole("button", { name: /Read it to me/ }).click();
-  await expect(page.getByRole("status")).toContainText("No audio was started");
-});
-
-test("Contract Check shows the backend failure reason", async ({ page }) => {
-  await openAsSignedInUser(page);
-  await page.route("**/api/contract-checks", (route) =>
-    route.fulfill({
-      status: 502,
-      json: { detail: "Gemini returned an invalid response" },
-    }),
-  );
-
-  await page.getByRole("button", { name: /Check my contract/ }).click();
-  await page.getByLabel(
-    "Talk to us about what your contract says and what is actually happening.",
-  ).fill("Please check my contract.");
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await expect(page.getByRole("alert")).toContainText(
-    "Gemini returned an invalid response (502)",
-  );
-  await expect(page.getByRole("alert")).toContainText(
-    "Your message is still here",
-  );
-  await expect(
-    page.getByLabel("Talk to us about what your contract says and what is actually happening."),
-  ).toHaveValue("Please check my contract.");
-});
-
-test("Contract Check keeps the newest turn visible in a long conversation", async ({
-  page,
-}) => {
-  await openAsSignedInUser(page);
-  await page.route("**/api/contract-checks", (route) =>
-    route.fulfill({
-      status: 201,
-      json: {
-        id: "long-check",
-        status: "in_progress",
-        prompt: "Tell us the next detail.",
-        interrupt_id: "interrupt-1",
-      },
-    }),
-  );
-  await page.route("**/api/contract-checks/long-check/messages", (route) =>
-    route.fulfill({
-      json: {
-        id: "long-check",
-        status: "in_progress",
-        prompt: "Tell us the next detail.",
-        interrupt_id: "interrupt-1",
-      },
-    }),
-  );
-
-  await page.getByRole("button", { name: /Check my contract/ }).click();
-  const input = page.getByLabel(
-    "Talk to us about what your contract says and what is actually happening.",
-  );
-  for (let turn = 1; turn <= 7; turn += 1) {
-    await input.fill(`Conversation detail ${turn}`);
-    await input.press("Enter");
-    await expect(input).toHaveValue("");
-    await expect(page.locator(".message.user").last()).toContainText(
-      `Conversation detail ${turn}`,
-    );
-    await expect(page.locator(".message.assistant")).toHaveCount(turn + 1);
-  }
-
-  await expect(page.locator(".message.user").last()).toContainText(
-    "Conversation detail 7",
-  );
-  await expect(page.locator(".message.user").last()).toBeInViewport();
-});
-
-test("Contract Check composer remains accessible on short landscape screens", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 900, height: 400 });
-  await openAsSignedInUser(page);
-  await page.getByRole("button", { name: /Check my contract/ }).click();
-
-  await expect(page.getByRole("button", { name: "Use voice" })).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Photograph my contract" }),
-  ).toBeVisible();
 });
 
 test("user can click through Crisis Help to code-owned contact cards", async ({
