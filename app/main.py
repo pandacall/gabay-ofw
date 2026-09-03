@@ -162,6 +162,21 @@ def create_app(
         result = deleter.wipe(uid, reason=DeletionReason.PANIC_WIPE)
         return {"wiped": True, "documents_deleted": result.documents_deleted}
 
+    @app.post("/api/emergency/button")
+    async def emergency_button(
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """The hardcoded EMERGENCY button (issue #41): renders the cached
+        action card OFFLINE, with ZERO model turns. Not a conversation —
+        a fixed, code-owned render plus a timestamped predicate trip; the
+        conversational EMERGENCY sub-agent takes over from her next chat
+        message once the predicate is active."""
+        return StreamingResponse(
+            service.press_emergency_button(uid=uid),
+            media_type="application/x-ndjson",
+        )
+
     @app.post("/api/mark-safe/nonce")
     def mark_safe_nonce(
         uid: str = Depends(get_current_uid),
@@ -170,19 +185,22 @@ def create_app(
         return {"nonce": nonces.issue(uid, _MARK_SAFE_ACTION)}
 
     @app.post("/api/mark-safe")
-    def mark_safe(
+    async def mark_safe(
         body: NonceIn,
         uid: str = Depends(get_current_uid),
         nonces: NonceStore = Depends(get_nonce_store),
+        service: ChatService = Depends(get_chat_service),
     ):
-        """Scaffold only: nonce gating lands here; the Imminent Danger
-        predicate semantics (clears predicate, never the flag) are issue #41.
-        Nonce-gated backend endpoint — never an agent tool."""
+        """Clears the Imminent Danger PREDICATE — never the safety flag
+        (issue #41). A coerced tap must not erase the disclosure: the
+        flag and its provenance survive; only the timestamped latch
+        flips off, so the app re-evaluates honestly next turn instead of
+        pretending the tap never happened. Nonce-gated backend endpoint
+        — never an agent tool."""
         if not nonces.consume(uid, _MARK_SAFE_ACTION, body.nonce):
             raise HTTPException(status_code=403, detail="Invalid or expired nonce")
-        raise HTTPException(
-            status_code=501, detail="mark_safe semantics land with issue #41"
-        )
+        case = await service.apply_mark_safe(uid=uid)
+        return {"marked_safe": True, "case": case}
 
     @app.post("/api/internal/retention-sweep")
     def retention_sweep(

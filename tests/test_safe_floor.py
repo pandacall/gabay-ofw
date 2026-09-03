@@ -184,14 +184,31 @@ class TestCardFixtures:
         assert cached_card(Country.PH)["country"] == "UNKNOWN"
 
 
-class TestImminentDangerStub:
-    def test_acute_flag_trips_the_predicate(self):
-        case = {"safety_flags": {"PHYSICAL_ASSAULT_ONGOING": {}}}
+class TestImminentDangerPredicate:
+    """Integration-level checks that Safe Floor's predicate hook is the
+    real one from app.case. The exhaustive pure-predicate suite (acute
+    set membership, button press, mark_safe) lives in
+    tests/test_case_merge.py as the CI-gating suite."""
+
+    def test_acute_flag_trips_the_predicate_via_merge(self):
+        from app.case import merge_case
+
+        case = merge_case(
+            None,
+            {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]},
+            now="2024-01-01T00:00:00Z",
+        )
         assert is_imminent_danger(case) is True
 
-    def test_chronic_flags_do_not(self):
+    def test_chronic_flags_alone_do_not(self):
+        from app.case import merge_case
+
         # CONFINED and PASSPORT_WITHHELD are the Gulf baseline — chronic.
-        case = {"safety_flags": {"CONFINED": {}, "PASSPORT_WITHHELD": {}}}
+        case = merge_case(
+            None,
+            {"safety_flags": ["CONFINED", "PASSPORT_WITHHELD"]},
+            now="2024-01-01T00:00:00Z",
+        )
         assert is_imminent_danger(case) is False
 
     def test_no_case_is_not_danger(self):
@@ -202,6 +219,33 @@ class TestImminentDangerStub:
         assert isinstance(ACUTE_SAFETY_FLAGS, frozenset)
         assert "PHYSICAL_ASSAULT_ONGOING" in ACUTE_SAFETY_FLAGS
         assert "PHYSICAL_ASSAULT_PAST" not in ACUTE_SAFETY_FLAGS
+
+    def test_safe_floor_card_tool_suppresses_hold_line_under_danger(self):
+        """End-to-end through app.tools.safe_floor_card (not just
+        build_card directly): an acute flag on the Case suppresses the
+        hold_line via the real predicate, and clearing it via mark_safe
+        restores the line on the next call."""
+        from app.case import mark_safe, merge_case
+        from app.tools import safe_floor_card
+
+        class FakeToolContext:
+            def __init__(self, case):
+                self.state = {"case": case}
+
+        case = merge_case(
+            None,
+            {
+                "claims": {"country": {"value": "Saudi Arabia", "confidence": "high"}},
+                "safety_flags": ["PHYSICAL_ASSAULT_ONGOING"],
+            },
+            now="2024-01-01T00:00:00Z",
+        )
+        result = safe_floor_card("NO_VERIFIED_PLAN", FakeToolContext(case))
+        assert result["card"]["hold_line"] is None
+
+        cleared = mark_safe(case, now="2024-01-01T00:10:00Z")
+        result = safe_floor_card("NO_VERIFIED_PLAN", FakeToolContext(cleared))
+        assert result["card"]["hold_line"] == HOLD_LINE
 
 
 class TestHardFallbackHttpSeam:

@@ -58,8 +58,12 @@ logger = logging.getLogger(__name__)
 #: in the tree, including calls made from inside FILING_SEQUENCER's own
 #: turn — so its four internal pure-function tools are allowlisted here
 #: too (their results, e.g. a HELD refusal's MWO contacts, still pass
-#: through the same channel filtering below). All cross this guard like
-#: any other.
+#: through the same channel filtering below). ``transfer_to_agent`` is
+#: ADK's own built-in tool that performs the one-way
+#: DISPATCHER->EMERGENCY handoff (issue #41's only LLM transfer) — it
+#: carries no contact data of its own, so allowlisting it does not
+#: weaken ROUTING_GUARD's contact-data guarantees. All of these cross
+#: this guard like any other tool.
 ALLOWED_TOOLS = frozenset(
     {
         "office_directory",
@@ -73,15 +77,19 @@ ALLOWED_TOOLS = frozenset(
         "sequencer_sequence_actions",
         "sequencer_compute_deadlines",
         "sequencer_verify_plan",
+        "transfer_to_agent",
     }
 )
 
-#: The one voice agent whose replies the after-model whitelist diffs.
+#: The voice agents whose replies the after-model whitelist diffs.
 #: Specialists' structured outputs are schema-validated and cross the
 #: after-TOOL rail instead (filtered there, and their values enter the
 #: turn whitelist so the voice may repeat them); diffing their raw JSON
-#: would corrupt it before output-schema validation.
-VOICE_AGENT_NAME = "DISPATCHER"
+#: would corrupt it before output-schema validation. EMERGENCY (issue
+#: #41) converses freely just like DISPATCHER — the same fabrication
+#: risk applies, so its replies are diffed too, never exempted just
+#: because a transfer handed her the conversation.
+VOICE_AGENT_NAMES = frozenset({"DISPATCHER", "EMERGENCY"})
 
 _GULF_PERMITTED = frozenset(
     {Channel.MWO, Channel.EMBASSY_ATN, Channel.OWWA_1348, Channel.DMW_HOTLINE}
@@ -365,12 +373,12 @@ class RoutingGuardPlugin(BasePlugin):
         callback_context: CallbackContext,
         llm_response: LlmResponse,
     ) -> Optional[LlmResponse]:
-        # Voice integrity is about the REPLY: only the voice agent's text
+        # Voice integrity is about the REPLY: only a voice agent's text
         # is diffed. A specialist's model output is a structured payload
         # validated by its output_schema and filtered on the after-tool
         # rail — rewriting its JSON here would corrupt it into a
         # validation failure instead of a caught fabrication.
-        if callback_context.agent_name != VOICE_AGENT_NAME:
+        if callback_context.agent_name not in VOICE_AGENT_NAMES:
             return None
         content = llm_response.content
         if content is None or not content.parts:
