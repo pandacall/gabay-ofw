@@ -29,10 +29,13 @@ Three forks, in the order they are checked:
    whichever fork above fired, whenever at least one grievance was
    reported — it is a support-and-legal-aid grant, not a competing legal
    venue, so it is additive rather than exclusive. Tier follows case
-   classification: physical abuse/danger is the "severe injury" tier
-   (PHP 75,000); every other in-scope grievance (unpaid wages, passport
-   withholding, status retaliation, exit blocked) plus the illegal-
-   recruitment fork itself is the base tier (PHP 50,000) — see
+   classification per the fund's own published breakdown: abuse,
+   exploitation, illegal recruitment, and contract violations are the
+   base tier (PHP 50,000); the higher "severe injury" tier (PHP 75,000)
+   requires a severity fact (severe illness, injury, or abuse-caused
+   disability) that :class:`~app.recourse.schema.RecourseRouteIn` does
+   not carry — so every grievance this corpus covers today classifies
+   to the base tier, never guessed up (fail closed) — see
    :data:`AksyonFundTier` and :func:`_aksyon_tier`.
 
 Every route's ``executor`` is decided by what is actually sourced for
@@ -83,7 +86,7 @@ from app.recourse.schema import (
     RecourseRoute,
     RecourseRouteIn,
 )
-from app.rules.schema import Citation, Grievance, SourceTier, TenureBucket
+from app.rules.schema import Citation, SourceTier, TenureBucket
 
 # ---------------------------------------------------------------------------
 # Sources (Tier-1 throughout: statute text verified against the official
@@ -173,19 +176,19 @@ class AksyonFundTier(str, Enum):
     SEVERE_INJURY = "php_75000"
 
 
-_PH_OFFICE_METRO_MANILA = "NCR"
-_PH_OFFICE_OUTSIDE_METRO_MANILA = "the regional/satellite office nearest your family"
-
-
-def _ph_office(family_region: FamilyRegion | None) -> str:
-    """Where a PH-side venue is named — never Metro Manila by default
-    (issue #48's regional-office fixture)."""
+def _regional_descriptor(family_region: FamilyRegion | None) -> str:
+    """The geographic qualifier a PH-side venue is named with — never
+    Metro Manila by default (issue #48's regional-office fixture). Each
+    route names its OWN institution explicitly (NCMB, NLRC, DMW); this
+    only supplies the "where" half, never the institution itself, so
+    distinct agencies are never blended into one interchangeable phrase.
+    """
     if family_region is FamilyRegion.OUTSIDE_METRO_MANILA:
-        return _PH_OFFICE_OUTSIDE_METRO_MANILA
+        return "the regional/satellite office nearest your family"
     if family_region is FamilyRegion.METRO_MANILA:
-        return _PH_OFFICE_METRO_MANILA
-    # Never asked: name the office generically, never assume Metro Manila.
-    return "the DMW/NCMB office serving your family's location"
+        return "the NCR office"
+    # Never asked: name it generically, never assume Metro Manila.
+    return "the office serving your family's location"
 
 
 def _sena_route(country: str, family_region: FamilyRegion | None) -> RecourseRoute:
@@ -193,7 +196,7 @@ def _sena_route(country: str, family_region: FamilyRegion | None) -> RecourseRou
         venue=(
             f"DOLE Single Entry Approach (SEnA) — online via DOLE ARMS "
             f"(e-SEnA), through the MWO/POLO in {country}, or in person "
-            f"at {_ph_office(family_region)}"
+            f"at the NCMB/DOLE SEnA desk — {_regional_descriptor(family_region)}"
         ),
         prerequisites=(
             "Employment contract or other proof of the employer-employee "
@@ -213,10 +216,10 @@ def _sena_route(country: str, family_region: FamilyRegion | None) -> RecourseRou
 def _solidary_liability_route(family_region: FamilyRegion | None) -> RecourseRoute:
     return RecourseRoute(
         venue=(
-            f"NLRC money claim (after SEnA conciliation-mediation) naming "
-            f"the licensed recruitment/placement agency jointly and "
-            f"severally liable with the foreign employer — filed at "
-            f"{_ph_office(family_region)}"
+            f"NLRC Regional Arbitration Branch money claim (after SEnA "
+            f"conciliation-mediation) naming the licensed "
+            f"recruitment/placement agency jointly and severally liable "
+            f"with the foreign employer — {_regional_descriptor(family_region)}"
         ),
         prerequisites=(
             "SEnA conciliation-mediation attempted (Republic Act No. "
@@ -237,7 +240,7 @@ def _illegal_recruitment_route(family_region: FamilyRegion | None) -> RecourseRo
         venue=(
             f"DMW anti-illegal-recruitment branch (criminal "
             f"Affidavit-Complaint) — online/email report, or in person at "
-            f"{_ph_office(family_region)}"
+            f"{_regional_descriptor(family_region)}"
         ),
         prerequisites=(
             "Sworn/notarized Affidavit-Complaint narrating the recruitment",
@@ -268,25 +271,35 @@ def _owwa_repatriation_route() -> RecourseRoute:
     )
 
 
-def _aksyon_tier(grievances: tuple[Grievance, ...]) -> AksyonFundTier:
-    """Case classification per D.O. No. 5 s.2024: severe injury/abuse gets
-    the higher tier; every other in-scope grievance (and the
-    illegal-recruitment fork itself) gets the base tier."""
-    if Grievance.PHYSICAL_ABUSE_OR_DANGER in grievances:
-        return AksyonFundTier.SEVERE_INJURY
+def _aksyon_tier() -> AksyonFundTier:
+    """Case classification per D.O. No. 5 s.2024.
+
+    The higher (PHP 75,000) tier is reserved for a *severe* illness,
+    injury, or abuse-caused disability — a severity fact
+    :class:`~app.recourse.schema.RecourseRouteIn` does not carry (it has
+    a grievance category, ``PHYSICAL_ABUSE_OR_DANGER``, not an injury
+    outcome). Abuse, exploitation, illegal recruitment, and contract
+    violations are themselves the PHP 50,000 (base) tier per the fund's
+    own published breakdown (see :data:`CIT_AKSYON_FUND`) — so every
+    grievance this corpus covers today classifies to the base tier,
+    never guessed up to the severe-injury tier without the fact that
+    actually authorizes it (the same fail-closed posture as
+    ``check_agency_license``'s NOT_FOUND: never assert what is not
+    confirmed). Takes no arguments deliberately: there is currently no
+    typed signal that could change the answer.
+    """
     return AksyonFundTier.BASE
 
 
-def _aksyon_fund_route(
-    grievances: tuple[Grievance, ...], *, family_region: FamilyRegion | None
-) -> RecourseRoute:
-    tier = _aksyon_tier(grievances)
+def _aksyon_fund_route(family_region: FamilyRegion | None) -> RecourseRoute:
+    tier = _aksyon_tier()
     amount = "PHP 75,000" if tier is AksyonFundTier.SEVERE_INJURY else "PHP 50,000"
     return RecourseRoute(
         venue=(
             f"DMW AKSYON Fund financial/legal assistance ({amount} tier) "
             f"— submitted to the MWO if still abroad, or to DMW at "
-            f"{_ph_office(family_region)} if already in the Philippines"
+            f"{_regional_descriptor(family_region)} if already in the "
+            f"Philippines"
         ),
         prerequisites=(
             "Filed within one year of the qualifying event (e.g. the "
@@ -330,11 +343,6 @@ def build_recourse_routes(route_in: RecourseRouteIn) -> tuple[RecourseRoute, ...
         routes.append(_illegal_recruitment_route(route_in.family_region))
 
     if route_in.grievances:
-        routes.append(
-            _aksyon_fund_route(
-                route_in.grievances,
-                family_region=route_in.family_region,
-            )
-        )
+        routes.append(_aksyon_fund_route(route_in.family_region))
 
     return tuple(routes)

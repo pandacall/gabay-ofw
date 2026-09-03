@@ -149,14 +149,13 @@ class TestRegionalOfficeFork:
 
 
 class TestAksyonFundTier:
-    def test_physical_abuse_gets_severe_injury_tier(self):
-        assert (
-            _aksyon_tier((Grievance.PHYSICAL_ABUSE_OR_DANGER,))
-            is AksyonFundTier.SEVERE_INJURY
-        )
-
-    def test_unpaid_wages_gets_base_tier(self):
-        assert _aksyon_tier((Grievance.UNPAID_WAGES,)) is AksyonFundTier.BASE
+    def test_classifies_to_base_tier(self):
+        # No severity signal exists on RecourseRouteIn today (only a
+        # grievance category, not an injury outcome) — the fund's own
+        # published breakdown puts abuse/exploitation/illegal
+        # recruitment/contract violations at the base tier, so this
+        # never guesses up to the severe-injury tier.
+        assert _aksyon_tier() is AksyonFundTier.BASE
 
     def test_aksyon_route_rides_alongside_licensed_fork(self):
         routes = build_recourse_routes(
@@ -173,7 +172,7 @@ class TestAksyonFundTier:
                 grievances=(Grievance.PHYSICAL_ABUSE_OR_DANGER,),
             )
         )
-        assert any("AKSYON" in r.venue and "75,000" in r.venue for r in routes)
+        assert any("AKSYON" in r.venue and "50,000" in r.venue for r in routes)
 
     def test_no_grievances_means_no_aksyon_route(self):
         routes = build_recourse_routes(_route_in(grievances=()))

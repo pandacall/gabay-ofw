@@ -43,10 +43,15 @@ The machine-readable route table lives in `app/recourse/`:
    alongside the wrong-venue route.
 3. **AKSYON Fund** (additive, rides alongside whichever fork above
    fired, whenever at least one grievance was reported): tier by case
-   classification per D.O. No. 5 s.2024 — `PHYSICAL_ABUSE_OR_DANGER` is
-   the PHP 75,000 (severe injury) tier; every other in-scope grievance,
-   and the illegal-recruitment fork itself, is the PHP 50,000 (base)
-   tier.
+   classification per D.O. No. 5 s.2024. The higher (PHP 75,000) tier
+   requires a severity fact (severe illness, injury, or abuse-caused
+   disability) that `RecourseRouteIn` does not carry — it has a
+   grievance *category* (`PHYSICAL_ABUSE_OR_DANGER`), not an injury
+   *outcome*. Abuse, exploitation, illegal recruitment, and contract
+   violations are themselves the PHP 50,000 (base) tier per the fund's
+   own published breakdown, so every grievance this corpus covers today
+   classifies to the base tier — never guessed up to the higher tier
+   without the fact that actually authorizes it (fail closed).
 
 ## Source list and tier classification
 
@@ -92,12 +97,18 @@ what is sourced today, never a default.
 
 `family_region` (`FamilyRegion.METRO_MANILA` /
 `FamilyRegion.OUTSIDE_METRO_MANILA`, optional — `None` means DISPATCHER
-never asked) decides how a PH-side venue is named: DMW's own office
-network genuinely splits this way (an NCR office plus separate
-regional/satellite offices), so a route names the regional/satellite
-office nearest the family when set, the NCR office when the family is in
-Metro Manila, and a generic "serving your family's location" phrase when
-unset — never assuming Metro Manila by default. No route in this table
+never asked) decides the geographic qualifier a PH-side venue is named
+with, via `_regional_descriptor`: "the regional/satellite office nearest
+your family" when set to outside Metro Manila, "the NCR office" when set
+to Metro Manila, and a generic "the office serving your family's
+location" when unset — never assuming Metro Manila by default. This
+qualifier only supplies the "where" half of a venue; each route names
+its OWN institution explicitly (the NCMB/DOLE SEnA desk, the NLRC
+Regional Arbitration Branch, the DMW anti-illegal-recruitment branch, or
+DMW for AKSYON Fund) rather than blending distinct agencies into one
+interchangeable phrase — DMW, DOLE/NCMB, and NLRC each maintain their
+own regional office network, so "the regional office" is never
+institution-agnostic. No route in this table
 carries a phone number: contact numbers render only via `office_directory`
 / `action_card` (the immutable directory) or a `dmw.gov.ph` link-out, per
 house rules.
