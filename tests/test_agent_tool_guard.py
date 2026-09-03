@@ -7,19 +7,10 @@ from that moment on, any agent registering a tool with a forbidden name
 fails this test.
 """
 
-import importlib
-import pkgutil
-
-import app as app_package
 from app.main import create_app
+from tests.conftest import iter_app_modules
 
 FORBIDDEN_TOOL_NAMES = {"panic_wipe", "mark_safe"}
-
-
-def _app_modules():
-    yield app_package
-    for info in pkgutil.walk_packages(app_package.__path__, "app."):
-        yield importlib.import_module(info.name)
 
 
 def _tool_names(agent) -> set[str]:
@@ -34,7 +25,7 @@ def _tool_names(agent) -> set[str]:
 def test_no_agent_in_the_app_package_registers_wipe_or_mark_safe():
     from google.adk.agents import BaseAgent
 
-    for module in _app_modules():
+    for module in iter_app_modules():
         for value in vars(module).values():
             if isinstance(value, BaseAgent):
                 overlap = _tool_names(value) & FORBIDDEN_TOOL_NAMES

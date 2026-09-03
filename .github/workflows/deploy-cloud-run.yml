@@ -75,11 +75,16 @@ jobs:
         id: deploy
         shell: bash
         run: |
+          # --min-instances=1 (issue #49): keeps one instance warm so a judge's
+          # first request never pays a 10-20s cold-start before the first
+          # token. Set on every deploy so it survives a revision rollback that
+          # predates this change.
           gcloud run deploy "${{ vars.CLOUD_RUN_SERVICE }}" \
             --source . \
             --project "${{ vars.GCP_PROJECT_ID }}" \
             --region "${{ vars.GCP_REGION }}" \
             --labels dev-tutorial=cloud-run-ai-challenge \
+            --min-instances=1 \
             --quiet
 
           service_url="$(
