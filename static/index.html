@@ -103,27 +103,46 @@
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </button>
-      <nav class="rail-conversations" data-copy-aria="conversationsNavigation">
+
+      <!-- "New conversation" is the rail's primary action, so it leads —
+           above the list it starts, not buried under its heading. It only
+           clears the screen; the row appears once she sends a message
+           (issue #72). -->
+      <nav class="rail-nav" data-copy-aria="conversationsNavigation">
+        <button class="rail-new-conversation" type="button" data-action="new-conversation" data-copy-aria="newConversation">
+          <span class="rail-control-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M18.4 2.6a2.12 2.12 0 0 1 3 3L13 14l-4 1 1-4 8.4-8.4Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span data-copy="newConversation"></span>
+        </button>
         <p class="rail-heading" data-copy="conversationsHeading"></p>
-        <!-- The Conversation list (issue #72): a row per thread over her
-             one shared Case, most-recent first, rendered from
-             GET /api/conversations by renderRail() in app.js. "New
-             conversation" only clears the screen — the row appears once
-             she has actually sent a message. -->
-        <button class="rail-new-conversation" type="button" data-action="new-conversation" data-copy="newConversation"></button>
+        <!-- Rendered from GET /api/conversations by renderRail() in
+             app.js, most-recent first. Scrolls within the rail; the
+             footer stays pinned. -->
         <div id="rail-conversations-list" class="rail-conversations-list"></div>
       </nav>
 
       <div class="rail-footer">
         <label class="language-control rail-control">
+          <span class="rail-control-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M3 12h18M12 3c2.5 2.4 3.8 5.6 3.8 9S14.5 27.6 12 21M12 3C9.5 5.4 8.2 8.6 8.2 12S9.5 18.6 12 21" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
           <span class="sr-only" data-copy="languageLabel"></span>
           <select class="language-select" data-copy-aria="languageLabel"></select>
+          <span class="rail-control-chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
         </label>
         <button class="rail-control avatar-button" type="button" data-action="profile" data-copy-aria="profile">
           <span id="avatar-initial" aria-hidden="true">M</span>
           <span id="account-name" class="account-name"></span>
         </button>
-        <button class="rail-control text-button" id="signout" type="button" data-copy="signOut"></button>
+        <button class="rail-control text-button" id="signout" type="button" data-copy-aria="signOut">
+          <span class="rail-control-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M14 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8M16 12H9M16 12l-3-3M16 12l-3 3M20 12h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span data-copy="signOut"></span>
+        </button>
       </div>
     </aside>
 
@@ -181,8 +200,8 @@
       <h2 id="delete-conversation-title" data-copy="deleteConversationTitle"></h2>
       <p data-copy="deleteConversationBody"></p>
       <div class="dialog-actions">
-        <button class="button urgent-button full-width" type="button" data-action="delete-conversation-confirm" data-copy="deleteConversationConfirm"></button>
-        <button class="button full-width" type="button" data-action="delete-conversation-cancel" data-copy="deleteConversationCancel"></button>
+        <button class="button full-width delete-confirm-button" type="button" data-action="delete-conversation-confirm" data-copy="deleteConversationConfirm"></button>
+        <button class="button text-button full-width" type="button" data-action="delete-conversation-cancel" data-copy="deleteConversationCancel" autofocus></button>
       </div>
     </form>
   </dialog>

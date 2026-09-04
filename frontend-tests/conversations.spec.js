@@ -152,6 +152,11 @@ test("deleting a conversation shows the plain-language line, then removes the ro
     ],
   });
 
+  // Open the conversation, then remove it — its delete affordance shows
+  // on the active row (always on wide, on the open row on a phone).
+  await page
+    .locator('.rail-conversation[data-session-id="s-drop"] .rail-conversation-open')
+    .click();
   await page
     .locator('.rail-conversation[data-session-id="s-drop"]')
     .locator("[data-action='delete-conversation']")

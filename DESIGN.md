@@ -303,10 +303,16 @@ match them against a physical sign.
 ## Layout
 
 A two-part shell: a fixed-width left **rail** and a fluid main column. The rail
-is `264px` on desktop and collapses to a `68px` icon strip below `900px` — it
+is `16.5rem` on desktop and collapses to a `~68px` icon strip below `900px` — it
 stays a rail on every viewport, never a top bar or a hamburger drawer. The main
 column holds one of two screens (home or profile); everything else is a message
 in the thread.
+
+**The viewport is the frame.** `.app` is exactly `100dvh` and clips; the page
+itself never scrolls. The rail is fixed chrome — only its conversation list
+scrolls, inside the rail, with the footer pinned. The conversation surface owns
+the only other scroll: the message thread scrolls inside its own bounded column
+while the composer, greeting anchor, and rail all stay put.
 
 **Home, empty:** the greeting, the composer, and the opener chips cluster in the
 vertical center of the main column (`margin: auto` above and below), sitting over
@@ -432,28 +438,49 @@ never motion that demands attention.
 ### Inputs / Fields
 - **Text fields:** `faint` fill, no border, `13px` radius, `~0.7rem 0.95rem`
   padding. Focus shows the standard pine ring, not a border shift.
-- **Language select:** styled as a white pill with `xs` shadow, `appearance:
-  none`. It is the only "setting" control and it is deliberately minor.
+- **Language select:** in the signed-out nav it is a standalone white pill with
+  `xs` shadow (`appearance: none`); in the rail it is an ordinary rail row (see
+  Navigation). It is the only "setting" control and it is deliberately minor.
+
+### Dialogs
+- **Service limits / mark-safe:** centred `showModal()` panels, `lg` shadow,
+  dimmed `backdrop` — they genuinely interrupt.
+- **Remove-one-conversation:** *not* that. A compact panel anchored beside the
+  conversation list it came from (just past the rail on wide, top-left on a
+  phone), only a `~6%` scrim, click-anywhere-outside to dismiss. Its confirm
+  button is a quiet white button with `urgent` *text*, not a solid-red slab —
+  removing one transcript while the Case survives is a small action and should
+  feel like one.
 
 ### Navigation (the rail)
-- Flat `#f0efed` ground, no shadow, no border. Brand mark + wordmark at the top,
-  "New conversation" and the conversation list in the middle, account controls
-  pinned to the bottom.
+- Flat `rail` ground, no shadow, no border. Top to bottom: brand mark + wordmark,
+  then **New conversation** (the primary action — it *leads*, above the list it
+  starts, marked with a compose icon, never a bare `+`), then the conversation
+  list under a quiet "Past conversations" label, then account controls pinned to
+  the foot. Only the list scrolls.
 - Rows are full pills: `body` text, transparent at rest, `rail-row` on hover,
-  `rail-row-active` + a pine dot when open.
-- Below `900px` every label disappears and rows center their icon/mark in the
-  `68px` strip; the delete affordance, hover-only on desktop, becomes always
-  visible.
+  `rail-row-active` when open with a pine dot (the dot holds a fixed slot on every
+  row but only shows its weight on the active one).
+- The account controls — **language, profile, sign out — are ordinary rail rows**,
+  each an icon in a `1.75rem` slot plus a label. The language control is a real
+  row (the `<select>` fills it, the hover highlight is the row), never a small
+  floating pill dropped inside a wide highlight.
+- Conversation labels are **relative** — today's threads show the time, yesterday
+  says so, the last week shows the weekday, older shows the date — so a list of
+  same-day threads stays scannable before topic labels land.
+- Below `900px` the labels drop and every row centers its icon in the strip; the
+  conversation list becomes a column of tappable dots (the open one is pine), and
+  the per-row delete shows only on the open conversation.
 
 ### The Composer (signature component)
-A white pill, `32px` radius, `md` shadow, that never leaves the screen. A muted
-**"add a photo" button** at the head (photo capture is a prototype affordance, so
-the tap is acknowledged with a toast, never a silent no-op), a borderless
-auto-growing textarea in the middle, and a **circular send button at the tail**
-(an upward-arrow glyph; it takes Gabay's pine once the field has text). There is
-no visible "Send" label — Enter sends, Shift+Enter inserts a newline. Placeholder
-is "Tell Gabay what is happening" in the detected language, mirrored to
-`aria-label`.
+A white pill, `32px` radius, `md` shadow, that never leaves the screen. Two
+**matched circular buttons** flank a borderless auto-growing textarea, optically
+centred against a single line of text: an **add-a-photo** control at the head (an
+image icon; photo capture is a prototype affordance, so the tap is acknowledged
+with a toast, never a silent no-op) and a **send** control at the tail (an
+upward-arrow glyph that takes Gabay's pine once the field has text). No visible
+"Send" label — Enter sends, Shift+Enter inserts a newline. Placeholder is "Tell
+Gabay what is happening" in the detected language, mirrored to `aria-label`.
 
 ### The Emergency Affordance (signature component)
 A calm white pill fixed to the top-right of every signed-in screen (and repeated,
@@ -474,6 +501,12 @@ access to the fixed pill.
   things that genuinely float (cards, inputs, messages, dialogs, chips).
 - **Do** separate regions with space, then a one-shade ground shift, then a
   two-layer shadow — in that order.
+- **Do** keep the shell one screen tall and clipping — the page never scrolls;
+  the rail is fixed and the message thread is the only scroll region (its own
+  list is the rail's).
+- **Do** draw every glyph as an authored single-path SVG at one stroke weight —
+  the compose, globe, chevron, sign-out, trash, photo, and send icons. Never a
+  `+`, `×`, or other typographic character standing in for an icon.
 - **Do** set headings at weight 400 and create hierarchy with size and negative
   tracking (`-0.01em` to `-0.015em`).
 - **Do** keep the reading column near `47rem` and agent replies near `40rem`,
