@@ -54,3 +54,34 @@ the next visit starts clean.
 security rules deny any client write that creates or alters it, and deny
 client-side deletes of the profile document (which would bypass the
 single deletion path and orphan subcollections).
+
+## Amendment (2026-09-04): multi-Conversation deletion boundary
+
+A user may now hold many Conversations (ADR-0008), which puts a delete
+control on each row. That control is **narrower** than this ADR's single
+deletion routine, and the two must not be confused.
+
+**Deleting a Conversation removes that Conversation's transcript and
+nothing else.** Her Case is user-scoped, so the claims and Safety Flags
+she disclosed there survive — and the UI says so plainly, in one line,
+rather than letting a frightened person assume otherwise: *"This removes
+the conversation. What you told Gabay about your situation stays. To
+remove everything, use Delete everything."* `delete_user_subtree` remains
+the only routine that deletes a user's data, and `panic_wipe` remains
+the actual safety tool.
+
+Retracting a Conversation's claims on delete was rejected: Safety Flags
+are add-only precisely so no source can quietly unsay them, and an
+employer holding her unlocked phone could otherwise delete one
+conversation and make the app forget she was ever confined.
+
+**Safety Flag clearing is now defined** (this ADR previously left it as
+"only an authenticated UI action clears", out of scope). Ordinary Case
+claims are editable and deletable in one tap, where a delete is recorded
+as a user-sourced retraction rather than a hole — otherwise a later
+extraction silently refills it, against `merge_case`'s rule that a
+user-sourced value is never reverted by a later source. Safety Flags sit
+apart and clear only through the same nonce-gated two-step `mark_safe`
+uses: clearing the flag is strictly more destructive than clearing the
+latch, so it cannot be less protected.
+

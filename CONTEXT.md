@@ -53,7 +53,7 @@ Migrant Workers Office (formerly POLO-OWWA) — the country-specific DMW office.
 ### Sessions
 
 **Escalation Handoff**:
-The minimal structured object carried from an escalated Contract Check into a new Crisis Session: country, reason category, a one-line summary in the user's language, and the source check ID. Never the conversation transcript. The Crisis Help agent opens by confirming it, not re-asking.
+The minimal structured object carried from an escalating Conversation into a new Emergency Conversation: country, reason category, a one-line summary in the user's language, and the source Conversation's ID. Never the conversation transcript. The receiving agent opens by confirming it, not re-asking.
 
 **Crisis Session**:
 A stored Crisis Help conversation under `users/{uid}/crisisSessions/`, auto-deleted by Firestore TTL via its `expireAt` field and manually deletable by the user.
@@ -65,7 +65,7 @@ Terms for the PRD #34 / ADR-0004 DISPATCHER topology (`app/case.py`,
 place of, the Contract Check / Crisis Help terms above.
 
 **Case**:
-The structured facts DISPATCHER has built from the conversation, deterministically merged by `merge_case` and rendered back to the user in the UI, correctable in one tap (issue #44). Every claim carries provenance: `{value, source, confidence, at, conflicts[]}`. Stored as a plain JSON-serialisable dict in ADK session state.
+The structured facts DISPATCHER has built from the conversation, deterministically merged by `merge_case` and rendered back to the user in the UI, correctable in one tap (issue #44). Every claim carries provenance: `{value, source, confidence, at, conflicts[]}`. There is exactly **one Case per user**, shared by every Conversation she has: her country, tenure, and Safety Flags are facts about her, not about a thread, so no Conversation can be safety-blind to what she disclosed in another. Stored as a plain JSON-serialisable dict in user-scoped state.
 _Avoid_: Claims (that name belongs to the retired Contract Check pipeline).
 
 **Conflict**:
@@ -84,4 +84,70 @@ _Avoid_: confidence, register (those name something else — `confidence` is a C
 **RECOURSE_ROUTER**:
 The single-turn specialist (issue #48) that determines which legal recourses are open for a Case and who can execute each — the family is an attribute of a route (`family_region`), never the subject; the worker herself stays the subject of every route. Output is a list of `RecourseRoute{venue, prerequisites[], executor: SELF|KIN|EITHER, what_to_bring[], source}` (`app/recourse/schema.py`). Reuses `check_agency_license` (issue #46, `app/complaint/agency.py`) to fork the whole route table: a confirmed licensed agency clears SEnA plus the RA 8042/10022 joint-and-solidary liability lever; anything else forks to the illegal-recruitment criminal track, with SEnA absent. A worker already out of her employer's household (`tenure = LEFT_EMPLOYER_IN_COUNTRY`) routes only to OWWA/MWO-assisted repatriation — never a filing route. The AKSYON Fund route (DMW Department Order No. 5, s. 2024) rides alongside whichever fork fired, tiered by case classification. Never a refusal shape: an unlicensed agency or an already-out worker is itself a valid route, not a dead end.
 _Avoid_: KinRequest (no such type exists in code — `RecourseRouteIn` is the typed input; the family is one optional attribute on it, not a separate request subject).
+
+## v6 conversations
+
+**Conversation**:
+One chat thread a user can leave and return to, listed in the rail as
+"Past conversations". She may have many; they share her single Case but
+each keeps its own transcript. Stored as a Session (the ADK/Firestore
+row) — "Conversation" is the user-facing name for the same thing, and no
+third word is introduced for it.
+_Avoid_: check (a check is something Gabay does inside a Conversation,
+never the name of the row), thread, chat.
+
+**Emergency Conversation**:
+The Conversation where danger is handled — opened by the EMERGENCY
+button, or by her confirming an Escalation Prompt. It opens already
+knowing her Case and its Escalation Handoff, so it never re-asks what she
+disclosed under duress. Her other Conversations are untouched and keep
+behaving normally: the Imminent Danger latch belongs to this Conversation,
+while the Safety Flags that provoked it belong to her Case.
+
+**Escalation Prompt**:
+What a Conversation shows when she discloses an acute hazard mid-turn
+instead of tapping the button: the Safe Floor card, rendered at the same
+time and unconditionally, plus a two-tap offer to open an Emergency
+Conversation. Declining dismisses the prompt only — never the Safety
+Flag, which keeps its provenance and still counts for every specialist
+(the `mark_safe` rule: a coerced tap must not erase the disclosure). A
+new, different acute flag prompts again; the same one does not nag.
+
+**Pending Escalation**:
+What `merge_case` records on the Case when a new acute Safety Flag is
+disclosed — an acute flag noted and not yet acted on. It is *not* the
+Imminent Danger latch: it never transfers anyone anywhere. It is what
+the Escalation Prompt is drawn from, and it is resolved either by her
+confirming (an Emergency Conversation opens) or declining (the prompt
+goes, the flag stays). Because Safety Flags are add-only, a flag is only
+ever new once, so a declined prompt cannot re-fire for the same hazard.
+
+**Imminent Danger latch**:
+Whether *this Conversation* is the Emergency Conversation — Conversation
+state, not a fact about her (that is the Safety Flag, on her Case). Set
+exactly two ways: the EMERGENCY button opening an Emergency
+Conversation, or her confirming an Escalation Prompt. Cleared exactly one
+way: `mark_safe`. Never set by a disclosure alone.
+
+**Progress Trail**:
+The code-owned lines shown while a turn is running, so she sees what the
+app is doing instead of an animation. Each line is a fixed phrase keyed
+to what actually fired, translated like the acknowledgements — never a
+model-authored narration, never a raw tool name, never JSON. Labels name
+the task, never the hypothesis ("Looking up your agency", not "checking
+whether your agency is illegal"): the trail is read by whoever is looking
+at her screen. Transient — it clears when the turn's reply lands, and is
+never part of the transcript.
+_Avoid_: thinking summaries (the model's own reasoning is not the trail
+and is never surfaced), status, spinner.
+
+**Plan** (scope):
+At most **one live Plan per user** — the ordered filing steps
+FILING_SEQUENCER builds (ADR-0006's `Plan{plan_id, version, input_hash,
+steps[]}`), held in user-scoped state beside the Case. Asking for filing
+steps in a second Conversation never builds a rival: it shows the live
+Plan, or regenerates that one under ADR-0006's rules with DONE steps
+preserved. Two Plans would mean two orderings of the same facts and no
+way to reconcile what she has already filed.
+
 
