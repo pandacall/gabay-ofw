@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser } = require("./test-helpers");
+const { openAsSignedInUser, SAMPLE_CONTACTS } = require("./test-helpers");
 
 const emergencyCard = {
   type: "safe_floor",
@@ -7,10 +7,7 @@ const emergencyCard = {
   title: "Saudi Arabia — Mga totoong opisina na makakatulong / Real offices that can help",
   reason: "SERVICE_DOWN",
   reason_line: "Nag-render kami mula sa cache. / We are rendering from cache.",
-  contacts: [
-    { key: "mwo_riyadh", channel: "MWO", label: "MWO Riyadh (Migrant Workers Office)", phone: "+966 50 285 0944", dial_mode: "dialable", note: "" },
-    { key: "owwa_1348", channel: "OWWA_1348", label: "OWWA / DMW Hotline 1348", phone: "1348", dial_mode: "manila_relay", note: "for someone in the Philippines to call for you" },
-  ],
+  contacts: SAMPLE_CONTACTS,
   hold_line: null,
 };
 
@@ -32,7 +29,7 @@ function emergencyButtonNdjson({ active = true } = {}) {
   );
 }
 
-test("the EMERGENCY button is reachable from the dashboard and from Profile", async ({
+test("the EMERGENCY button is reachable from home and from Profile", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
@@ -81,16 +78,49 @@ test("pressing EMERGENCY renders the cached action card with zero /api/chat call
 
   await page.getByRole("button", { name: "EMERGENCY" }).click();
 
-  await expect(page.getByRole("heading", { name: "Tell me what's happening" })).toBeVisible();
   const card = page.locator(".contact-card");
   await expect(card).toBeVisible();
   await expect(card.locator(".card-contact.dialable a.card-contact-phone")).toHaveAttribute(
     "href",
     "tel:+966502850944",
   );
+  // The findings render in the conversation, and the composer never
+  // leaves the screen (issue #71) — even for the cached EMERGENCY card.
+  await expect(page.locator("#chat-input")).toBeVisible();
   expect(emergencyAuth).toEqual("Bearer valid-alice");
   expect(chatCalls).toEqual([]);
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
+});
+
+test("EMERGENCY switches to the home screen synchronously, bypassing the animated screen transition", async ({
+  page,
+}) => {
+  let resolveEmergency;
+  const emergencyPromise = new Promise((resolve) => {
+    resolveEmergency = resolve;
+  });
+  await page.route("**/api/emergency/button", async (route) => {
+    await emergencyPromise;
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body: emergencyButtonNdjson({ active: true }),
+    });
+  });
+  await openAsSignedInUser(page);
+  await page.getByRole("button", { name: "Profile" }).click();
+  await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
+
+  await page.getByRole("button", { name: "EMERGENCY" }).click();
+
+  // The screen is already the home screen — composer visible — even
+  // though the network call has not resolved yet, and the animated
+  // navigate() loading skeleton is never shown: an emergency exit must
+  // not wait on a decorative delay (issue #71).
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await expect(page.locator("#screen-loading")).toBeHidden();
+
+  resolveEmergency();
+  await expect(page.locator(".contact-card")).toBeVisible();
 });
 
 test("mark safe stays hidden until the Imminent Danger predicate is active", async ({
@@ -124,7 +154,6 @@ test("the mark-safe affordance reacts to case.emergency.active from the chat str
     }),
   );
 
-  await page.locator(".chat-card").click();
   await page.locator("#chat-input").fill("Sinasaktan niya ako ngayon.");
   await page.getByRole("button", { name: "Send" }).click();
 
