@@ -55,6 +55,7 @@ from google.cloud import firestore
 from app.retention import touch_expire_at
 from app.deletion import delete_document_tree
 from app.case import apply_mutations as apply_case_mutations
+from app.labels import LISTING_STATE_KEYS
 from app.plan_ops import apply_mutations as apply_plan_mutations
 from app.state_keys import (
     CASE,
@@ -397,6 +398,15 @@ class FirestoreSessionService(BaseSessionService):
                 app_name=app_name,
                 user_id=user_id,
                 id=snapshot.id,
+                # Just the denormalised label keys (issue #73), projected
+                # from the session document this stream already fetched —
+                # no extra read, and nothing broader than the rail needs.
+                # The per-user Case/Plan and the events are not loaded.
+                state={
+                    key: value
+                    for key, value in (snapshot.to_dict().get("state") or {}).items()
+                    if key in LISTING_STATE_KEYS
+                },
                 last_update_time=snapshot.to_dict().get("lastUpdateTime", 0.0),
             )
             for snapshot in snapshots

@@ -135,6 +135,187 @@ class TestSharedCaseAcrossConversations:
         assert "SECRET-MARKER-of-the-first-thread" in first_transcript
 
 
+PASSPORT_EXTRACTION = json.dumps(
+    {
+        "language": "en",
+        "claims": {
+            "country": {"value": "Qatar", "confidence": "high"},
+            "passport_location": {"value": "employer", "confidence": "high"},
+        },
+        "safety_flags": ["PASSPORT_WITHHELD"],
+    }
+)
+
+FLAG_ONLY_EXTRACTION = json.dumps(
+    {
+        "language": "en",
+        "claims": {"country": {"value": "Qatar", "confidence": "high"}},
+        "safety_flags": ["PHYSICAL_ASSAULT_PAST"],
+    }
+)
+
+
+def _row(client, session_id, uid="maria"):
+    for row in _conversations(client, uid=uid):
+        if row["session_id"] == session_id:
+            return row
+    raise AssertionError(f"{session_id} not listed")
+
+
+class TestLabels:
+    def test_labelled_from_the_first_identifiable_claim_by_precedence(
+        self, client, fake_model
+    ):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        by_type, _ = turn(client, "They took my passport in Qatar")
+        session_id = by_type["reply"]["session_id"]
+        row = _row(client, session_id)
+        assert row["label"] == "passport"
+        assert row["label_source"] == "derived"
+
+    def test_label_does_not_change_when_the_conversation_moves_on(
+        self, client, fake_model
+    ):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        by_type, _ = turn(client, "They took my passport")
+        session_id = by_type["reply"]["session_id"]
+
+        # A later turn in the same conversation adds a wages claim; the
+        # label must still read "passport".
+        fake_model.extraction_results.append(
+            json.dumps(
+                {
+                    "language": "en",
+                    "claims": {"months_unpaid": {"value": "5", "confidence": "high"}},
+                    "safety_flags": [],
+                }
+            )
+        )
+        turn(client, "and I have not been paid for 5 months", session_id=session_id)
+        assert _row(client, session_id)["label"] == "passport"
+
+    def test_a_safety_only_disclosure_carries_no_topic_label(self, client, fake_model):
+        fake_model.extraction_results.append(FLAG_ONLY_EXTRACTION)
+        by_type, _ = turn(client, "my employer hit me last month")
+        session_id = by_type["reply"]["session_id"]
+        assert _row(client, session_id)["label"] is None
+
+    def test_country_only_conversation_carries_no_topic_label(self, client, fake_model):
+        fake_model.extraction_results.append(
+            json.dumps(
+                {
+                    "language": "en",
+                    "claims": {"country": {"value": "Qatar", "confidence": "high"}},
+                    "safety_flags": [],
+                }
+            )
+        )
+        by_type, _ = turn(client, "I work in Qatar")
+        session_id = by_type["reply"]["session_id"]
+        assert _row(client, session_id)["label"] is None
+
+    def test_two_conversations_can_share_a_label_and_stay_date_distinct(
+        self, client, fake_model
+    ):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        first, _ = turn(client, "They took my passport")
+        first_id = first["reply"]["session_id"]
+
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        second, _ = turn(client, "still about my passport")
+        second_id = second["reply"]["session_id"]
+
+        rows = {r["session_id"]: r for r in _conversations(client)}
+        assert rows[first_id]["label"] == rows[second_id]["label"] == "passport"
+        assert rows[first_id]["last_update_time"] != rows[second_id]["last_update_time"]
+
+
+class TestRename:
+    def test_her_rename_wins_and_survives_later_turns(self, client, fake_model):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        by_type, _ = turn(client, "They took my passport")
+        session_id = by_type["reply"]["session_id"]
+
+        response = client.patch(
+            f"/api/conversations/{session_id}",
+            json={"label": "the passport one"},
+            headers=auth("maria"),
+        )
+        assert response.status_code == 200
+        row = _row(client, session_id)
+        assert row["label"] == "the passport one"
+        assert row["label_source"] == "user"
+
+        # A later turn touching another topic never re-derives over her name.
+        fake_model.extraction_results.append(
+            json.dumps(
+                {
+                    "language": "en",
+                    "claims": {"agency_name": {"value": "ABC Manpower"}},
+                    "safety_flags": [],
+                }
+            )
+        )
+        turn(client, "my agency is ABC Manpower", session_id=session_id)
+        assert _row(client, session_id)["label"] == "the passport one"
+
+    def test_rename_before_any_derived_label(self, client, fake_model):
+        fake_model.extraction_results.append(
+            json.dumps(
+                {
+                    "language": "en",
+                    "claims": {"country": {"value": "Qatar", "confidence": "high"}},
+                    "safety_flags": [],
+                }
+            )
+        )
+        by_type, _ = turn(client, "I work in Qatar")
+        session_id = by_type["reply"]["session_id"]
+        client.patch(
+            f"/api/conversations/{session_id}",
+            json={"label": "my note"},
+            headers=auth("maria"),
+        )
+        assert _row(client, session_id)["label"] == "my note"
+
+    def test_rename_unknown_conversation_is_404(self, client):
+        assert (
+            client.patch(
+                "/api/conversations/nope",
+                json={"label": "x"},
+                headers=auth("maria"),
+            ).status_code
+            == 404
+        )
+
+    def test_cannot_rename_another_users_conversation(self, client, fake_model):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        by_type, _ = turn(client, "They took my passport", uid="maria")
+        session_id = by_type["reply"]["session_id"]
+        assert (
+            client.patch(
+                f"/api/conversations/{session_id}",
+                json={"label": "x"},
+                headers=auth("intruder"),
+            ).status_code
+            == 404
+        )
+        assert _row(client, session_id, uid="maria")["label"] == "passport"
+
+    def test_blank_rename_is_rejected(self, client, fake_model):
+        fake_model.extraction_results.append(PASSPORT_EXTRACTION)
+        by_type, _ = turn(client, "They took my passport")
+        session_id = by_type["reply"]["session_id"]
+        assert (
+            client.patch(
+                f"/api/conversations/{session_id}",
+                json={"label": "   "},
+                headers=auth("maria"),
+            ).status_code
+            == 422
+        )
+
+
 class TestDeletion:
     def test_deleting_a_conversation_removes_its_transcript_but_not_the_case(
         self, client, fake_model
