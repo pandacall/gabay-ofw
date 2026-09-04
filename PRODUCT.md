@@ -145,8 +145,9 @@ never counsels anyone through active danger; it hands off to people who can.
   Escalation Prompt; there is no mode picker.
 - `README.md`'s **"four-language copy"** line is stale: there are three reply
   languages (English, Filipino, Cebuano).
-- `docs/design/DESIGN.md` (**"Dawn One Accent"** — warm clay/sand, Newsreader /
-  Karla, two-mode dashboard) does not describe the current frontend.
+- The old `docs/design/DESIGN.md` ("Dawn One Accent" — warm clay/sand,
+  Newsreader / Karla, two-mode dashboard) was removed; `DESIGN.md` at the repo
+  root is the current visual authority.
 
 ### Open decisions
 
