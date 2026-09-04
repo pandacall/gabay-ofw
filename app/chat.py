@@ -29,6 +29,20 @@ itself.
 the Case streamed on the ``case`` line is rendered and correctable by the
 UI directly (never only narrated by DISPATCHER's prose), and a tap there
 calls this method instead of going through a conversation turn at all.
+
+The Progress Trail (issue #75, ADR-0010) crosses the same seam as its own
+``trail`` line type: a fixed, code-owned label — never the model's own
+narration — shown while the turn runs and cleared when the reply lands.
+The opening ``trail`` line is emitted right after ``ack``, before the
+Runner (and therefore any model) is invoked, because reasoning and
+extraction happen before any tool call. Every subsequent ``trail`` line
+is keyed to a tool CALL (``event.get_function_calls()``, read live as the
+Runner streams events — never the tool RESULT, so the label appears
+while the work is happening) against the fixed
+``app.agent.PROGRESS_TRAIL_LABELS`` table; a call whose name has no entry
+there emits nothing. Each specialist call fires at most once per turn
+(deduplicated by call name), matching "each specialist that runs produces
+exactly one line."
 """
 
 from __future__ import annotations
@@ -46,7 +60,13 @@ from google.adk.runners import Runner
 from google.adk.sessions import BaseSessionService, Session
 from google.genai import types
 
-from app.agent import APP_NAME, acknowledgement_for, build_adk_app
+from app.agent import (
+    APP_NAME,
+    acknowledgement_for,
+    build_adk_app,
+    progress_trail_label_for,
+    progress_trail_opening_for,
+)
 from app.case import mark_safe as case_mark_safe
 from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
@@ -350,14 +370,28 @@ class ChatService:
     async def stream_turn(
         self, *, uid: str, session: Session, text: str
     ) -> AsyncIterator[str]:
-        """Yields the NDJSON lines of one turn: ack, reply, case."""
+        """Yields the NDJSON lines of one turn: ack, trail, reply, case."""
         case = session.state.get(CASE) or {}
+        language = case.get("language")
         # The acknowledgement is fixed and yielded before the Runner — and
         # therefore any model — is invoked.
         yield _line(
             {
                 "type": "ack",
-                "text": acknowledgement_for(case.get("language")),
+                "text": acknowledgement_for(language),
+                "session_id": session.id,
+            }
+        )
+        # The Progress Trail's opening line (issue #75, ADR-0010) fires
+        # right here, immediately after the acknowledgement and still
+        # before the Runner runs: reasoning and extraction happen before
+        # any tool call, so a call-triggered trail would leave this exact
+        # moment silent. It must not repeat the acknowledgement's own
+        # wording ("reading what you wrote") — it is the next beat.
+        yield _line(
+            {
+                "type": "trail",
+                "text": progress_trail_opening_for(language),
                 "session_id": session.id,
             }
         )
@@ -369,6 +403,11 @@ class ChatService:
         regeneration_failed = False
         complaint_drafts: list[dict] = []
         recourse_routes: list[dict] = []
+        # Progress Trail dedup (ADR-0010: "each specialist that runs
+        # produces exactly one line"): a call name renders at most once
+        # per turn even if a specialist is invoked more than once (e.g. a
+        # regeneration retry).
+        trail_calls_seen: set[str] = set()
         try:
             async for event in self._runner.run_async(
                 user_id=uid,
@@ -379,6 +418,27 @@ class ChatService:
             ):
                 if event.partial or not event.content or not event.content.parts:
                     continue
+                # Progress Trail labels come from the CALL, not the
+                # result (ADR-0010), so they appear while the work is
+                # happening rather than after it — read live, here,
+                # rather than batched with the cards/reply below. A call
+                # whose name has no entry in the fixed table (e.g. an
+                # internal sequencing step, a contact-directory lookup,
+                # or a tool ROUTING_GUARD later refuses) renders nothing.
+                for call in event.get_function_calls():
+                    if call.name in trail_calls_seen:
+                        continue
+                    label = progress_trail_label_for(call.name, language)
+                    if label is None:
+                        continue
+                    trail_calls_seen.add(call.name)
+                    yield _line(
+                        {
+                            "type": "trail",
+                            "text": label,
+                            "session_id": session.id,
+                        }
+                    )
                 # Tool results carrying a card render outside the LLM text
                 # (ADR-0002): the card is fixed data, DISPATCHER only frames it.
                 for function_response in event.get_function_responses():
