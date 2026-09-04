@@ -1,44 +1,70 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-04T00:00:00Z",
+  "generatedAt": "2026-09-04T12:00:00Z",
   "title": "Design System: Gabay OFW",
   "extensions": {
+    "themeStrategy": "Light default in the frontmatter is normative. Dark is a :root token swap under @media (prefers-color-scheme: dark) — no per-component overrides, no in-app toggle. `dark` below is the dark-mode value of each token.",
     "colorMeta": {
       "pine": {
         "role": "primary",
         "displayName": "Pine",
         "canonical": "#1f5e4a",
+        "dark": "#6cc0a5",
         "tonalRamp": ["#0d2b21", "#0f3226", "#143f31", "#184c3b", "#1f5e4a", "#3c7d67", "#6ba593", "#a9ccc0", "#dcebe5"]
       },
       "urgent": {
         "role": "secondary",
         "displayName": "Flag Red",
         "canonical": "#ce1126",
+        "dark": "#f56770",
         "tonalRamp": ["#3f0209", "#5c050f", "#7d0715", "#a30e1f", "#ce1126", "#dc4350", "#ec7079", "#f4a9ae", "#fbdde0"]
       },
       "ground": {
         "role": "neutral",
         "displayName": "Ground",
         "canonical": "#fbfbfa",
+        "dark": "#141518",
         "tonalRamp": ["#232322", "#3a3a38", "#54544f", "#727269", "#9a9a90", "#c2c2b8", "#e3e3dc", "#f1f1ee", "#fbfbfa"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#ffffff",
+        "dark": "#24262c",
+        "tonalRamp": ["#1c1c1c", "#333333", "#4c4c4c", "#6b6b6b", "#909090", "#b6b6b6", "#dadada", "#efefef", "#ffffff"]
       },
       "rail": {
         "role": "neutral",
         "displayName": "Rail Ground",
         "canonical": "#f0efed",
+        "dark": "#1a1b1e",
         "tonalRamp": ["#26251f", "#3d3c34", "#57564c", "#747266", "#9b9a8d", "#c3c2b7", "#e0dfd9", "#ebeae6", "#f0efed"]
       },
       "user-bubble": {
         "role": "neutral",
         "displayName": "Warm Grey",
         "canonical": "#efeeec",
+        "dark": "#2d2f35",
         "tonalRamp": ["#252523", "#3c3b38", "#55544f", "#727168", "#9a988d", "#c1c0b6", "#dedcd6", "#e9e8e4", "#efeeec"]
       },
       "ink": {
         "role": "neutral",
         "displayName": "Ink",
         "canonical": "#1f1f1f",
+        "dark": "#f1f1ef",
         "tonalRamp": ["#1f1f1f", "#333333", "#474746", "#5e5d5b", "#7b7a76", "#a0a09a", "#c6c6c0", "#e2e2dd", "#f4f4f0"]
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Body Text",
+        "canonical": "#444746",
+        "dark": "#b9bcbe"
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Text",
+        "canonical": "#6e7370",
+        "dark": "#93989b"
       },
       "flag-blue": {
         "role": "tertiary",

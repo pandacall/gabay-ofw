@@ -363,6 +363,25 @@ let pendingDeleteSessionId = null;
 // cleared as soon as the "reply" line lands (see handleChatLine) and
 // again defensively in sendChatTurn's finally block.
 let chatTrail = [];
+// The language Gabay replies in for this Conversation (issue #67 closed
+// set), derived from the Case's detected input language. Used only to
+// stamp `lang` on non-English message text so a screen reader voices
+// Tagalog/Cebuano correctly (WCAG 3.1.2). Defaults to English — turn 1
+// and English input both reply in English.
+let chatReplyLang = "en";
+// Set when the transcript must be rebuilt in full on the next refresh
+// rather than appended to — e.g. the reply language became known after
+// this turn's messages were already painted.
+let forceMessageRerender = false;
+
+// Map the Case's free-form detected language onto the reply language.
+function replyLangFrom(value) {
+  const v = String(value || "").toLowerCase();
+  if (/tag|fil|taglish|^tl$/.test(v)) return "tl";
+  if (/ceb|bis/.test(v)) return "ceb";
+  return "en";
+}
+const langAttr = (lang) => (lang && lang !== "en" ? ` lang="${lang}"` : "");
 
 const t = (key, ...args) => {
   const value = copy[language][key] ?? copy.en[key];
@@ -487,8 +506,9 @@ function chatMessageHtml(message) {
   }
   // A plain reply gets the "reply" class so the rotated pine mark renders
   // before it (styles.css); the transient ack/error lines stay markless.
+  // `lang` is stamped when Gabay's reply is not English.
   const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : " reply";
-  return `<div class="chat-message agent${extra}">${escapeHtml(message.text)}</div>`;
+  return `<div class="chat-message agent${extra}"${langAttr(message.lang)}>${escapeHtml(message.text)}</div>`;
 }
 
 // The rail's Conversation list (issue #72). Rows are rendered from
@@ -549,9 +569,13 @@ async function openConversation(sessionId) {
   chatMessages = [];
   chatCase = {};
   chatTrail = [];
+  chatReplyLang = "en";
   if (currentScreen !== "home") renderScreen("home");
   renderRail();
   refreshChatScreen();
+  // Suppress the transcript live region while the whole thread replays —
+  // an SR should not read N restored messages aloud on re-open.
+  document.getElementById("chat-messages")?.setAttribute("aria-busy", "true");
   try {
     const token = await auth.currentUser.getIdToken();
     const response = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
@@ -564,6 +588,7 @@ async function openConversation(sessionId) {
   } finally {
     chatTrail = [];
     refreshChatScreen();
+    document.getElementById("chat-messages")?.setAttribute("aria-busy", "false");
   }
 }
 
@@ -575,6 +600,7 @@ function newConversation() {
   chatMessages = [];
   chatCase = {};
   chatTrail = [];
+  chatReplyLang = "en";
   editingCaseField = null;
   if (currentScreen !== "home") renderScreen("home");
   renderRail();
@@ -614,7 +640,7 @@ function chatTailHtml() {
   const trail = chatTrail.length
     ? chatTrail
         .map(
-          (label) => `<div class="chat-message agent trail">${escapeHtml(label)}</div>`,
+          (label) => `<div class="chat-message agent trail"${langAttr(chatReplyLang)}>${escapeHtml(label)}</div>`,
         )
         .join("")
     : "";
@@ -715,9 +741,16 @@ function chatCaseHtml() {
 function homeTemplate() {
   const isEmpty = chatMessages.length === 0;
   const firstName = userName.split(" ")[0] || "friend";
-  const openers = CHAT_OPENERS.map(
-    (opener) => `<button type="button" class="chat-opener" data-opener="${escapeHtml(opener)}">${escapeHtml(opener)}</button>`,
-  ).join("");
+  // Each opener is "<Filipino> / <English>". The full string still goes
+  // into the composer, but the two halves render with their own `lang`
+  // so a screen reader voices each in the right language (WCAG 3.1.2).
+  const openers = CHAT_OPENERS.map((opener) => {
+    const [tl, en] = opener.split(" / ");
+    const label = en
+      ? `<span lang="tl">${escapeHtml(tl)}</span> / <span lang="en">${escapeHtml(en)}</span>`
+      : escapeHtml(opener);
+    return `<button type="button" class="chat-opener" data-opener="${escapeHtml(opener)}">${label}</button>`;
+  }).join("");
   return `<section class="home-shell${isEmpty ? "" : " has-messages"}">
     <div class="ph-glow" aria-hidden="true"></div>
     <div class="home-main">
@@ -725,7 +758,7 @@ function homeTemplate() {
         <h1>${escapeHtml(t("greeting", firstName))}</h1>
         <p>${t("chatBody")}</p>
       </div>
-      <div class="messages" id="chat-messages" aria-live="polite">${messagesInnerHtml()}</div>
+      <div class="messages" id="chat-messages" aria-live="polite" aria-relevant="additions" aria-busy="false">${messagesInnerHtml()}</div>
       <form class="composer-pill" data-form="chat">
         <button type="button" class="composer-plus" data-action="composer-attach" aria-label="${escapeHtml(t("attachLabel"))}">+</button>
         <textarea id="chat-input" rows="1" maxlength="4000" required aria-label="${escapeHtml(t("chatPlaceholder"))}" placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
@@ -764,8 +797,9 @@ function refreshChatScreen() {
     // times. A full rebuild happens only when the transcript was reset
     // (new/opened Conversation) or the tail node is missing.
     const tail = document.getElementById("chat-tail");
-    if (!tail || chatMessages.length < renderedMessageCount) {
+    if (!tail || forceMessageRerender || chatMessages.length < renderedMessageCount) {
       messagesEl.innerHTML = messagesInnerHtml();
+      forceMessageRerender = false;
     } else {
       if (chatMessages.length > renderedMessageCount) {
         tail.insertAdjacentHTML(
@@ -848,8 +882,11 @@ async function sendChatTurn(text) {
 // type.
 function handleChatLine(line) {
   if (line.session_id) chatSessionId = line.session_id;
+  // A line may name its own language (tolerant: only used if present);
+  // otherwise the reply language is whatever the Case last reported.
+  const lineLang = line.lang ? replyLangFrom(line.lang) : chatReplyLang;
   if (line.type === "ack") {
-    chatMessages.push({ role: "agent", kind: "ack", text: line.text });
+    chatMessages.push({ role: "agent", kind: "ack", text: line.text, lang: lineLang });
   } else if (line.type === "user") {
     // Only seen when replaying a re-opened Conversation (issue #72):
     // her own past turns, rendered as her bubbles.
@@ -866,12 +903,23 @@ function handleChatLine(line) {
     // Cleared the moment the reply lands (ADR-0010): the trail's job is
     // done once she has something to read.
     chatTrail = [];
-    if (line.text) chatMessages.push({ role: "agent", text: line.text });
+    if (line.text) chatMessages.push({ role: "agent", text: line.text, lang: lineLang });
   } else if (line.type === "card") {
     // The card is fixed app data rendered outside the LLM text (ADR-0002).
     if (line.card) chatMessages.push({ role: "agent", kind: "card", card: line.card });
   } else if (line.type === "case") {
     chatCase = line.case || {};
+    const nextLang = replyLangFrom(chatCase.language);
+    if (nextLang !== chatReplyLang) {
+      // The ack/reply for this turn were pushed before the language was
+      // known (the "case" line comes last). Restamp them and rebuild the
+      // transcript once so `lang` actually lands on the DOM.
+      chatReplyLang = nextLang;
+      for (const m of chatMessages) {
+        if (m.role === "agent" && (m.kind === undefined || m.kind === "ack")) m.lang = nextLang;
+      }
+      forceMessageRerender = true;
+    }
   } else if (line.type === "error") {
     chatMessages.push({ role: "agent", kind: "error", text: t("chatError") });
   }
@@ -913,7 +961,10 @@ function renderScreen(name = currentScreen) {
   screen.innerHTML = templates[name]();
   // homeTemplate paints the current transcript inline; keep the
   // append-only counter in step with what was just rendered.
-  if (name === "home") renderedMessageCount = chatMessages.length;
+  if (name === "home") {
+    renderedMessageCount = chatMessages.length;
+    forceMessageRerender = false;
+  }
   // Focus is moved to #screen only on an explicit route change (see
   // navigate), never on the first render or a re-render — otherwise a
   // keyboard user who just signed in can never tab *back* to the skip
@@ -1239,6 +1290,8 @@ if (auth) {
       chatSessionId = null;
       chatMessages = [];
       chatCase = {};
+      chatReplyLang = "en";
+      renderedMessageCount = 0;
       conversations = [];
       pendingDeleteSessionId = null;
       editingCaseField = null;

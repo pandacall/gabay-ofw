@@ -199,8 +199,30 @@ only as light.
   off-system.
 
 ### External
-- **Google Blue** (`#1a73e8`): used for the single "G" glyph in the
+- **Google Blue** (`#1a73e8`, `#8ab4f8` in dark): the single "G" glyph in the
   Sign-in-with-Google button only. Not a Gabay color — never reuse it.
+
+### Dark
+
+Picked from the use scene — an OFW reading discreetly at night on a phone that
+might be watched — not from category habit. The surfaces invert to a warm
+near-black; every rule elsewhere in this file consumes the same token names
+unchanged.
+
+- **Ground** `#141518`, **Surface** `#24262c`, **Rail** `#1a1b1e` — the same
+  "one shade off" relationship, now *lighter* means raised.
+- **Ink** `#f1f1ef`, **Body** `#b9bcbe`, **Muted** `#93989b` (5.2:1 on surface).
+- **Pine** lightens to `#6cc0a5`, a mint-pine — 7:1 on surface, still reads as
+  Gabay's green. **Flag Red** lightens to `#f56770` — still unmistakably red,
+  clears AA on both ground and surface.
+- Depth stops leaning on shadow (near-invisible on black): the surface being
+  lighter than its ground does the lifting, with shadow alphas raised to
+  `rgba(0,0,0,0.35–0.55)` as faint reinforcement.
+- The glow shifts luminous — `rgba(58,112,240,.17)` blue, warmer red and gold
+  at low alpha — so it still pools behind the composer instead of going muddy.
+
+Dark follows `prefers-color-scheme` only; there is no in-app toggle. The
+`<meta name="theme-color">` pair keeps the mobile browser chrome in step.
 
 ### Neutral
 - **Ground** (`#fbfbfa`): the one page background, everywhere, signed-in and
@@ -336,7 +358,8 @@ dramatic.
 ### Named Rules
 **The No-Line Rule.** Don't add a border to create separation. If two regions
 blur together, the fix is more space or a ground-shift, then a shadow — a
-`1px solid` line is the wrong tool in this system.
+`1px solid` line is the wrong tool in this system. In dark this is load-bearing:
+shadow barely registers on black, so the ground-shift *is* the separation.
 
 **The Glow-Recedes Rule.** The `.ph-glow` layer is decoration that must never
 compete with content. It is present and saturated on the empty home screen and
@@ -468,7 +491,13 @@ access to the fixed pill.
 - **Do** label every input with `aria-label` or `<label>` — a placeholder is not
   a name.
 - **Do** theme the browser surfaces from the palette: selection, caret,
-  scrollbars, focus ring.
+  scrollbars, focus ring, and the `theme-color` meta pair.
+- **Do** keep every color a token — light and dark differ only in the `:root`
+  values under `@media (prefers-color-scheme: dark)`, never a per-component
+  override.
+- **Do** mark non-English text (`lang="tl"` / `lang="ceb"`) so a screen reader
+  voices Filipino and Cebuano correctly — Gabay's reply, and each half of a
+  bilingual opener chip.
 
 ### Don't:
 - **Don't** add a `1px` border to separate anything. The system has none.
