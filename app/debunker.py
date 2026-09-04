@@ -50,6 +50,7 @@ from app.directory import (
 )
 from app.guard import guard_before_tool
 from app.rules.schema import SourceTier
+from app.state_keys import CASE, CASE_MUTATIONS
 
 Language = Literal["en", "tl", "taglish", "ceb", "other"]
 
@@ -294,17 +295,27 @@ def search_corpus(
     reverted; ``merge_case`` records a disagreement as a Conflict
     instead).
     """
-    case = tool_context.state.get("case")
+    case = tool_context.state.get(CASE)
     country = resolve_case_country(case if isinstance(case, dict) else None)
     payload, delta = debunk_claims(claims, language, country)
     if delta is not None:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        tool_context.state["case"] = merge_case(
+        tool_context.state[CASE] = merge_case(
             case if isinstance(case, dict) else None,
             delta,
             source="debunker",
             now=now,
         )
+        # Append, never assign (ADR-0008 amendment / a code-review
+        # regression caught before it shipped): each tool call gets its
+        # own ToolContext, and two search_corpus calls in one model
+        # response must never have the second's mutation replace the
+        # first's — read whatever this turn has already accumulated and
+        # add to it.
+        existing = list(tool_context.state.get(CASE_MUTATIONS) or [])
+        tool_context.state[CASE_MUTATIONS] = existing + [
+            {"op": "merge", "delta": delta, "source": "debunker", "now": now}
+        ]
     return payload
 
 

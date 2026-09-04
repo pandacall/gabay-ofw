@@ -52,6 +52,7 @@ from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
 from app.directory import Country, resolve_case_country, resolve_keys
 from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card, is_imminent_danger
+from app.state_keys import CASE, CASE_MUTATIONS, CASE_RAW, PLAN_ACTIVE
 
 logger = logging.getLogger(__name__)
 
@@ -153,9 +154,15 @@ class ChatService:
 
     async def _most_recent_session(self, *, uid: str) -> Session | None:
         """The uid's most-recently-updated session, or None with no
-        sessions yet. Used by the button and mark_safe paths, which act
-        on "the" session for a uid rather than one named on the request
-        (a nonce is per-uid, not per-session)."""
+        sessions yet.
+
+        Used only by the fallback path in ``_mutate_case``/``_case_for_country``
+        below, for a ``BaseSessionService`` with no ``append_user_mutation``/
+        ``get_user_state`` seam (e.g. the in-memory service the test suite
+        injects). A real (Firestore) backend never calls this any more —
+        the Case moved to user-scoped state (ADR-0008), so there is no
+        longer a meaningful "her session" to find for it.
+        """
         response = await self._session_service.list_sessions(
             app_name=APP_NAME, user_id=uid
         )
@@ -164,32 +171,78 @@ class ChatService:
             return None
         return max(sessions, key=lambda session: session.last_update_time)
 
+    async def _case_for_country(self, *, uid: str) -> dict | None:
+        """Best-effort Case read for country resolution ONLY (ADR-0008's
+        "plain GET seam" — the Case is no longer owned by a turn, so it
+        must be readable without sending a message or finding a session).
+        Never gates anything on this succeeding; callers already wrap it
+        in their own try/except.
+        """
+        try:
+            user_state = await self._session_service.get_user_state(
+                app_name=APP_NAME, user_id=uid
+            )
+            return user_state.get(CASE_RAW)
+        except NotImplementedError:
+            # A BaseSessionService with no user-scoped read seam: fall
+            # back to whatever her most-recently-touched session shows.
+            session = await self._most_recent_session(uid=uid)
+            return session.state.get(CASE) if session else None
+
     async def _mutate_case(
-        self, *, uid: str, mutate
-    ) -> tuple[str, dict | None]:
-        """Loads (or creates) the uid's current session, applies a pure
-        Case-mutating function outside the Runner's turn flow, and
-        persists the delta as a hand-built Event — the same append_event
-        path a normal turn uses, without running the model at all.
-        Returns ``(session_id, new_case)``."""
+        self, *, uid: str, op: str
+    ) -> tuple[str | None, dict | None]:
+        """Records a Case mutation (``press_emergency_button`` /
+        ``mark_safe``) outside the Runner's turn flow.
+
+        ADR-0008: the Case is user-scoped and belongs to her, not to any
+        one Conversation, so a real (Firestore) backend applies this
+        directly to her user-scoped state via ``append_user_mutation`` —
+        no Session is read, found, or created at all;
+        ``_most_recent_session`` stopped being a meaningful way to find
+        "her session" for this once the Case moved off per-Conversation
+        state. A ``BaseSessionService`` with no such seam (e.g. the
+        in-memory service the test suite injects) falls back to a
+        hand-built ``Event`` against an existing (or freshly created)
+        session, the same append_event path a normal turn uses.
+
+        Returns ``(session_id, new_case)`` — ``session_id`` is ``None``
+        on the session-less (Firestore) path.
+        """
+        now_wall = time.time()
+        now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
+        mutation = {"op": op, "now": now_iso}
+
+        append_user_mutation = getattr(
+            self._session_service, "append_user_mutation", None
+        )
+        if append_user_mutation is not None:
+            stored_user = await append_user_mutation(
+                app_name=APP_NAME, user_id=uid, case_mutations=[mutation]
+            )
+            return None, stored_user.get(CASE_RAW) or {}
+
         session = await self._most_recent_session(uid=uid)
         if session is None:
             session = await self._session_service.create_session(
                 app_name=APP_NAME, user_id=uid
             )
-        now_wall = time.time()
-        now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
-        case = session.state.get("case")
+        case = session.state.get(CASE)
+        mutate = case_press_emergency_button if op == "press_emergency_button" else case_mark_safe
         new_case = mutate(case, now=now_iso)
         event = Event(
             id=Event.new_id(),
             invocation_id=f"emergency-{uuid4().hex}",
             author="system",
             timestamp=now_wall,
-            actions=EventActions(state_delta={"case": new_case}),
+            actions=EventActions(
+                state_delta={CASE: new_case, CASE_MUTATIONS: [mutation]}
+            ),
         )
         await self._session_service.append_event(session, event)
-        return session.id, new_case
+        # Reconcile to whatever append_event actually persisted (a
+        # concurrent write may have been folded in).
+        return session.id, session.state.get(CASE) or new_case
 
     async def press_emergency_button(self, *, uid: str) -> AsyncIterator[str]:
         """The hardcoded EMERGENCY button: renders the cached action card
@@ -203,8 +256,8 @@ class ChatService:
         retracts the card she already has.
         """
         try:
-            session = await self._most_recent_session(uid=uid)
-            country = resolve_case_country(session.state.get("case") if session else None)
+            case = await self._case_for_country(uid=uid)
+            country = resolve_case_country(case)
         except Exception:
             logger.exception("press_emergency_button: could not read country")
             country = Country.UNKNOWN
@@ -214,20 +267,21 @@ class ChatService:
 
         try:
             session_id, case = await self._mutate_case(
-                uid=uid, mutate=case_press_emergency_button
+                uid=uid, op="press_emergency_button"
             )
         except Exception:
             logger.exception("press_emergency_button: could not record the press")
             yield _line({"type": "error", "detail": "session store unavailable"})
             return
-        yield _line(
-            {"type": "case", "case": case or {}, "session_id": session_id}
-        )
+        payload: dict = {"type": "case", "case": case or {}}
+        if session_id is not None:
+            payload["session_id"] = session_id
+        yield _line(payload)
 
     async def apply_mark_safe(self, *, uid: str) -> dict:
         """Clears the Imminent Danger PREDICATE (never the safety flag)
-        on the uid's current session. Returns the updated Case."""
-        _, case = await self._mutate_case(uid=uid, mutate=case_mark_safe)
+        on the uid's Case. Returns the updated Case."""
+        _, case = await self._mutate_case(uid=uid, op="mark_safe")
         return case or {}
 
     async def correct_case(
@@ -240,14 +294,17 @@ class ChatService:
         on this field — never silently reverted by a later extraction or
         document (``merge_case``'s merge policy). Persisted the same way a
         DISPATCHER turn persists its own state delta: one ``Event``
-        carrying the new Case as a session-state delta, appended through
-        the same session service the conversation spine uses.
+        carrying the mutation (ADR-0008) on a ``temp:`` key, plus the
+        pre-merged Case for this turn's own immediate read, appended
+        through the same session service the conversation spine uses.
 
-        Unlike ``press_emergency_button``/``apply_mark_safe`` above, this
-        acts on the specific ``session_id`` the UI is showing her — not
-        "the" most recent session for the uid — matching ``/api/chat``'s
-        own per-session contract (a correction always targets the Case
-        she is looking at).
+        This still targets the specific ``session_id`` the UI is showing
+        her — not "the" most recent session for the uid — matching
+        ``/api/chat``'s own per-session contract: unlike the button/
+        mark_safe above, a correction is scoped to an authenticated,
+        already-open Conversation, so there is a real session to check
+        ownership against (and 404 on a mismatch), even though the Case
+        it writes is shared with every other Conversation she has.
 
         Returns the updated Case, or ``None`` when the session does not
         exist (or belongs to a different user — the caller renders 404,
@@ -260,11 +317,9 @@ class ChatService:
             return None
         now_wall = time.time()
         now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
+        delta = {"claims": {field: {"value": value, "confidence": "high"}}}
         updated_case = merge_case(
-            session.state.get("case"),
-            {"claims": {field: {"value": value, "confidence": "high"}}},
-            source="user",
-            now=now_iso,
+            session.state.get(CASE), delta, source="user", now=now_iso
         )
         await self._session_service.append_event(
             session,
@@ -273,16 +328,30 @@ class ChatService:
                 invocation_id=f"correction-{uuid4().hex}",
                 author="user",
                 timestamp=now_wall,
-                actions=EventActions(state_delta={"case": updated_case}),
+                actions=EventActions(
+                    state_delta={
+                        CASE: updated_case,
+                        CASE_MUTATIONS: [
+                            {
+                                "op": "merge",
+                                "delta": delta,
+                                "source": "user",
+                                "now": now_iso,
+                            }
+                        ],
+                    }
+                ),
             ),
         )
-        return updated_case
+        # Reconcile to whatever append_event actually persisted (a
+        # concurrent write may have been folded in).
+        return session.state.get(CASE) or updated_case
 
     async def stream_turn(
         self, *, uid: str, session: Session, text: str
     ) -> AsyncIterator[str]:
         """Yields the NDJSON lines of one turn: ack, reply, case."""
-        case = session.state.get("case") or {}
+        case = session.state.get(CASE) or {}
         # The acknowledgement is fixed and yielded before the Runner — and
         # therefore any model — is invoked.
         yield _line(
@@ -401,14 +470,14 @@ class ChatService:
         updated = await self._session_service.get_session(
             app_name=APP_NAME, user_id=uid, session_id=session.id
         )
-        updated_case = (updated.state.get("case") if updated else None) or {}
+        updated_case = (updated.state.get(CASE) if updated else None) or {}
 
         # An inactive Plan (issue #43, ADR-0006 — an input-hash mismatch
         # detected by pure code every turn, never DISPATCHER's judgement)
         # gets the Safe Floor rendered here, unconditionally, unless a
         # plan/safe_floor/held_refusal card already streamed above this
         # turn (e.g. DISPATCHER regenerated a replacement itself).
-        plan_inactive = bool(updated) and updated.state.get("plan_active") is False
+        plan_inactive = bool(updated) and updated.state.get(PLAN_ACTIVE) is False
         already_shown = any(
             card.get("type") in _PLAN_STATUS_CARD_TYPES for card in cards
         )

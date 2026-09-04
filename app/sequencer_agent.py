@@ -30,7 +30,6 @@ the same UI as a verified one is worse than nothing).
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Any, Literal, Optional
@@ -42,23 +41,19 @@ from pydantic import BaseModel
 
 from app.case import unresolved_sequencer_conflict
 from app.directory import resolve_case_country
+from app.plan_ops import republish
 from app.rules import Grievance, Jurisdiction, JurisdictionStatus, TenureBucket
 from app.sequencer import (
     JurisdictionHeldError,
     NoVerifiedPlanError,
     Plan,
-    PlanNotVerifiedError,
     SequencerIn,
-    build_plan,
     compute_deadlines,
     held_refusal_card,
     jurisdiction_rules,
-    plan_hash,
-    publish_plan,
     sequence_actions,
-    verify_plan,
 )
-from app.staleness import apply_step_expiry, is_input_stale, reconcile_plan
+from app.state_keys import CASE, PLAN, PLAN_ACTIVE, PLAN_MUTATIONS, PLAN_SEQ_IN
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +129,7 @@ def sequencer_sequence_actions(
     and ``verify_plan`` can be called without the model re-transmitting
     the full row payload.
     """
-    case = tool_context.state.get("case")
+    case = tool_context.state.get(CASE)
     blocked_field = unresolved_sequencer_conflict(case)
     if blocked_field:
         return {
@@ -248,7 +243,7 @@ def sequencer_verify_plan(
     back to Safe Floor, never render a partially-cited plan.
 
     Staleness (issue #43, ADR-0006) is handled here too, against the
-    session's PERSISTED prior plan (``state["plan"]``, never the
+    session's PERSISTED prior plan (``state[PLAN]``, never the
     ``temp:`` scratch this turn's rows live in): ``is_input_stale`` is
     the pure check of whether this turn's ``SequencerIn`` still hashes to
     the persisted plan's ``input_hash``; regardless of the answer,
@@ -262,6 +257,15 @@ def sequencer_verify_plan(
     was never actually stale) leaves that persisted plan untouched — this
     call simply failed to build a plan, it did not invalidate an existing
     good one.
+
+    The actual reconcile/verify/publish decision runs through
+    ``app.plan_ops.republish`` — the same pure core the commit-time
+    ``"publish"`` Plan mutation replays against whatever is ACTUALLY
+    stored (ADR-0008 amendment: the Plan is user-scoped now and has no
+    session-document revision guard, so a concurrent Conversation's
+    fresher Plan must be what a regeneration is really decided against,
+    not this turn's possibly-stale copy). The two calls agree
+    bit-for-bit whenever there is no concurrent writer.
     """
     raw_seq_in = tool_context.state.get("temp:filing_sequencer_seq_in")
     raw_steps = tool_context.state.get("temp:filing_sequencer_steps")
@@ -277,62 +281,41 @@ def sequencer_verify_plan(
     seq_in = SequencerIn.model_validate(raw_seq_in)
     steps = tuple(PlanStep.model_validate(step) for step in raw_steps)
 
-    raw_old_plan = tool_context.state.get("plan")
+    raw_old_plan = tool_context.state.get(PLAN)
     old_plan = Plan.model_validate(raw_old_plan) if raw_old_plan else None
-    was_stale = old_plan is not None and is_input_stale(old_plan, seq_in)
-    version = (old_plan.version + 1) if old_plan is not None else 1
+    now = datetime.now(timezone.utc)
 
-    fresh_plan = build_plan(seq_in, steps, plan_id=plan_id, version=version)
-    plan, delta = reconcile_plan(old_plan, fresh_plan)
-    plan = apply_step_expiry(plan, now=datetime.now(timezone.utc))
+    new_state, response = republish(
+        old_plan, seq_in=seq_in, steps=steps, plan_id=plan_id, now=now
+    )
 
-    def _invalidate_persisted_plan() -> None:
-        # Ship NO sequence: neither the now-stale original nor the
-        # unverified replacement is ever presented as current (ADR-0006).
-        tool_context.state["plan"] = None
-        tool_context.state["plan_seq_in"] = None
-        tool_context.state["plan_active"] = False
-
-    result = verify_plan(plan)
-    if not result.ok:
-        if was_stale:
-            _invalidate_persisted_plan()
-        return {
-            "ok": False,
-            "reason": "VERIFY_FAILED",
-            "violations": list(result.violations),
-            "regeneration_failed": was_stale,
+    if new_state is not None:
+        tool_context.state[PLAN] = new_state["plan"]
+        tool_context.state[PLAN_SEQ_IN] = new_state["plan_seq_in"]
+        tool_context.state[PLAN_ACTIVE] = new_state["plan_active"]
+        # Record the mutation (ADR-0008 amendment): the commit-time
+        # replay re-runs the SAME republish decision against whatever is
+        # ACTUALLY stored, so a concurrent Conversation's write is never
+        # silently clobbered by this turn's possibly-stale computation.
+        # Append, never assign — a second FILING_SEQUENCER-shaped call
+        # sharing this invocation must never replace an earlier one's
+        # mutation record.
+        mutation = {
+            "op": "publish",
+            "seq_in": seq_in.model_dump(mode="json"),
+            "steps": [step.model_dump(mode="json") for step in steps],
+            "plan_id": plan_id,
+            "now": now.isoformat(),
         }
+        existing = list(tool_context.state.get(PLAN_MUTATIONS) or [])
+        tool_context.state[PLAN_MUTATIONS] = existing + [mutation]
 
-    cleared_hashes = frozenset({plan_hash(plan)})
-    try:
-        published = publish_plan(plan, cleared_hashes=cleared_hashes)
-    except PlanNotVerifiedError as exc:  # defensive: should be unreachable
-        logger.error("publish_plan refused a plan verify_plan cleared: %s", exc)
-        if was_stale:
-            _invalidate_persisted_plan()
-        return {"ok": False, "reason": "PUBLISH_REFUSED", "detail": str(exc)}
-
-    tool_context.state["plan"] = published.model_dump(mode="json")
-    tool_context.state["plan_seq_in"] = seq_in.model_dump(mode="json")
-    tool_context.state["plan_active"] = True
-
-    response: dict[str, Any] = {
-        "ok": True,
-        "plan": json.loads(published.model_dump_json()),
-    }
-    if was_stale:
-        response["was_stale"] = True
-    # A "delta" is only meaningful relative to a PRIOR plan — a brand-new
-    # plan with nothing to regenerate from is never reported as if it
-    # were a regeneration (every step being "added" would be trivially
-    # true and misleading).
-    if old_plan is not None and (delta.changed or delta.carried_done):
-        response["delta"] = {
-            "added": list(delta.added),
-            "removed": list(delta.removed),
-            "carried_done": list(delta.carried_done),
-        }
+    if not response.get("ok"):
+        logger.warning(
+            "sequencer_verify_plan: %s (%s)",
+            response.get("reason"),
+            response.get("detail") or response.get("violations"),
+        )
     return response
 
 

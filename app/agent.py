@@ -3,8 +3,9 @@
 PRD #34 (ADR-0004 decisions): the root DISPATCHER is a chat-mode LlmAgent —
 the only voice the user hears. ``read_narrative`` runs in the root
 before-agent callback, strictly before DISPATCHER's turn, never parallel;
-its CaseDelta is merged deterministically into ``state["case"]`` by
-``merge_case``. The App is constructed with ``App(plugins=[...])``, never
+its CaseDelta is merged deterministically into her user-scoped Case
+(``app.state_keys.CASE``) by ``merge_case``. The App is constructed
+with ``App(plugins=[...])``, never
 ``Runner(plugins=...)``. The dev UI is never deployed.
 
 DEBUNKER and PROOF_BUILDER are single-turn specialist sub-agents
@@ -70,6 +71,14 @@ from app.rules import Jurisdiction
 from app.sequencer import Plan, SequencerIn
 from app.sequencer_agent import FILING_SEQUENCER_NAME, build_filing_sequencer
 from app.staleness import apply_step_expiry, is_input_stale
+from app.state_keys import (
+    CASE,
+    CASE_MUTATIONS,
+    PLAN,
+    PLAN_ACTIVE,
+    PLAN_MUTATIONS,
+    PLAN_SEQ_IN,
+)
 from app.tools import (
     action_card,
     mark_plan_step_done,
@@ -120,7 +129,7 @@ def acknowledgement_for(language: str | None) -> str:
 
 
 def _dispatcher_instruction(readonly_context: ReadonlyContext) -> str:
-    case = readonly_context.state.get("case") or {}
+    case = readonly_context.state.get(CASE) or {}
     extraction_failed = bool(readonly_context.state.get("temp:extraction_failed"))
     case_block = json.dumps(case, ensure_ascii=False) if case else "{}"
     failure_block = (
@@ -162,7 +171,7 @@ transfer_to_agent with agent_name="EMERGENCY". Do this immediately,
 every time, for every message, until the app tells you the predicate is
 no longer active.
 """
-    plan_active = readonly_context.state.get("plan_active")
+    plan_active = readonly_context.state.get(PLAN_ACTIVE)
     stale_block = (
         "\nHer previously verified Plan just went inactive because"
         " something she told you changed (ADR-0006, issue #43) — the app"
@@ -341,7 +350,7 @@ return, since it does not return any.
 
 
 def _emergency_instruction(readonly_context: ReadonlyContext) -> str:
-    case = readonly_context.state.get("case") or {}
+    case = readonly_context.state.get(CASE) or {}
     case_block = json.dumps(case, ensure_ascii=False) if case else "{}"
     return f"""\
 You are EMERGENCY for Gabay OFW. DISPATCHER has just transferred this
@@ -374,7 +383,9 @@ needed — the app itself decides when she has left EMERGENCY.
 """
 
 
-def _recheck_plan_staleness(callback_context: CallbackContext) -> None:
+def _recheck_plan_staleness(
+    callback_context: CallbackContext, *, plan_mutations: list[dict]
+) -> None:
     """Runs both ADR-0006 staleness checks every turn, unconditionally —
     never DISPATCHER's judgement (issue #43).
 
@@ -389,8 +400,18 @@ def _recheck_plan_staleness(callback_context: CallbackContext) -> None:
     of ``hash(current_sequencer_in) != plan.input_hash``. A mismatch
     marks the plan inactive; ``chat.py`` renders the Safe Floor from
     that flag with zero reliance on DISPATCHER calling any tool.
+
+    Writes ``callback_context.state`` directly too (the pre-merged
+    convenience blob this turn's own reads use), but the persisted truth
+    is the ``"recheck_staleness"`` mutation appended to ``plan_mutations``
+    (ADR-0008 amendment): the Plan is user-scoped now and has no
+    session-document revision guard, so the commit-time replay
+    (``app.plan_ops``) always re-evaluates against whichever Plan is
+    ACTUALLY stored — never this turn's possibly-stale copy — closing the
+    race where a second Conversation's stale recheck could overwrite a
+    Plan another Conversation just verified.
     """
-    raw_plan = callback_context.state.get("plan")
+    raw_plan = callback_context.state.get(PLAN)
     if not raw_plan:
         return None
     plan = Plan.model_validate(raw_plan)
@@ -398,28 +419,36 @@ def _recheck_plan_staleness(callback_context: CallbackContext) -> None:
     now = datetime.datetime.now(datetime.timezone.utc)
     voided = apply_step_expiry(plan, now=now)
     if voided is not plan:
-        callback_context.state["plan"] = voided.model_dump(mode="json")
+        callback_context.state[PLAN] = voided.model_dump(mode="json")
         plan = voided
 
-    raw_seq_in = callback_context.state.get("plan_seq_in")
-    if not raw_seq_in:
-        return None
-    case = callback_context.state.get("case")
+    case = callback_context.state.get(CASE)
     country = resolve_case_country(case)
     try:
-        jurisdiction = Jurisdiction(country.value)
+        country_value: str | None = Jurisdiction(country.value).value
     except ValueError:
         # UNKNOWN/PH: no country signal to compare against — leave the
         # existing plan_active as-is (nothing derivable changed).
-        return None
-    current_seq_in = SequencerIn.model_validate(
-        {**raw_seq_in, "country": jurisdiction.value}
+        country_value = None
+
+    raw_seq_in = callback_context.state.get(PLAN_SEQ_IN)
+    if raw_seq_in and country_value is not None:
+        current_seq_in = SequencerIn.model_validate(
+            {**raw_seq_in, "country": country_value}
+        )
+        # plan_active is the single source of truth chat.py reads to decide
+        # whether to render the inactive-plan Safe Floor; there is only one
+        # reason today (a fact changed) so no separate reason key is kept —
+        # add one back if a second reason is ever introduced.
+        callback_context.state[PLAN_ACTIVE] = not is_input_stale(plan, current_seq_in)
+
+    plan_mutations.append(
+        {
+            "op": "recheck_staleness",
+            "country": country_value,
+            "now": now.isoformat(),
+        }
     )
-    # plan_active is the single source of truth chat.py reads to decide
-    # whether to render the inactive-plan Safe Floor; there is only one
-    # reason today (a fact changed) so no separate reason key is kept —
-    # add one back if a second reason is ever introduced.
-    callback_context.state["plan_active"] = not is_input_stale(plan, current_seq_in)
     return None
 
 
@@ -435,7 +464,16 @@ def make_absorb_narrative_callback(llm: BaseLlm):
 
     async def absorb_narrative(*, callback_context: CallbackContext) -> None:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        case = callback_context.state.get("case")
+        # Both the record_emergency_turn write below and the extraction
+        # merge write further down can happen in THIS SAME callback, which
+        # shares exactly one Event — accumulate their mutations in local
+        # lists and write each temp: key once at the end (ADR-0008).
+        # Reading it back out of state to append would leak an
+        # already-persisted mutation forward into a LATER event this same
+        # invocation and re-apply it a second time.
+        case_mutations: list[dict] = []
+        plan_mutations: list[dict] = []
+        case = callback_context.state.get(CASE)
         if is_imminent_danger(case):
             # Long-gap resume (issue #41): decide, BEFORE narrative
             # reading, whether DISPATCHER should re-ask once rather than
@@ -444,8 +482,15 @@ def make_absorb_narrative_callback(llm: BaseLlm):
             # when this turn is actually processed.
             resume_check = needs_resume_check(case, now=now)
             callback_context.state["temp:resume_check"] = resume_check
-            callback_context.state["case"] = record_emergency_turn(
+            callback_context.state[CASE] = record_emergency_turn(
                 case, now=now, resume_check_issued=resume_check
+            )
+            case_mutations.append(
+                {
+                    "op": "record_emergency_turn",
+                    "now": now,
+                    "resume_check_issued": resume_check,
+                }
             )
             if resume_check:
                 # Still record the narrative for the Case, but the
@@ -464,11 +509,23 @@ def make_absorb_narrative_callback(llm: BaseLlm):
             if delta is None:
                 callback_context.state["temp:extraction_failed"] = True
             else:
-                case = callback_context.state.get("case")
-                callback_context.state["case"] = merge_case(
+                case = callback_context.state.get(CASE)
+                callback_context.state[CASE] = merge_case(
                     case, delta, source="extraction", now=now
                 )
-        _recheck_plan_staleness(callback_context)
+                case_mutations.append(
+                    {
+                        "op": "merge",
+                        "delta": delta,
+                        "source": "extraction",
+                        "now": now,
+                    }
+                )
+        _recheck_plan_staleness(callback_context, plan_mutations=plan_mutations)
+        if case_mutations:
+            callback_context.state[CASE_MUTATIONS] = case_mutations
+        if plan_mutations:
+            callback_context.state[PLAN_MUTATIONS] = plan_mutations
         return None
 
     return absorb_narrative

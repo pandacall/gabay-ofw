@@ -9,6 +9,7 @@ ROUTING_GUARD, which filters rows by channel on the way back.
 
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import Any
 
@@ -22,12 +23,13 @@ from app.directory import (
 from app.safe_floor import SafeFloorReason, build_card, is_imminent_danger
 from app.sequencer import Plan
 from app.staleness import mark_step_done
+from app.state_keys import CASE, PLAN, PLAN_ACTIVE, PLAN_MUTATIONS
 
 logger = logging.getLogger(__name__)
 
 
 def _case(tool_context: ToolContext) -> dict[str, Any] | None:
-    case = tool_context.state.get("case")
+    case = tool_context.state.get(CASE)
     return case if isinstance(case, dict) else None
 
 
@@ -121,10 +123,10 @@ def mark_plan_step_done(
             wrong plan.
         step_id: The step's own id, exactly as shown on that step.
     """
-    raw_plan = tool_context.state.get("plan")
+    raw_plan = tool_context.state.get(PLAN)
     if not raw_plan:
         return {"ok": False, "reason": "NO_ACTIVE_PLAN"}
-    if tool_context.state.get("plan_active") is False:
+    if tool_context.state.get(PLAN_ACTIVE) is False:
         # ADR-0006: an inactive (stale) plan stops being presented as
         # actionable. Advancing one of its steps to DONE would still be
         # treating it as current — code-owned, not left to the model
@@ -137,5 +139,14 @@ def mark_plan_step_done(
         updated = mark_step_done(plan, step_id)
     except ValueError as exc:
         return {"ok": False, "reason": "STEP_NOT_DONE_ELIGIBLE", "detail": str(exc)}
-    tool_context.state["plan"] = updated.model_dump(mode="json")
+    tool_context.state[PLAN] = updated.model_dump(mode="json")
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    # Append, never assign (ADR-0008): two tool calls sharing one
+    # invocation must never have the second's mutation record replace
+    # the first's — read whatever this turn has already accumulated and
+    # add to it.
+    existing = list(tool_context.state.get(PLAN_MUTATIONS) or [])
+    tool_context.state[PLAN_MUTATIONS] = existing + [
+        {"op": "mark_step_done", "plan_id": plan_id, "step_id": step_id, "now": now}
+    ]
     return {"card": {"type": "plan", **updated.model_dump(mode="json")}}

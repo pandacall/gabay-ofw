@@ -114,3 +114,34 @@ Conflicts rather than overwrite.
   without a clock (contact data, verdicts, past proof gaps) replay
   unchanged.
 
+## Amendment (issue #70): the Plan needs the mutation treatment too
+
+This ADR's "writes persist the mutation" decision, as originally written,
+only covered the Case. Moving `plan` / `plan_seq_in` / `plan_active` to
+`user:` scope removes their only PRIOR concurrency guard: they used to
+live in per-session state, protected by the session document's
+`revision` check, but user-scoped state has no revision guard at all —
+and the whole point of this ADR is to enable concurrent Conversations.
+Left as plain blobs, this reopens the exact class of lost-update bug the
+Case fix closes, concretely:
+
+- the plan-staleness recheck (run every turn, unconditionally) writes
+  `plan_active` from whichever Plan copy it loaded at THAT turn's start;
+  a second Conversation's stale copy could overwrite `plan_active=True`
+  a first Conversation just verified with a stale `False`;
+- marking a step done writes the entire Plan blob, so a stale writer
+  could silently discard a newer version and its completed steps;
+- a failed regeneration invalidating a Plan could null out a Plan
+  another Conversation had just published.
+
+The Plan therefore gets the same treatment: `publish`, `mark_step_done`,
+and `recheck_staleness` are recorded as mutations (`app.plan_ops`,
+mirroring `app.case.apply_mutations`) and re-applied inside the same
+Firestore transaction against the freshly-read stored Plan, never a
+turn-start snapshot. `publish`'s reconcile/verify/publish decision runs
+through one shared pure core (`app.plan_ops.republish`) used both by
+FILING_SEQUENCER's tool (which needs an answer that turn, computed
+against the turn-start Plan) and by the mutation replay (recomputed
+against whatever is ACTUALLY stored) — the two agree bit-for-bit
+whenever there is no concurrent writer, and only diverge, correctly, when
+one exists.

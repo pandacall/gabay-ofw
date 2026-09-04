@@ -30,14 +30,21 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements-dev.txt
 
-      - name: Run backend tests
-        run: python -m pytest tests -q
-
+      # Node is needed here (moved up from below) so `npx firebase-tools`
+      # can wrap the backend test run in the Firestore emulator declared
+      # in firebase.json — without it, tests/test_firestore_session_service.py
+      # is gated on FIRESTORE_EMULATOR_HOST and silently skips (issue #70).
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
+
+      - name: Run backend tests
+        # emulators:exec sets FIRESTORE_EMULATOR_HOST for the wrapped
+        # command and propagates the command's exit code, so a test
+        # failure still fails the workflow rather than being swallowed.
+        run: npx --yes firebase-tools@latest emulators:exec --only firestore --project demo-gabay-ofw "python -m pytest tests -q"
 
       - name: Install frontend dependencies
         run: npm ci

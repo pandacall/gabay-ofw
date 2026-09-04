@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from app.rules import Grievance, Jurisdiction, TenureBucket
 from app.sequencer import SequencerIn, build_plan, compute_deadlines, sequence_actions
+from app.state_keys import PLAN, PLAN_ACTIVE
 from app.tools import mark_plan_step_done
 
 
@@ -39,14 +40,14 @@ class TestMarkPlanStepDone:
     def test_marks_a_step_done_and_persists_it(self):
         ctx = _FakeToolContext()
         plan = _published_plan()
-        ctx.state["plan"] = plan.model_dump(mode="json")
+        ctx.state[PLAN] = plan.model_dump(mode="json")
         step_id = plan.steps[0].id
 
         result = mark_plan_step_done(plan.plan_id, step_id, ctx)
         assert result["card"]["type"] == "plan"
         by_id = {step["id"]: step for step in result["card"]["steps"]}
         assert by_id[step_id]["status"] == "DONE"
-        assert ctx.state["plan"]["steps"][0]["status"] == "DONE"
+        assert ctx.state[PLAN]["steps"][0]["status"] == "DONE"
 
     def test_no_active_plan_refuses(self):
         ctx = _FakeToolContext()
@@ -56,22 +57,22 @@ class TestMarkPlanStepDone:
     def test_plan_id_mismatch_refuses(self):
         ctx = _FakeToolContext()
         plan = _published_plan(plan_id="plan-1")
-        ctx.state["plan"] = plan.model_dump(mode="json")
+        ctx.state[PLAN] = plan.model_dump(mode="json")
 
         result = mark_plan_step_done("plan-2", plan.steps[0].id, ctx)
         assert result == {"ok": False, "reason": "PLAN_MISMATCH"}
         # The persisted plan is left untouched.
-        assert ctx.state["plan"]["steps"][0]["status"] == "PENDING"
+        assert ctx.state[PLAN]["steps"][0]["status"] == "PENDING"
 
     def test_unknown_step_id_refuses_without_mutating_state(self):
         ctx = _FakeToolContext()
         plan = _published_plan()
-        ctx.state["plan"] = plan.model_dump(mode="json")
+        ctx.state[PLAN] = plan.model_dump(mode="json")
 
         result = mark_plan_step_done(plan.plan_id, "no-such-step", ctx)
         assert result["ok"] is False
         assert result["reason"] == "STEP_NOT_DONE_ELIGIBLE"
-        assert ctx.state["plan"]["steps"][0]["status"] == "PENDING"
+        assert ctx.state[PLAN]["steps"][0]["status"] == "PENDING"
 
     def test_inactive_plan_refuses(self):
         # ADR-0006 (issue #43): an inactive (stale) plan stops being
@@ -79,9 +80,9 @@ class TestMarkPlanStepDone:
         # would still be treating it as current.
         ctx = _FakeToolContext()
         plan = _published_plan()
-        ctx.state["plan"] = plan.model_dump(mode="json")
-        ctx.state["plan_active"] = False
+        ctx.state[PLAN] = plan.model_dump(mode="json")
+        ctx.state[PLAN_ACTIVE] = False
 
         result = mark_plan_step_done(plan.plan_id, plan.steps[0].id, ctx)
         assert result == {"ok": False, "reason": "PLAN_INACTIVE"}
-        assert ctx.state["plan"]["steps"][0]["status"] == "PENDING"
+        assert ctx.state[PLAN]["steps"][0]["status"] == "PENDING"

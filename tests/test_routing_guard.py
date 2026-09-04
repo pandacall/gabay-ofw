@@ -22,6 +22,7 @@ from app.guard import (
     permitted_for,
     refusal,
 )
+from app.state_keys import CASE
 
 ALL_COUNTRIES = list(Country)
 KNOWN_COUNTRIES = [Country.SA, Country.QA, Country.KW, Country.AE]
@@ -208,7 +209,7 @@ class TestNeverConditionedOnFlags:
 
         class FakeToolContext:
             def __init__(self, case):
-                self.state = {"case": case}
+                self.state = {CASE: case}
 
         case = {
             "claims": {"country": {"value": "Saudi Arabia", "source": "user"}},

@@ -28,6 +28,7 @@ from app.agent import (
     _emergency_instruction,
     acknowledgement_for,
 )
+from app.state_keys import CASE
 
 
 class _FakeReadonlyContext:
@@ -84,8 +85,10 @@ class TestAcknowledgementMapping:
 
 
 class TestDispatcherInstructionNeverProducesTaglish:
-    def _instruction(self, **state) -> str:
-        return _dispatcher_instruction(_FakeReadonlyContext(state))
+    def _instruction(self, *, case=None, **extra) -> str:
+        return _dispatcher_instruction(
+            _FakeReadonlyContext({CASE: case, **extra})
+        )
 
     def test_default_turn_with_no_case_yet(self):
         text = self._instruction(case=None)
@@ -127,8 +130,10 @@ class TestDispatcherInstructionNeverProducesTaglish:
 
 
 class TestEmergencyInstructionNeverProducesTaglish:
-    def _instruction(self, **state) -> str:
-        return _emergency_instruction(_FakeReadonlyContext(state))
+    def _instruction(self, *, case=None, **extra) -> str:
+        return _emergency_instruction(
+            _FakeReadonlyContext({CASE: case, **extra})
+        )
 
     def test_no_instruction_tells_the_model_to_write_taglish(self):
         text = self._instruction(case={"language": "taglish"})

@@ -353,6 +353,83 @@ SEQUENCER_FIELDS = frozenset({"country", "tenure_months"})
 
 
 
+# ---------------------------------------------------------------------------
+# Mutation replay (ADR-0008): a Case write persists the mutation that
+# produced it, not the merged blob computed in memory. The session
+# service re-runs this pure replay INSIDE its Firestore transaction,
+# against the freshly-read stored Case — closing the lost-update bug
+# where a turn already in flight when she taps EMERGENCY commits a Case
+# computed before the tap and silently erases the press.
+# ---------------------------------------------------------------------------
+
+#: The mutation shapes this build understands. Anything else is an
+#: "unknown op" per ``apply_mutations``'s contract below.
+MUTATION_OPS = frozenset(
+    {"merge", "press_emergency_button", "mark_safe", "record_emergency_turn"}
+)
+
+
+def apply_mutations(
+    case: dict[str, Any] | None, mutations: list[Any] | None
+) -> dict[str, Any] | None:
+    """Replays recorded mutations onto ``case``, in order.
+
+    Each mutation is a small JSON-serialisable record:
+
+        {"op": "merge", "delta": <CaseDelta>, "source": ..., "now": ...}
+        {"op": "press_emergency_button", "now": ...}
+        {"op": "mark_safe", "now": ...}
+        {"op": "record_emergency_turn", "now": ..., "resume_check_issued": ...}
+
+    Pure: neither ``case`` nor any entry of ``mutations`` is mutated — the
+    op handlers below already return a fresh Case each time. A non-dict
+    entry is ignored. An entry whose ``"op"`` is not one of the four known
+    mutators — or whose payload this build cannot make sense of (a
+    missing ``"now"``, an unrecognised ``merge`` source, a malformed
+    delta) — leaves ``case`` UNTOUCHED for that entry rather than raising
+    or clearing it: a mutation this build cannot understand must never
+    lose data.
+
+    Safe to replay out of order, late, or twice: the merge policy itself
+    is order-tolerant by construction (Safety Flags are add-only,
+    disagreements accumulate as Conflicts rather than overwrite), so
+    replaying a mutation against a Case that has moved on since it was
+    recorded is exactly as safe as applying it the moment it was
+    recorded.
+    """
+    for mutation in mutations or []:
+        if not isinstance(mutation, dict):
+            continue
+        op = mutation.get("op")
+        now = mutation.get("now")
+        if op not in MUTATION_OPS or not isinstance(now, str) or not now:
+            # Unknown (or malformed) mutation: leave the Case exactly as
+            # it was for this entry, never raise, never clear anything.
+            continue
+        if op == "merge":
+            delta = mutation.get("delta")
+            source = mutation.get("source", "extraction")
+            if not isinstance(delta, dict):
+                continue
+            try:
+                case = merge_case(case, delta, source=source, now=now)
+            except ValueError:
+                # An unrecognised source is exactly as harmless to skip
+                # as an unrecognised op above.
+                continue
+        elif op == "press_emergency_button":
+            case = press_emergency_button(case, now=now)
+        elif op == "mark_safe":
+            case = mark_safe(case, now=now)
+        elif op == "record_emergency_turn":
+            case = record_emergency_turn(
+                case,
+                now=now,
+                resume_check_issued=bool(mutation.get("resume_check_issued")),
+            )
+    return case
+
+
 def unresolved_sequencer_conflict(case: dict[str, Any] | None) -> Optional[str]:
     """The first ``SEQUENCER_FIELDS`` claim carrying an unresolved Conflict.
 
