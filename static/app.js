@@ -413,9 +413,13 @@ function chatMessagesHtml() {
   const bubbles = chatMessages.map(chatMessageHtml).join("");
   // The Progress Trail replaces the meaningless typing animation with
   // fixed, code-owned labels of what the app is actually doing (issue
-  // #75, ADR-0010) — shown only while busy, and only in the DOM, never
-  // added to chatMessages, so it can never become part of the transcript.
-  const trail = chatBusy
+  // #75, ADR-0010) — rendered whenever any are queued, never added to
+  // chatMessages so it can never become part of the transcript. Keyed
+  // on chatTrail itself, not chatBusy, so it renders identically no
+  // matter which stream populated it (the EMERGENCY button's response
+  // reuses this same handleChatLine, per ADR-0010: "shown in every
+  // Conversation").
+  const trail = chatTrail.length
     ? chatTrail
         .map(
           (label) => `<div class="chat-message agent trail">${escapeHtml(label)}</div>`,
