@@ -31,6 +31,7 @@ from app.sequencer_agent import (
     sequencer_sequence_actions,
     sequencer_verify_plan,
 )
+from app.state_keys import CASE, PLAN, PLAN_ACTIVE, PLAN_SEQ_IN
 
 
 class _FakeState(dict):
@@ -104,7 +105,7 @@ class TestSequenceActionsBlocksOnUnresolvedConflict:
 
     def test_unresolved_country_conflict_blocks_before_sequencing(self):
         ctx = _FakeToolContext()
-        ctx.state["case"] = {
+        ctx.state[CASE] = {
             "claims": {
                 "country": {
                     "value": "Saudi Arabia",
@@ -136,7 +137,7 @@ class TestSequenceActionsBlocksOnUnresolvedConflict:
 
     def test_non_sequencer_field_conflict_never_blocks(self):
         ctx = _FakeToolContext()
-        ctx.state["case"] = {
+        ctx.state[CASE] = {
             "claims": {
                 "employer_name": {
                     "value": "Al Rashid",
@@ -161,7 +162,7 @@ class TestSequenceActionsBlocksOnUnresolvedConflict:
 
     def test_resolved_conflict_no_longer_blocks(self):
         ctx = _FakeToolContext()
-        ctx.state["case"] = {
+        ctx.state[CASE] = {
             "claims": {
                 "country": {
                     "value": "Saudi Arabia",
@@ -189,7 +190,7 @@ class TestSequenceActionsRefusesCaseCountryMismatch:
 
     def test_supplied_country_disagreeing_with_case_is_refused(self):
         ctx = _FakeToolContext()
-        ctx.state["case"] = {
+        ctx.state[CASE] = {
             "claims": {
                 "country": {
                     "value": "Qatar",
@@ -217,7 +218,7 @@ class TestSequenceActionsRefusesCaseCountryMismatch:
 
     def test_agreeing_country_proceeds(self):
         ctx = _FakeToolContext()
-        ctx.state["case"] = {
+        ctx.state[CASE] = {
             "claims": {
                 "country": {
                     "value": "Saudi Arabia",
@@ -238,7 +239,7 @@ class TestSequenceActionsRefusesCaseCountryMismatch:
         # UNKNOWN/PH (no resolvable jurisdiction) — no signal to compare,
         # so a first-ever call with no Case country on file proceeds.
         ctx = _FakeToolContext()
-        ctx.state["case"] = {"claims": {}}
+        ctx.state[CASE] = {"claims": {}}
         result = sequencer_sequence_actions(
             "SA", "employed_in_country", ["unpaid_wages"], ctx
         )
@@ -295,9 +296,9 @@ class TestVerifyPlanToolPublishesOnSuccess:
         sequencer_compute_deadlines(ctx)
         result = sequencer_verify_plan("plan-1", ctx)
         assert result["ok"] is True
-        assert ctx.state["plan"]["plan_id"] == "plan-1"
-        assert ctx.state["plan_seq_in"]["country"] == "SA"
-        assert ctx.state["plan_active"] is True
+        assert ctx.state[PLAN]["plan_id"] == "plan-1"
+        assert ctx.state[PLAN_SEQ_IN]["country"] == "SA"
+        assert ctx.state[PLAN_ACTIVE] is True
 
     def test_a_brand_new_plan_never_carries_a_delta_or_was_stale(self):
         # A delta/was_stale is only meaningful relative to a PRIOR plan —
@@ -332,8 +333,8 @@ class TestVerifyPlanToolStaleness:
         done_step_id = first["plan"]["steps"][0]["id"]
 
         # She reports having already filed the wages step.
-        plan = Plan.model_validate(ctx.state["plan"])
-        ctx.state["plan"] = mark_step_done(plan, done_step_id).model_dump(
+        plan = Plan.model_validate(ctx.state[PLAN])
+        ctx.state[PLAN] = mark_step_done(plan, done_step_id).model_dump(
             mode="json"
         )
 
@@ -383,7 +384,7 @@ class TestVerifyPlanToolStaleness:
         sequencer_compute_deadlines(ctx)
         first = sequencer_verify_plan("plan-1", ctx)
         assert first["ok"] is True
-        assert ctx.state["plan"] is not None
+        assert ctx.state[PLAN] is not None
 
         # A new turn with a changed SequencerIn (stale trigger), but the
         # steps that would build the replacement are tampered so the
@@ -402,8 +403,8 @@ class TestVerifyPlanToolStaleness:
         assert result["regeneration_failed"] is True
         # Ship NO sequence: neither the stale original nor the unverified
         # replacement is ever left standing (ADR-0006).
-        assert ctx.state["plan"] is None
-        assert ctx.state["plan_active"] is False
+        assert ctx.state[PLAN] is None
+        assert ctx.state[PLAN_ACTIVE] is False
 
     def test_a_verify_failure_that_was_never_stale_leaves_the_persisted_plan_untouched(
         self,
@@ -434,9 +435,9 @@ class TestVerifyPlanToolStaleness:
         assert result["ok"] is False
         assert result["regeneration_failed"] is False
         # The persisted (still valid, still non-stale) plan stands.
-        assert ctx.state["plan"] is not None
-        assert ctx.state["plan"]["plan_id"] == "plan-1"
-        assert ctx.state["plan_active"] is True
+        assert ctx.state[PLAN] is not None
+        assert ctx.state[PLAN]["plan_id"] == "plan-1"
+        assert ctx.state[PLAN_ACTIVE] is True
 
 
 class TestBuildFilingSequencer:

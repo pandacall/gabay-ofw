@@ -41,6 +41,7 @@ from google.adk.tools import BaseTool, ToolContext
 from google.genai import types
 
 from app.directory import Channel, Country, resolve_case_country
+from app.state_keys import CASE
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +327,7 @@ def diff_reply(
 
 def _state_case(state: Any) -> Optional[dict[str, Any]]:
     try:
-        case = state.get("case")
+        case = state.get(CASE)
     except Exception:  # fail closed on any state weirdness
         return None
     return case if isinstance(case, dict) else None

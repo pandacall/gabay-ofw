@@ -20,6 +20,7 @@ from pydantic import Field
 from app.agent import APP_NAME, GEMINI_MODEL
 from app.chat import ChatService
 from app.main import create_app
+from app.state_keys import CASE
 from tests.test_chat_api import TAGLISH_EXTRACTION
 
 
@@ -253,7 +254,7 @@ class TestLongGapResume:
                 app_name=APP_NAME, user_id="maria", session_id=session_id
             )
         )
-        stale_case = dict(session.state["case"])
+        stale_case = dict(session.state[CASE])
         stale_case["emergency"] = dict(stale_case["emergency"])
         stale_case["emergency"]["last_turn_at"] = "2000-01-01T00:00:00+00:00"
         asyncio.run(
@@ -263,7 +264,7 @@ class TestLongGapResume:
                     id=Event.new_id(),
                     invocation_id=f"test-{uuid4().hex}",
                     author="system",
-                    actions=EventActions(state_delta={"case": stale_case}),
+                    actions=EventActions(state_delta={CASE: stale_case}),
                 ),
             )
         )

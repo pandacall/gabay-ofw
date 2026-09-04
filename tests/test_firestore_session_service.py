@@ -6,6 +6,13 @@ survives an instance recycle, ``temp:`` state never persists), scoped
 state living off the session document, the concurrent-write retry that
 never clobbers a safety flag, and a failed append surfacing an error
 instead of silently dropping a state delta.
+
+Also covers issue #70 (ADR-0008)'s safety fix: a Case/Plan write persists
+the MUTATION, replayed inside the transaction against the freshly-read
+stored Case — the EMERGENCY press surviving an in-flight turn's commit,
+a Safety Flag surviving a concurrent writer, a user correction replayed
+late still winning outright, and an unrecognised mutation leaving the
+Case untouched rather than raising or clearing it.
 """
 
 import asyncio
@@ -19,6 +26,7 @@ from google.adk.events import Event, EventActions
 from google.cloud import firestore
 
 from app.firestore_session_service import FirestoreSessionService
+from app.state_keys import CASE, CASE_MUTATIONS
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FIRESTORE_EMULATOR_HOST"),
@@ -204,5 +212,328 @@ def test_partial_event_is_not_persisted():
         )
         assert resumed.events == []
         assert "case_country" not in resumed.state
+
+    asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+# Case mutation replay (issue #70, ADR-0008): the safety fix at the heart
+# of this slice, exercised against a REAL Firestore transaction.
+# ---------------------------------------------------------------------------
+
+
+def _case_mutation_event(
+    *, pre_merged_blob: dict | None, mutations: list[dict]
+) -> Event:
+    """An Event carrying BOTH a same-turn pre-merged Case blob (the
+    convenience write every writer also makes for immediate in-turn
+    reads) and the recorded mutations — proving the mutation wins."""
+    delta: dict = {CASE_MUTATIONS: mutations}
+    if pre_merged_blob is not None:
+        delta[CASE] = pre_merged_blob
+    return _event(delta)
+
+
+def test_emergency_press_survives_a_turn_already_in_flight():
+    """The concrete failure ADR-0008 exists to close: a DISPATCHER turn
+    is already in flight (holding a stale in-memory Case) when she taps
+    EMERGENCY. The turn's eventual commit — a pre-merged blob computed
+    BEFORE the tap, plus its own recorded mutation — must never erase
+    the press, because the transaction re-runs the merge against the
+    freshly-stored (already-pressed) Case rather than trusting the blob.
+    """
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"emergency-in-flight-{uuid4().hex}"
+
+    async def scenario():
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        in_flight_writer = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        # She taps EMERGENCY: a session-less write straight to her
+        # user-scoped Case, exactly like ChatService.press_emergency_button.
+        pressed_at = "2026-09-04T00:00:00+00:00"
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            case_mutations=[{"op": "press_emergency_button", "now": pressed_at}],
+        )
+
+        # The in-flight DISPATCHER turn now commits — its own pre-merged
+        # blob was computed BEFORE the tap (no emergency), but it also
+        # carries its own recorded mutation.
+        stale_blob = {
+            "claims": {"country": {"value": "Saudi Arabia", "source": "extraction"}},
+            "safety_flags": {},
+            "language": None,
+            "emergency": {
+                "active": False,
+                "button_pressed_at": None,
+                "marked_safe_at": None,
+                "flag_triggered_at": None,
+                "last_turn_at": None,
+                "resume_check_at": None,
+            },
+        }
+        await service.append_event(
+            in_flight_writer,
+            _case_mutation_event(
+                pre_merged_blob=stale_blob,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {
+                            "claims": {
+                                "country": {
+                                    "value": "Saudi Arabia",
+                                    "confidence": "high",
+                                }
+                            }
+                        },
+                        "source": "extraction",
+                        "now": "2026-09-03T23:59:59+00:00",
+                    }
+                ],
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        case = user_state["case"]
+        assert case["emergency"]["active"] is True
+        assert case["emergency"]["button_pressed_at"] == pressed_at
+        assert case["claims"]["country"]["value"] == "Saudi Arabia"
+        # The in-flight writer's own in-memory/event view is reconciled
+        # to the true persisted Case too, not left showing the stale blob.
+        assert in_flight_writer.state[CASE]["emergency"]["active"] is True
+
+    asyncio.run(scenario())
+
+
+def test_safety_flag_survives_a_concurrent_writers_later_commit():
+    """A Safety Flag one writer merged must survive a SECOND writer's
+    later commit, even though the second writer's own delta carries no
+    flags at all (add-only, never cleared)."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"flag-survives-{uuid4().hex}"
+
+    async def scenario():
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer_a = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        writer_b = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+
+        await service.append_event(
+            writer_a,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {"safety_flags": ["PASSPORT_WITHHELD"]},
+                        "source": "extraction",
+                        "now": "2026-09-04T00:00:00+00:00",
+                    }
+                ],
+            ),
+        )
+        # writer_b is now stale in the session-revision sense too; its
+        # own mutation carries no flags, and its Case merge is unrelated.
+        await service.append_event(
+            writer_b,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {
+                            "claims": {
+                                "employer_name": {
+                                    "value": "Al Rashid",
+                                    "confidence": "high",
+                                }
+                            }
+                        },
+                        "source": "extraction",
+                        "now": "2026-09-04T00:05:00+00:00",
+                    }
+                ],
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        case = user_state["case"]
+        assert "PASSPORT_WITHHELD" in case["safety_flags"]
+        assert case["claims"]["employer_name"]["value"] == "Al Rashid"
+
+    asyncio.run(scenario())
+
+
+def test_user_correction_replayed_late_still_wins_and_resolves_conflict():
+    """A one-tap ``user``-sourced correction, replayed AFTER a
+    disagreeing extraction/document conflict was already stored, still
+    wins outright and clears the Conflict — replay order never matters
+    for who wins, only the source does."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"user-correction-late-{uuid4().hex}"
+
+    async def scenario():
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer_a = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        writer_b = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+
+        await service.append_event(
+            writer_a,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {
+                            "claims": {
+                                "country": {"value": "Saudi Arabia", "confidence": "high"}
+                            }
+                        },
+                        "source": "extraction",
+                        "now": "2026-09-04T00:00:00+00:00",
+                    }
+                ],
+            ),
+        )
+        await service.append_event(
+            writer_b,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {
+                            "claims": {"country": {"value": "Kuwait", "confidence": "high"}}
+                        },
+                        "source": "document",
+                        "now": "2026-09-04T00:05:00+00:00",
+                    }
+                ],
+            ),
+        )
+
+        resumed = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        assert resumed.state[CASE]["claims"]["country"]["conflicts"]
+
+        writer_c = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        await service.append_event(
+            writer_c,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {
+                            "claims": {"country": {"value": "Qatar", "confidence": "high"}}
+                        },
+                        "source": "user",
+                        "now": "2026-09-04T00:10:00+00:00",
+                    }
+                ],
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        claim = user_state["case"]["claims"]["country"]
+        assert claim["value"] == "Qatar"
+        assert claim["user_confirmed"] is True
+        assert claim["conflicts"] == []
+
+    asyncio.run(scenario())
+
+
+def test_unrecognised_mutation_leaves_the_stored_case_untouched():
+    """An unrecognised ``"op"`` must never raise and must never clear the
+    stored Case — it is simply skipped, leaving everything else this
+    same event carries to apply normally."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"unknown-mutation-{uuid4().hex}"
+
+    async def scenario():
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer_a = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        await service.append_event(
+            writer_a,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {
+                        "op": "merge",
+                        "delta": {"safety_flags": ["CONFINED"]},
+                        "source": "extraction",
+                        "now": "2026-09-04T00:00:00+00:00",
+                    }
+                ],
+            ),
+        )
+
+        writer_b = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        await service.append_event(
+            writer_b,
+            _case_mutation_event(
+                pre_merged_blob=None,
+                mutations=[
+                    {"op": "delete_everything", "now": "2026-09-04T00:05:00+00:00"}
+                ],
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        case = user_state["case"]
+        assert "CONFINED" in case["safety_flags"]
+
+    asyncio.run(scenario())
+
+
+def test_get_user_state_and_append_user_mutation_need_no_session():
+    """ADR-0008: the Case is user-scoped and belongs to her, not to any
+    one Conversation — ``append_user_mutation``/``get_user_state`` never
+    read, create, or touch a Session at all."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"session-less-{uuid4().hex}"
+
+    async def scenario():
+        empty = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        assert empty == {}
+
+        stored_user = await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            case_mutations=[
+                {"op": "press_emergency_button", "now": "2026-09-04T00:00:00+00:00"}
+            ],
+        )
+        assert stored_user["case"]["emergency"]["active"] is True
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        assert user_state["case"]["emergency"]["active"] is True
+
+        # No session was ever created for this uid.
+        sessions = await service.list_sessions(app_name=APP_NAME, user_id=uid)
+        assert sessions.sessions == []
 
     asyncio.run(scenario())

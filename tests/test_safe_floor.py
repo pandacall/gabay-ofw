@@ -27,6 +27,7 @@ from app.safe_floor import (
     cached_card,
     is_imminent_danger,
 )
+from app.state_keys import CASE
 from tests.test_chat_api import FakeVerifier, TAGLISH_EXTRACTION, auth
 
 ALL_CARD_COUNTRIES = list(CARD_KEYS)
@@ -230,7 +231,7 @@ class TestImminentDangerPredicate:
 
         class FakeToolContext:
             def __init__(self, case):
-                self.state = {"case": case}
+                self.state = {CASE: case}
 
         case = merge_case(
             None,
