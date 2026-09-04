@@ -40,6 +40,17 @@ jobs:
           node-version: "22"
           cache: npm
 
+      # The Firestore emulator is a Java process, and firebase-tools requires
+      # JDK 21 or above. The runner image's default JDK is older, so without
+      # this the emulator never starts and the backend step fails with
+      # "firebase-tools no longer supports Java version before 21" — which is
+      # exactly how it failed on master in run 33833057570.
+      - name: Set up Java for the Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Run backend tests
         # emulators:exec sets FIRESTORE_EMULATOR_HOST for the wrapped
         # command and propagates the command's exit code, so a test
