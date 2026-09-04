@@ -16,6 +16,7 @@ Case untouched rather than raising or clearing it.
 """
 
 import asyncio
+import json
 import os
 from uuid import uuid4
 
@@ -535,5 +536,62 @@ def test_get_user_state_and_append_user_mutation_need_no_session():
         # No session was ever created for this uid.
         sessions = await service.list_sessions(app_name=APP_NAME, user_id=uid)
         assert sessions.sessions == []
+
+    asyncio.run(scenario())
+
+
+def test_emergency_button_resolves_country_from_stored_case_not_a_stateless_listing():
+    """Regression pin (issue #79). ``FirestoreSessionService.list_sessions``
+    returns sessions with NO state at all (the real Firestore contract:
+    ``Session(app_name=..., user_id=..., id=snapshot.id, ...)`` carries
+    no ``state=`` at all) — unlike the in-memory fake the HTTP-seam tests
+    inject, whose ``list_sessions`` DOES populate state on listed
+    sessions and would silently mask a regression back to reading the
+    Case off ``_most_recent_session()``. Exercised against the REAL
+    backend: the EMERGENCY button must resolve her recorded country from
+    ``adkUserState`` (via ``get_user_state``), so the cached card it
+    renders unconditionally is for the RIGHT country rather than always
+    UNKNOWN. A test that only ran against the in-memory fake could never
+    catch this — it is the exact blind spot #79 tracked.
+    """
+    from google.adk.models import BaseLlm
+
+    from app.chat import ChatService
+
+    class _NeverCalledLlm(BaseLlm):
+        model: str = "structural-test-only"
+
+        async def generate_content_async(self, llm_request, stream: bool = False):
+            raise AssertionError("the EMERGENCY button must never call the model")
+            yield  # pragma: no cover - unreachable, satisfies the generator shape
+
+    service = FirestoreSessionService(_db())
+    chat_service = ChatService(session_service=service, llm=_NeverCalledLlm())
+    uid = f"button-country-{uuid4().hex}"
+
+    async def scenario():
+        # She told Gabay her country in an earlier turn — a real Case
+        # write, exactly like an ordinary DISPATCHER turn's extraction.
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            case_mutations=[
+                {
+                    "op": "merge",
+                    "delta": {
+                        "claims": {
+                            "country": {"value": "Qatar", "confidence": "high"}
+                        }
+                    },
+                    "source": "extraction",
+                    "now": "2026-09-04T00:00:00+00:00",
+                }
+            ],
+        )
+
+        lines = [line async for line in chat_service.press_emergency_button(uid=uid)]
+        cards = [json.loads(line) for line in lines if json.loads(line)["type"] == "card"]
+        assert cards, "the button must render a card unconditionally"
+        assert cards[0]["card"]["country"] == "QA"
 
     asyncio.run(scenario())
