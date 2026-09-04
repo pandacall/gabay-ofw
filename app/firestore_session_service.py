@@ -112,6 +112,67 @@ def _merge_state(
     return merged
 
 
+def _plan_state_from(stored_user: dict[str, Any]) -> dict[str, Any]:
+    """The ``{"plan", "plan_seq_in", "plan_active"}`` bundle
+    ``app.plan_ops`` operates on, read from a raw ``adkUserState`` dict."""
+    return {
+        "plan": stored_user.get(PLAN_RAW),
+        "plan_seq_in": stored_user.get(PLAN_SEQ_IN_RAW),
+        "plan_active": stored_user.get(PLAN_ACTIVE_RAW),
+    }
+
+
+def _write_plan_state(stored_user: dict[str, Any], plan_state: dict[str, Any]) -> None:
+    stored_user[PLAN_RAW] = plan_state["plan"]
+    stored_user[PLAN_SEQ_IN_RAW] = plan_state["plan_seq_in"]
+    stored_user[PLAN_ACTIVE_RAW] = plan_state["plan_active"]
+
+
+def _replay_case_mutations(
+    stored_user: dict[str, Any],
+    fresh_case: Any,
+    mutations: list[dict[str, Any]] | None,
+    *,
+    force: bool = False,
+) -> bool:
+    """Replays ``mutations`` against ``fresh_case`` and writes the result
+    onto ``stored_user[CASE_RAW]`` — but only when something actually
+    changed, or ``force`` says so. An all-unrecognised mutation list must
+    leave the stored Case truly UNTOUCHED, never rewritten to an
+    identical value (which, from empty state, would otherwise plant a
+    ``case: null`` field where none existed). ``force=True`` is for
+    ``append_event``: a same-turn pre-merged blob on the raw delta must
+    be overridden back to the replayed value even when replay itself was
+    a no-op, or that stale blob would silently win. Returns whether
+    ``stored_user`` was written to.
+    """
+    if not mutations:
+        return False
+    new_case = apply_case_mutations(fresh_case, mutations)
+    if new_case == fresh_case and not force:
+        return False
+    stored_user[CASE_RAW] = new_case
+    return True
+
+
+def _replay_plan_mutations(
+    stored_user: dict[str, Any],
+    fresh_plan_state: dict[str, Any],
+    mutations: list[dict[str, Any]] | None,
+    *,
+    force: bool = False,
+) -> bool:
+    """The Plan analogue of ``_replay_case_mutations``. Returns whether
+    ``stored_user`` was written to."""
+    if not mutations:
+        return False
+    new_plan_state = apply_plan_mutations(fresh_plan_state, mutations)
+    if new_plan_state == fresh_plan_state and not force:
+        return False
+    _write_plan_state(stored_user, new_plan_state)
+    return True
+
+
 class FirestoreSessionService(BaseSessionService):
     """Persists ADK sessions to the v6 contract paths with revision checks."""
 
@@ -182,22 +243,12 @@ class FirestoreSessionService(BaseSessionService):
             def mutate_txn(txn) -> dict[str, Any]:
                 snapshot = user_ref.get(transaction=txn)
                 stored_user = snapshot.to_dict() or {}
-                if case_mutations:
-                    stored_user[CASE_RAW] = apply_case_mutations(
-                        stored_user.get(CASE_RAW), case_mutations
-                    )
-                if plan_mutations:
-                    new_plan_state = apply_plan_mutations(
-                        {
-                            "plan": stored_user.get(PLAN_RAW),
-                            "plan_seq_in": stored_user.get(PLAN_SEQ_IN_RAW),
-                            "plan_active": stored_user.get(PLAN_ACTIVE_RAW),
-                        },
-                        plan_mutations,
-                    )
-                    stored_user[PLAN_RAW] = new_plan_state["plan"]
-                    stored_user[PLAN_SEQ_IN_RAW] = new_plan_state["plan_seq_in"]
-                    stored_user[PLAN_ACTIVE_RAW] = new_plan_state["plan_active"]
+                _replay_case_mutations(
+                    stored_user, stored_user.get(CASE_RAW), case_mutations
+                )
+                _replay_plan_mutations(
+                    stored_user, _plan_state_from(stored_user), plan_mutations
+                )
                 txn.set(user_ref, stored_user, merge=True)
                 return stored_user
 
@@ -449,34 +500,35 @@ class FirestoreSessionService(BaseSessionService):
                 if user_snapshot is not None:
                     stored_user = user_snapshot.to_dict() or {}
                     fresh_case = stored_user.get(CASE_RAW)
-                    fresh_plan_state = {
-                        "plan": stored_user.get(PLAN_RAW),
-                        "plan_seq_in": stored_user.get(PLAN_SEQ_IN_RAW),
-                        "plan_active": stored_user.get(PLAN_ACTIVE_RAW),
-                    }
+                    fresh_plan_state = _plan_state_from(stored_user)
                     stored_user.update(deltas["user"])
                     touched_raw_keys = set(deltas["user"].keys())
-                    if case_mutations:
-                        # The re-merged result WINS over any pre-merged
-                        # blob this event's delta may also carry (a
-                        # same-turn in-memory convenience write) — never
-                        # trust the blob computed before this transaction
-                        # re-read the freshly-stored Case.
-                        stored_user[CASE_RAW] = apply_case_mutations(
-                            fresh_case, case_mutations
-                        )
+                    # The re-merged result WINS over any pre-merged blob
+                    # this event's delta may also carry (a same-turn
+                    # in-memory convenience write) — never trust the blob
+                    # computed before this transaction re-read the
+                    # freshly-stored Case/Plan. force=True whenever that
+                    # blob is present, so an all-unrecognised mutation
+                    # list still overrides it back to the true value
+                    # rather than letting the stale blob stand.
+                    if _replay_case_mutations(
+                        stored_user,
+                        fresh_case,
+                        case_mutations,
+                        force=CASE_RAW in deltas["user"],
+                    ):
                         touched_raw_keys.add(CASE_RAW)
-                    if plan_mutations:
-                        new_plan_state = apply_plan_mutations(
-                            fresh_plan_state, plan_mutations
-                        )
-                        stored_user[PLAN_RAW] = new_plan_state["plan"]
-                        stored_user[PLAN_SEQ_IN_RAW] = new_plan_state[
-                            "plan_seq_in"
-                        ]
-                        stored_user[PLAN_ACTIVE_RAW] = new_plan_state[
-                            "plan_active"
-                        ]
+                    plan_keys_in_delta = {
+                        PLAN_RAW,
+                        PLAN_SEQ_IN_RAW,
+                        PLAN_ACTIVE_RAW,
+                    } & deltas["user"].keys()
+                    if _replay_plan_mutations(
+                        stored_user,
+                        fresh_plan_state,
+                        plan_mutations,
+                        force=bool(plan_keys_in_delta),
+                    ):
                         touched_raw_keys.update(
                             {PLAN_RAW, PLAN_SEQ_IN_RAW, PLAN_ACTIVE_RAW}
                         )

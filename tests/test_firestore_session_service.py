@@ -27,7 +27,9 @@ from google.adk.events import Event, EventActions
 from google.cloud import firestore
 
 from app.firestore_session_service import FirestoreSessionService
-from app.state_keys import CASE, CASE_MUTATIONS
+from app.rules import Citation, Grievance, Jurisdiction, SourceTier, TenureBucket
+from app.sequencer import ActionClass, PlanStep, SequencerIn
+from app.state_keys import CASE, CASE_MUTATIONS, PLAN, PLAN_MUTATIONS
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FIRESTORE_EMULATOR_HOST"),
@@ -505,6 +507,215 @@ def test_unrecognised_mutation_leaves_the_stored_case_untouched():
         user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
         case = user_state["case"]
         assert "CONFINED" in case["safety_flags"]
+
+    asyncio.run(scenario())
+
+
+# ---------------------------------------------------------------------------
+# Plan mutation replay (ADR-0008 amendment): the Plan gets the same
+# commit-time-against-freshly-stored-state treatment as the Case, exercised
+# against a REAL Firestore transaction via append_event.
+# ---------------------------------------------------------------------------
+
+
+def _plan_mutation_event(mutations: list[dict]) -> Event:
+    return _event({PLAN_MUTATIONS: mutations})
+
+
+def _citation() -> Citation:
+    return Citation(
+        source_name="Test Source",
+        reference="Art. 1",
+        url="https://example.org/law",
+        tier=SourceTier.TIER_1,
+    )
+
+
+def _plan_step(step_id: str) -> PlanStep:
+    return PlanStep(
+        id=step_id,
+        rule_citation=_citation(),
+        grievance=Grievance.UNPAID_WAGES,
+        file_where="SEnA",
+        action_class=ActionClass.PROTECTIVE_REVERSIBLE,
+        tier=SourceTier.TIER_1,
+    )
+
+
+def _seq_in(country: Jurisdiction = Jurisdiction.SA) -> SequencerIn:
+    return SequencerIn(
+        country=country,
+        tenure=TenureBucket.EMPLOYED_IN_COUNTRY,
+        grievances=(Grievance.UNPAID_WAGES,),
+    )
+
+
+def test_plan_publish_mutation_replayed_against_a_fresher_stored_plan():
+    """A ``publish`` mutation recorded against the turn-start Plan must
+    be replayed against whatever is ACTUALLY stored at commit time — a
+    concurrent Conversation's DONE mark on the same Plan must survive a
+    regeneration, not be silently discarded by a stale in-memory copy."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"plan-publish-fresh-{uuid4().hex}"
+
+    async def scenario():
+        seq_in = _seq_in()
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            plan_mutations=[
+                {
+                    "op": "publish",
+                    "seq_in": seq_in.model_dump(mode="json"),
+                    "steps": [_plan_step("row-1").model_dump(mode="json")],
+                    "plan_id": "plan-1",
+                    "now": "2026-09-04T00:00:00+00:00",
+                }
+            ],
+        )
+
+        # A concurrent writer marks the step DONE.
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            plan_mutations=[
+                {
+                    "op": "mark_step_done",
+                    "plan_id": "plan-1",
+                    "step_id": "row-1",
+                    "now": "2026-09-04T00:01:00+00:00",
+                }
+            ],
+        )
+
+        # A regeneration mutation, computed against the version-1 Plan
+        # BEFORE the DONE mark landed, commits through a Session/event.
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        await service.append_event(
+            writer,
+            _plan_mutation_event(
+                [
+                    {
+                        "op": "publish",
+                        "seq_in": seq_in.model_dump(mode="json"),
+                        "steps": [_plan_step("row-1").model_dump(mode="json")],
+                        "plan_id": "plan-1",
+                        "now": "2026-09-04T00:02:00+00:00",
+                    }
+                ]
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        stored_plan = user_state["plan"]
+        assert stored_plan["steps"][0]["status"] == "DONE"
+        assert stored_plan["version"] == 2
+
+    asyncio.run(scenario())
+
+
+def test_plan_mark_step_done_mismatch_is_a_noop_via_append_event():
+    """A ``mark_step_done`` mutation whose ``plan_id`` no longer matches
+    the freshly-stored Plan (a concurrent regeneration since it was
+    recorded) must leave the stored Plan untouched, not mislabel a step
+    on the wrong Plan."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"plan-mark-mismatch-{uuid4().hex}"
+
+    async def scenario():
+        seq_in = _seq_in()
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            plan_mutations=[
+                {
+                    "op": "publish",
+                    "seq_in": seq_in.model_dump(mode="json"),
+                    "steps": [_plan_step("row-1").model_dump(mode="json")],
+                    "plan_id": "plan-1",
+                    "now": "2026-09-04T00:00:00+00:00",
+                }
+            ],
+        )
+
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        await service.append_event(
+            writer,
+            _plan_mutation_event(
+                [
+                    {
+                        "op": "mark_step_done",
+                        "plan_id": "stale-plan-id",
+                        "step_id": "row-1",
+                        "now": "2026-09-04T00:01:00+00:00",
+                    }
+                ]
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        assert user_state["plan"]["steps"][0]["status"] == "PENDING"
+
+    asyncio.run(scenario())
+
+
+def test_plan_recheck_staleness_evaluated_against_freshly_stored_plan():
+    """Two Conversations race a staleness recheck: A publishes a fresh,
+    matching Plan; B's recheck was computed against an OLDER copy at
+    B's turn start. Replayed against the FRESH stored Plan (A's), the
+    recheck must find it not stale — closing the ADR-0008 amendment's
+    race (a second Conversation's stale recheck must never overwrite a
+    Plan another Conversation just verified)."""
+    db = _db()
+    service = FirestoreSessionService(db)
+    uid = f"plan-recheck-race-{uuid4().hex}"
+
+    async def scenario():
+        seq_in = _seq_in()
+        await service.append_user_mutation(
+            app_name=APP_NAME,
+            user_id=uid,
+            plan_mutations=[
+                {
+                    "op": "publish",
+                    "seq_in": seq_in.model_dump(mode="json"),
+                    "steps": [_plan_step("row-1").model_dump(mode="json")],
+                    "plan_id": "plan-1",
+                    "now": "2026-09-04T00:00:00+00:00",
+                }
+            ],
+        )
+
+        session = await service.create_session(app_name=APP_NAME, user_id=uid)
+        writer = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session.id
+        )
+        # B's recheck carries only the country it resolved this turn —
+        # never a seq_in snapshot — so replay always compares against
+        # the freshly-stored plan_seq_in, matching A's fresh Plan.
+        await service.append_event(
+            writer,
+            _plan_mutation_event(
+                [
+                    {
+                        "op": "recheck_staleness",
+                        "country": "SA",
+                        "now": "2026-09-04T00:05:00+00:00",
+                    }
+                ]
+            ),
+        )
+
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        assert user_state["plan_active"] is True
 
     asyncio.run(scenario())
 
