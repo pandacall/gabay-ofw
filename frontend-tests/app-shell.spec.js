@@ -1,21 +1,28 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser, SAMPLE_CONTACTS } = require("./test-helpers");
+const { openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer } = require("./test-helpers");
 
 const openApp = openAsSignedInUser;
 
 test("signed-in user lands directly on the home screen: a centred greeting, the rail, and the floating composer", async ({
   page,
-}) => {
+}, testInfo) => {
   await openAsSignedInUser(page);
 
   await expect(page.getByRole("heading", { name: "Kumusta, Alice?" })).toBeVisible();
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+
+  if (testInfo.project.name === "mobile") {
+    // No persistent rail on a phone — the burger opens it as a drawer.
+    await expect(page.locator(".topbar-menu")).toBeVisible();
+    await expect(page.locator(".app.rail-open")).toHaveCount(0);
+  }
+  await openRailIfDrawer(page);
   await expect(page.locator(".rail")).toBeVisible();
   // Creation is implicit (issue #72): no Conversation row exists until
   // she sends her first message — the rail offers "new conversation".
   await expect(page.getByRole("button", { name: "New conversation" })).toBeVisible();
   await expect(page.locator(".rail-conversation")).toHaveCount(0);
-  await expect(page.locator("#chat-input")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
@@ -51,6 +58,7 @@ test("language choice updates the home screen and persists", async ({ page }) =>
 
   // The greeting is "Kumusta, {name}?" in every language, so assert on
   // body copy that is genuinely localised.
+  await openRailIfDrawer(page);
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
   await expect(page.getByRole("heading", { name: "Kumusta, Alice?" })).toBeVisible();
   await expect(page.locator("#home-greeting")).toContainText("Bisan unsang pinulongan");
@@ -65,6 +73,7 @@ test("optional profile accepts and retains any destination country", async ({
 }) => {
   await openAsSignedInUser(page);
 
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await page.getByLabel("Destination country (optional)").fill("Iceland");
   await page.getByLabel("Occupation (optional)").fill("");
@@ -72,6 +81,7 @@ test("optional profile accepts and retains any destination country", async ({
   await expect(page.getByRole("status")).toContainText("Profile saved");
 
   await page.getByRole("button", { name: "Back" }).click();
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByLabel("Destination country (optional)")).toHaveValue("Iceland");
 });
@@ -105,6 +115,7 @@ test("one tap wipes everything through the nonce-gated backend", async ({
     localStorage.setItem("gabay-disclaimer-accepted:alice", "true");
   });
 
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await page.getByRole("button", { name: "Delete everything now" }).click();
 
@@ -126,6 +137,7 @@ test("a failed wipe is reported, never silently swallowed", async ({ page }) => 
   );
   await openAsSignedInUser(page);
 
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await page.getByRole("button", { name: "Delete everything now" }).click();
 
@@ -229,9 +241,12 @@ test("profile stays reachable, and the composer stays visible, on a small screen
   await page.setViewportSize({ width: 360, height: 740 });
   await openAsSignedInUser(page);
 
-  await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
   await expect(page.locator("#chat-input")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+  // Profile lives in the rail, reached from the burger on a phone.
+  await expect(page.getByRole("button", { name: "Menu", exact: true })).toBeVisible();
+  await openRailIfDrawer(page);
+  await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
 });
 
 test("a Case conflict is shown with both values and resolved by one tap", async ({
@@ -319,6 +334,7 @@ test("the retired Crisis Help wizard is gone: no danger question, country picker
   await expect(page.locator("[data-form='crisis-country']")).toHaveCount(0);
   await expect(page.locator("[data-form='crisis-situation']")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Are you in physical danger right now?" })).toHaveCount(0);
+  await openRailIfDrawer(page);
   await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
 });
 

@@ -29,7 +29,7 @@ const copy = {
     notEmergencyBody: "If you are in immediate danger, contact local emergency services or the nearest Philippine Embassy.",
     understand: "I understand",
     greeting: (name) => `Kumusta, ${name}?`,
-    conversationsHeading: "Conversations",
+    conversationsHeading: "Past conversations",
     conversationsNavigation: "Conversations",
     thisConversation: "Your conversation",
     backHome: "Back",
@@ -99,7 +99,7 @@ const copy = {
     notEmergencyBody: "Kung may agarang panganib, tumawag sa local emergency services o pinakamalapit na Philippine Embassy.",
     understand: "Naiintindihan ko",
     greeting: (name) => `Kumusta, ${name}?`,
-    conversationsHeading: "Mga Usapan",
+    conversationsHeading: "Mga nakaraang usapan",
     conversationsNavigation: "Mga Usapan",
     thisConversation: "Ang usapan mo",
     backHome: "Bumalik",
@@ -169,7 +169,7 @@ const copy = {
     notEmergencyBody: "Kung naa sa diha-diha nga peligro, kontaka ang local emergency services o duol nga Philippine Embassy.",
     understand: "Nasabtan nako",
     greeting: (name) => `Kumusta, ${name}?`,
-    conversationsHeading: "Mga Panag-istorya",
+    conversationsHeading: "Mga nangaging panag-istorya",
     conversationsNavigation: "Mga Panag-istorya",
     thisConversation: "Imong panag-istorya",
     backHome: "Balik",
@@ -296,18 +296,24 @@ Object.assign(copy.en, {
   emergencyRegion: "Emergency help",
   attachLabel: "Add a photo",
   attachUnavailable: "Adding a photo isn't available yet — tell Gabay what it shows instead.",
+  menuLabel: "Menu",
+  closeLabel: "Close",
 });
 Object.assign(copy.tl, {
   skipToEmergency: "Dumiretso sa tulong pang-emergency",
   emergencyRegion: "Tulong pang-emergency",
   attachLabel: "Magdagdag ng larawan",
   attachUnavailable: "Hindi pa puwedeng magdagdag ng larawan — sabihin na lang kay Gabay ang nakikita rito.",
+  menuLabel: "Menu",
+  closeLabel: "Isara",
 });
 Object.assign(copy.ceb, {
   skipToEmergency: "Diretso sa tabang pang-emergency",
   emergencyRegion: "Tabang pang-emergency",
   attachLabel: "Pagdugang og litrato",
   attachUnavailable: "Dili pa mahimo ang pagdugang og litrato — isulti na lang kang Gabay ang makita niini.",
+  menuLabel: "Menu",
+  closeLabel: "Isira",
 });
 
 const screen = document.getElementById("screen");
@@ -321,6 +327,31 @@ const markSafeButton = document.getElementById("mark-safe-button");
 const markSafeDialog = document.getElementById("mark-safe-dialog");
 const deleteConversationDialog = document.getElementById("delete-conversation-dialog");
 const status = document.getElementById("status");
+
+// The rail on a phone (<=900px) is an off-canvas drawer opened from the
+// burger bar; on wider screens it is always visible and these are no-ops
+// (the CSS ignores .rail-open above the breakpoint).
+const railIsDrawer = () => window.matchMedia("(max-width: 900px)").matches;
+function applyRailState(open, { moveFocus = true } = {}) {
+  app.classList.toggle("rail-open", open);
+  document.querySelector(".topbar-menu")?.setAttribute("aria-expanded", String(open));
+  // Take the scrimmed background out of the tab order while the drawer is
+  // open — but never the emergency controls, which sit outside #screen.
+  const bg = open && railIsDrawer();
+  screen.inert = bg;
+  document.querySelector(".mobile-topbar")?.toggleAttribute("inert", bg);
+  if (!moveFocus || !railIsDrawer()) return;
+  (open ? document.querySelector(".rail-close") : document.querySelector(".topbar-menu"))?.focus();
+}
+// The burger / X / scrim / Escape path — moves focus with the drawer.
+const setRailOpen = (open) => applyRailState(open);
+// A navigation closed the drawer as a side effect — clear it without
+// stealing focus from whatever the navigation target focuses.
+const closeRailAfterNav = () => {
+  if (railIsDrawer() && app.classList.contains("rail-open")) {
+    applyRailState(false, { moveFocus: false });
+  }
+};
 
 const supportedLanguages = Object.keys(copy);
 const savedLanguage = localStorage.getItem("gabay-language");
@@ -516,11 +547,32 @@ function chatMessageHtml(message) {
 // label is a neutral date derived from last-activity — denormalised
 // topic labels arrive in a later slice (#73). Never loads a
 // Conversation's state to build this list.
+// A relative label, so a list of same-day threads is still scannable
+// before the denormalised topic labels of #73 land: today shows the
+// time, yesterday says so, the last week shows the weekday, older shows
+// the date. All localised to the reply language.
 function conversationDateLabel(lastUpdateTime) {
   if (!lastUpdateTime) return "";
   const date = new Date(lastUpdateTime * 1000);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat(language, { month: "short", day: "numeric" }).format(date);
+  const now = new Date();
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(date)) / 86400000);
+  if (dayDiff <= 0) {
+    return new Intl.DateTimeFormat(language, { hour: "numeric", minute: "2-digit" }).format(date);
+  }
+  if (dayDiff === 1) {
+    return new Intl.RelativeTimeFormat(language, { numeric: "auto" }).format(-1, "day");
+  }
+  if (dayDiff < 7) {
+    return new Intl.DateTimeFormat(language, { weekday: "long" }).format(date);
+  }
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return new Intl.DateTimeFormat(language, {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  }).format(date);
 }
 
 function renderRail() {
@@ -531,11 +583,13 @@ function renderRail() {
       const active = row.session_id === chatSessionId ? " active" : "";
       const label = conversationDateLabel(row.last_update_time) || t("thisConversation");
       return `<div class="rail-conversation${active}" data-session-id="${escapeHtml(row.session_id)}">
-        <button type="button" class="rail-conversation-open" data-action="open-conversation">
+        <button type="button" class="rail-conversation-open" data-action="open-conversation" aria-label="${escapeHtml(label)}"${active ? ' aria-current="page"' : ""}>
           <span class="rail-conversation-dot" aria-hidden="true"></span>
           <span class="rail-conversation-label">${escapeHtml(label)}</span>
         </button>
-        <button type="button" class="rail-conversation-delete" data-action="delete-conversation" aria-label="${escapeHtml(t("deleteConversationLabel"))}">&times;</button>
+        <button type="button" class="rail-conversation-delete" data-action="delete-conversation" aria-label="${escapeHtml(t("deleteConversationLabel"))}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 4h4M9 7l.7 12a2 2 0 0 0 2 1.9h.6a2 2 0 0 0 2-1.9L17 7M10.5 10.5v6M13.5 10.5v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>`;
     })
     .join("");
@@ -760,7 +814,9 @@ function homeTemplate() {
       </div>
       <div class="messages" id="chat-messages" aria-live="polite" aria-relevant="additions" aria-busy="false">${messagesInnerHtml()}</div>
       <form class="composer-pill" data-form="chat">
-        <button type="button" class="composer-plus" data-action="composer-attach" aria-label="${escapeHtml(t("attachLabel"))}">+</button>
+        <button type="button" class="composer-plus" data-action="composer-attach" aria-label="${escapeHtml(t("attachLabel"))}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.6" stroke="currentColor" stroke-width="1.7"/><circle cx="8.8" cy="10" r="1.7" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 16.5l4.2-3.7a1.5 1.5 0 0 1 2 0l2.6 2.3m2-1.6a1.5 1.5 0 0 1 2 0l0.6 0.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <textarea id="chat-input" rows="1" maxlength="4000" required aria-label="${escapeHtml(t("chatPlaceholder"))}" placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
         <button class="composer-send" type="submit" aria-label="${escapeHtml(t("chatSend"))}" ${chatBusy ? "disabled" : ""}>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1145,12 +1201,22 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "toggle-rail") {
+    setRailOpen(!app.classList.contains("rail-open"));
+    return;
+  }
+  if (action === "close-rail") {
+    setRailOpen(false);
+    return;
+  }
   if (action === "new-conversation") {
     newConversation();
+    closeRailAfterNav();
     return;
   }
   if (action === "open-conversation") {
     openConversation(button.closest(".rail-conversation")?.dataset.sessionId);
+    closeRailAfterNav();
     return;
   }
   if (action === "delete-conversation") {
@@ -1184,8 +1250,19 @@ document.addEventListener("click", (event) => {
       ?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "end" });
     return;
   }
-  if (action === "home" && currentScreen === "home") return;
+  if (action === "home" && currentScreen === "home") {
+    closeRailAfterNav();
+    return;
+  }
   navigate(action);
+  closeRailAfterNav();
+});
+
+// Escape closes the mobile drawer (matching the dialogs).
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && app.classList.contains("rail-open")) {
+    setRailOpen(false);
+  }
 });
 
 // The composer has no Send button — the mic is the submit control and
@@ -1258,6 +1335,11 @@ document.getElementById("accept-disclaimer").addEventListener("click", () => {
 deleteConversationDialog.addEventListener("close", () => {
   pendingDeleteSessionId = null;
 });
+// It is a light panel, not a demanding modal — a click on the scrim
+// (anywhere outside the form) dismisses it, like a popover.
+deleteConversationDialog.addEventListener("click", (event) => {
+  if (event.target === deleteConversationDialog) deleteConversationDialog.close();
+});
 
 applyCopy();
 renderLanguageOptions();
@@ -1297,6 +1379,7 @@ if (auth) {
       editingCaseField = null;
       if (markSafeDialog.open) markSafeDialog.close();
       if (deleteConversationDialog.open) deleteConversationDialog.close();
+      app.classList.remove("rail-open");
       refreshEmergencyControls();
       return;
     }

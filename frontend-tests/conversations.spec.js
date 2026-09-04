@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser, SAMPLE_CONTACTS } = require("./test-helpers");
+const { openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer } = require("./test-helpers");
 
 // issue #72 (ADR-0008): many Conversations she can leave and return to,
 // sharing one Case. These drive the rail + transcript UI with every
@@ -52,6 +52,7 @@ test("tapping 'new conversation' clears the thread and leaves no row until she s
   await openAsSignedInUser(page);
   await useConversations(page, { list: [] });
 
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "New conversation" }).click();
   await expect(page.locator(".rail-conversation")).toHaveCount(0);
   await expect(page.locator("#home-greeting")).toBeVisible();
@@ -110,6 +111,7 @@ test("opening a conversation from the rail restores its transcript and cards", a
     },
   });
 
+  await openRailIfDrawer(page);
   await page.locator(".rail-conversation .rail-conversation-open").first().click();
 
   await expect(page.locator(".chat-message.user")).toContainText("not been paid");
@@ -134,6 +136,7 @@ test("a re-opened turn with a past plan card shows one 'view current plan' line,
     },
   });
 
+  await openRailIfDrawer(page);
   await page.locator(".rail-conversation .rail-conversation-open").first().click();
 
   await expect(page.locator(".chat-message.stale-plan")).toHaveCount(1);
@@ -152,6 +155,7 @@ test("deleting a conversation shows the plain-language line, then removes the ro
     ],
   });
 
+  await openRailIfDrawer(page);
   await page
     .locator('.rail-conversation[data-session-id="s-drop"]')
     .locator("[data-action='delete-conversation']")
@@ -173,6 +177,7 @@ test("deleting a conversation shows the plain-language line, then removes the ro
 
 test("delete-everything is still one tap in the profile screen", async ({ page }) => {
   await openAsSignedInUser(page);
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("button", { name: "Delete everything now" })).toBeVisible();
 });

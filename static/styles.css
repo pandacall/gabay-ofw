@@ -71,8 +71,8 @@
   :root {
     --ground: #141518;
     --surface: #24262c;
-    --rail: #1a1b1e;
-    --rail-row: #2b2d33;
+    --rail: #1c1d21;
+    --rail-row: #2c2e34;
     --rail-row-active: #363940;
     --user-bubble: #2d2f35;
     --faint: #202228;
@@ -445,63 +445,129 @@ p { color: var(--body); line-height: 1.55; }
 .notice-list strong { color: var(--ink); font-weight: 500; }
 .dialog-actions { display: grid; gap: 0.6rem; margin-top: 1.4rem; }
 
-/* ---------- Signed-in shell ---------- */
+/* Removing one Conversation is a small, contained action (the Case
+   survives) — its confirm is a compact panel anchored beside the list it
+   came from, with only a faint scrim, not a screen-blocking modal. */
+#delete-conversation-dialog {
+  position: fixed;
+  margin: 0;
+  left: 1rem;
+  top: 4.25rem;
+  max-width: 19rem;
+  width: min(19rem, calc(100vw - 2rem));
+  padding: 1.05rem 1.1rem 1.1rem;
+  box-shadow: var(--shadow-md);
+}
+#delete-conversation-dialog::backdrop { background: rgba(0, 0, 0, 0.06); backdrop-filter: none; }
+#delete-conversation-dialog h2 { font-size: 1.02rem; margin-bottom: 0.35rem; letter-spacing: -0.005em; }
+#delete-conversation-dialog p { font-size: 0.86rem; line-height: 1.5; }
+#delete-conversation-dialog .dialog-actions { gap: 0.35rem; margin-top: 0.9rem; }
+#delete-conversation-dialog .dialog-actions .button { padding: 0.6rem 1rem; font-size: 0.9rem; }
+.delete-confirm-button { color: var(--urgent); }
+.delete-confirm-button:hover { color: var(--urgent-dark); }
+@media (min-width: 901px) {
+  #delete-conversation-dialog { left: calc(16.5rem + 0.6rem); top: 5rem; }
+}
+
+/* ---------- Signed-in shell ----------
+   The viewport is the frame: .app is exactly one screen tall and clips.
+   The rail is fixed chrome; the conversation surface (#screen) owns all
+   scrolling. The page itself never scrolls. */
 .app {
   display: flex;
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   background: var(--ground);
 }
 
+/* Mobile burger bar + drawer scaffolding — display:none until the
+   <=900px block turns them on. */
+.mobile-topbar { display: none; }
+.rail-scrim { display: none; }
+.rail-close { display: none; }
+
 /* The left rail: a flat panel on its own ground, one shade off the page
-   — no shadow, no line. Brand, the Conversation list, then the account
-   controls. Width in rem so it scales with the user's text zoom. */
+   — no shadow, no line. Brand, then the primary action + Conversation
+   list, then account controls pinned to the foot. Only the list scrolls,
+   inside the rail. Always visible on wide screens; an off-canvas drawer
+   on a phone. Width in rem so it scales with the user's text zoom. */
 .rail {
   width: 16.5rem;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem 0.9rem 1.25rem;
+  gap: 1.15rem;
+  padding: 1.5rem 0.75rem 1rem;
   background: var(--rail);
   position: relative;
   z-index: 2;
+  overflow: hidden;
 }
 .rail-brand { padding: 0.35rem 0.6rem 0.25rem; }
-.rail-conversations { display: flex; flex-direction: column; gap: 0.35rem; }
+.rail-nav { display: flex; flex-direction: column; gap: 0.12rem; flex: 1; min-height: 0; }
 .rail-heading {
-  margin: 0.35rem 0.6rem 0.15rem;
-  font-size: 0.78rem;
+  flex-shrink: 0;
+  margin: 0.9rem 0.7rem 0.35rem;
+  font-size: 0.76rem;
   font-weight: 500;
   color: var(--muted);
 }
 .rail-new-conversation {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.65rem 0.8rem;
+  gap: 0.55rem;
+  padding: 0.6rem 0.7rem;
   border-radius: var(--radius-pill);
-  color: var(--body);
+  color: var(--ink);
   font-size: 0.92rem;
   font-weight: 500;
   text-align: left;
+  transition: background 0.14s ease;
 }
-.rail-new-conversation::before { content: "+"; color: var(--muted); font-weight: 400; font-size: 1.1rem; line-height: 1; }
 .rail-new-conversation:hover { background: var(--rail-row); }
-.rail-conversations-list { display: flex; flex-direction: column; gap: 0.1rem; overflow-y: auto; max-height: 34vh; }
+.rail-control-icon {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.rail-control-icon svg { width: 1.15rem; height: 1.15rem; display: block; }
+.rail-conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  margin: 0 -0.15rem;
+  padding: 0 0.15rem;
+}
 .rail-conversation { display: flex; align-items: center; border-radius: var(--radius-pill); }
 .rail-conversation-open {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
   flex: 1;
   min-width: 0;
-  padding: 0.62rem 0.85rem;
+  padding: 0.55rem 0.7rem;
   color: var(--body);
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   text-align: left;
 }
 .rail-conversation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-conversation-dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+/* The dot is the open-conversation marker — it holds a fixed slot on
+   every row for alignment, but only shows its weight on the active one. */
+.rail-conversation-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--pine);
+  flex-shrink: 0;
+  opacity: 0;
+}
 .rail-conversation-delete {
   flex-shrink: 0;
   display: grid;
@@ -509,35 +575,38 @@ p { color: var(--body); line-height: 1.55; }
   min-width: 2rem;
   min-height: 2rem;
   padding: 0.3rem;
-  margin-right: 0.15rem;
-  font-size: 1.05rem;
-  line-height: 1;
+  margin-right: 0.1rem;
   color: var(--muted);
   border-radius: var(--radius-sm);
   opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
+.rail-conversation-delete svg { width: 1rem; height: 1rem; display: block; }
 .rail-conversation:hover .rail-conversation-delete,
+.rail-conversation.active .rail-conversation-delete,
 .rail-conversation-delete:focus-visible { opacity: 1; }
-.rail-conversation-delete:hover { background: var(--rail-row); color: var(--body); }
+.rail-conversation-delete:hover { background: var(--rail-row-active); color: var(--urgent); }
 .rail-conversation:hover { background: var(--rail-row); }
-.rail-conversation.active { background: var(--rail-row-active); color: var(--ink); font-weight: 500; }
-.rail-conversation.active .rail-conversation-dot { background: var(--pine); }
+.rail-conversation.active { background: var(--rail-row-active); color: var(--ink); }
+.rail-conversation.active .rail-conversation-open { color: var(--ink); font-weight: 500; }
+.rail-conversation.active .rail-conversation-dot { opacity: 1; }
 
-.rail-footer { margin-top: auto; display: flex; flex-direction: column; gap: 0.25rem; padding-top: 0.5rem; }
+.rail-footer { flex-shrink: 0; display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.6rem; }
 .rail-control {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.55rem 0.6rem;
+  gap: 0.55rem;
+  padding: 0.5rem 0.7rem;
   border-radius: var(--radius-pill);
   font-size: 0.9rem;
   color: var(--body);
   text-align: left;
+  transition: background 0.14s ease;
 }
 .rail-control:hover { background: var(--rail-row); }
 .avatar-button #avatar-initial {
-  width: 1.8rem;
-  height: 1.8rem;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 50%;
   background: var(--pine);
   color: var(--on-pine);
@@ -545,21 +614,48 @@ p { color: var(--body); line-height: 1.55; }
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   flex-shrink: 0;
 }
 .account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-#screen { flex: 1; min-width: 0; position: relative; outline: none; }
+/* The in-rail language control is a rail row like any other — no nested
+   floating pill. The select fills the row so the hover highlight and
+   the control are the same shape. (The signed-out nav keeps its own
+   standalone pill treatment.) */
+.rail .language-control { cursor: pointer; }
+.rail .language-select {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  font: inherit;
+  color: var(--body);
+  text-overflow: ellipsis;
+}
+.rail-control-chevron {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+.rail-control-chevron svg { width: 0.85rem; height: 0.85rem; display: block; }
+
+#screen { flex: 1; min-width: 0; min-height: 0; position: relative; outline: none; overflow-y: auto; }
 #screen-loading { position: absolute; }
 
 /* ---------- Home: greeting, thread, floating composer ---------- */
-.home-shell { position: relative; display: flex; min-height: 100dvh; }
+.home-shell { position: relative; display: flex; height: 100%; min-height: 0; overflow: hidden; }
 .home-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   padding: clamp(1.25rem, 3vw, 2.25rem) clamp(1.1rem, 4vw, 3rem) clamp(1.25rem, 3vw, 2rem);
   position: relative;
   z-index: 1;
@@ -603,65 +699,56 @@ p { color: var(--body); line-height: 1.55; }
 .chat-opener:hover { box-shadow: var(--shadow-sm); }
 
 /* The composer: a floating pill that is on screen for every state —
-   empty greeting, mid-conversation, EMERGENCY card. A "+" (add a photo —
-   a prototype affordance that acknowledges the tap) at the head, the
-   send control at the tail. Enter sends; Shift+Enter is a newline. */
+   empty greeting, mid-conversation, EMERGENCY card. An add-a-photo
+   control at the head (a prototype affordance that acknowledges the
+   tap), the send control at the tail — matched circular buttons,
+   optically centred against a single line of text. Enter sends;
+   Shift+Enter is a newline. */
 .composer-pill {
   margin: 1rem auto 0;
+  flex-shrink: 0;
   display: flex;
-  align-items: flex-end;
-  gap: 0.4rem;
+  align-items: center;
+  gap: 0.3rem;
   background: var(--surface);
   border-radius: var(--radius-composer);
   box-shadow: var(--shadow-md);
-  padding: 0.4rem 0.5rem 0.4rem 0.65rem;
+  padding: 0.4rem 0.5rem;
   max-width: 47rem;
   width: 100%;
 }
-.composer-plus {
+.composer-plus,
+.composer-send {
   flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
   display: grid;
   place-items: center;
-  width: 2.4rem;
-  height: 2.4rem;
-  border-radius: 50%;
-  font-size: 1.5rem;
-  font-weight: 300;
   color: var(--muted);
-  line-height: 1;
-  margin-bottom: 0.15rem;
   transition: background 0.14s ease, color 0.14s ease;
 }
-.composer-plus:hover { background: var(--faint); color: var(--ink); }
+.composer-plus svg,
+.composer-send svg { width: 1.2rem; height: 1.2rem; display: block; }
+.composer-plus:hover,
+.composer-send:hover { background: var(--faint); color: var(--ink); }
 .composer-pill textarea {
   flex: 1;
   min-width: 0;
   border: none;
   resize: none;
   background: none;
-  padding: 0.85rem 0;
+  padding: 0.6rem 0.2rem;
   max-height: 8rem;
   font-size: 1rem;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--ink);
   caret-color: var(--pine);
 }
 .composer-pill textarea::placeholder { color: var(--muted); }
 .composer-pill textarea:focus { outline: none; }
-.composer-send {
-  flex-shrink: 0;
-  width: 2.9rem;
-  height: 2.9rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  color: var(--muted);
-  transition: background 0.14s ease, color 0.14s ease;
-}
-.composer-send:hover { background: var(--faint); color: var(--ink); }
 /* Once there is something to send, the control takes Gabay's colour. */
 .composer-pill textarea:not(:placeholder-shown) + .composer-send { color: var(--pine); }
-.composer-send svg { width: 1.15rem; height: 1.15rem; display: block; }
 .composer-send:disabled { opacity: 0.4; cursor: default; }
 
 /* ---------- Thread: markless agent replies, warm-grey user turns ---------- */
@@ -902,50 +989,98 @@ p { color: var(--body); line-height: 1.55; }
    never a top bar. Labels collapse to the mark and the account initial
    so it costs little width on a phone. */
 @media (max-width: 900px) {
+  /* No persistent rail on a phone (Gemini-style): a burger bar up top
+     opens the rail as an off-canvas drawer over a scrim. */
+  .mobile-topbar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 6;
+    padding: 0.55rem 0.6rem;
+  }
+  .topbar-menu {
+    flex-shrink: 0;
+    width: 2.6rem;
+    height: 2.6rem;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: var(--ink);
+    transition: background 0.14s ease;
+  }
+  .topbar-menu svg { width: 1.4rem; height: 1.4rem; display: block; }
+  .topbar-menu:hover { background: var(--rail-row); }
+  .topbar-brand { font-size: 0.95rem; padding: 0.4rem 0.3rem; }
+
+  .rail-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: var(--backdrop);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .app.rail-open .rail-scrim { opacity: 1; pointer-events: auto; }
+
   .rail {
-    width: 4.25rem;
-    padding: 1rem 0.25rem;
-    gap: 0.9rem;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(19rem, 84vw);
+    z-index: 40;
+    box-shadow: var(--shadow-lg);
+    padding: 1.25rem 0.8rem 1rem;
+    gap: 1rem;
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
   }
-  .rail-heading,
-  .rail-brand span:not(.brand-dot),
-  .rail-conversation-label,
-  .account-name { display: none; }
-  .rail-brand { justify-content: center; padding: 0.35rem 0; min-height: 2.75rem; }
-  .rail-new-conversation { justify-content: center; font-size: 0; padding: 0.6rem 0.3rem; min-height: 2.75rem; }
-  .rail-new-conversation::before { font-size: 1.2rem; }
-  /* Touch targets: every rail control clears 44px on a phone. */
-  .rail-conversation-open, .rail-control { justify-content: center; padding: 0.55rem 0.3rem; min-height: 2.75rem; }
-  .rail-control { font-size: 0; }
-  .rail-footer .language-control { padding: 0; }
-  .rail .language-select {
-    width: 100%;
-    padding: 0.5rem 0.1rem;
-    min-height: 2.6rem;
-    font-size: 0.72rem;
-    text-align: center;
+  .app.rail-open .rail { transform: translateX(0); }
+
+  .rail-close {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: 0.75rem;
+    right: 0.65rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    color: var(--muted);
+    transition: background 0.14s ease, color 0.14s ease;
   }
-  .rail-conversation-delete { opacity: 1; min-width: 2.25rem; min-height: 2.25rem; margin: 0; }
+  .rail-close svg { width: 1.15rem; height: 1.15rem; display: block; }
+  .rail-close:hover { background: var(--rail-row); color: var(--ink); }
+  .rail-brand { padding-right: 2.75rem; }
+  /* The drawer has full width — labels, delete affordance, and the
+     conversation list all read normally. */
+  .rail-conversation-delete { opacity: 1; }
+  .rail-conversation-open, .rail-control, .rail-new-conversation { min-height: 2.75rem; }
+
   .case-inline { max-width: 100%; }
   .welcome-nav { padding: 1rem; }
-  .emergency-controls { top: 0.7rem; right: 0.7rem; }
+  .emergency-controls { top: 0.62rem; right: 0.7rem; }
   .emergency-button { padding: 0.7rem 1rem; font-size: 0.84rem; min-height: 2.75rem; }
   .mark-safe-button { min-height: 2.5rem; }
   .messages { gap: 1.15rem; }
   .chat-message.agent { font-size: 1.02rem; }
   .chat-message.user { max-width: 85%; }
-  /* Keep content clear of the fixed help affordance in the top-right. */
-  .home-main { padding-top: 3.5rem; }
-  .flow-shell { padding-top: 3.5rem; }
+  /* Clear the fixed burger bar / emergency pill up top. */
+  .home-main { padding-top: 3.75rem; }
+  .flow-shell { padding-top: 3.75rem; }
   /* The pill holds two controls plus a one-line placeholder in a narrow
-     column: both controls sit at 40px (comfortably past WCAG 2.5.8's
-     24px, close to the 44px target), the text shrinks a step, padding
-     tightens. Below 360px the "+" drops entirely (see that block). */
-  .composer-pill { padding: 0.3rem 0.35rem 0.3rem 0.4rem; gap: 0.15rem; }
-  .composer-plus { width: 2.5rem; height: 2.5rem; font-size: 1.3rem; margin-bottom: 0; }
-  .composer-pill textarea { font-size: 0.85rem; padding: 0.7rem 0; }
-  .composer-send { width: 2.5rem; height: 2.5rem; }
-  .composer-send svg { width: 1.05rem; height: 1.05rem; }
+     column: both controls stay at 40px (comfortably past WCAG 2.5.8's
+     24px), the text shrinks a step, padding tightens. Below 360px the
+     photo control drops entirely (see that block). */
+  .composer-pill { padding: 0.3rem 0.35rem; gap: 0.1rem; }
+  .composer-plus, .composer-send { width: 2.5rem; height: 2.5rem; }
+  .composer-plus svg, .composer-send svg { width: 1.1rem; height: 1.1rem; }
+  .composer-pill textarea { font-size: 0.85rem; padding: 0.6rem 0.15rem; }
   .chat-opener { padding: 0.7rem 1.05rem; }
 }
 

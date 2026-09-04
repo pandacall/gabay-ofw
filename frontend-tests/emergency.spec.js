@@ -1,5 +1,5 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser, SAMPLE_CONTACTS } = require("./test-helpers");
+const { openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer } = require("./test-helpers");
 
 const emergencyCard = {
   type: "safe_floor",
@@ -35,6 +35,7 @@ test("the EMERGENCY button is reachable from home and from Profile", async ({
   await openAsSignedInUser(page);
   await expect(page.getByRole("button", { name: "I need help now" })).toBeVisible();
 
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("button", { name: "I need help now" })).toBeVisible();
 });
@@ -107,6 +108,7 @@ test("EMERGENCY switches to the home screen synchronously, bypassing the animate
     });
   });
   await openAsSignedInUser(page);
+  await openRailIfDrawer(page);
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
 
