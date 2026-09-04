@@ -26,6 +26,8 @@ from __future__ import annotations
 
 from google.adk.events import Event
 
+from app.reply_text import visible_texts
+
 #: Every key under a tool result whose dict value is fixed, non-model
 #: data to render as a card, never framed as free text (ADR-0002).
 #: ``card`` is the original convention
@@ -116,7 +118,9 @@ def replay_conversation(events: list[Event]) -> list[dict]:
             ):
                 lines.append({"type": "recourse_routes", "recourse_routes": response})
 
-        texts = [part.text for part in event.content.parts if part.text]
+        # issue #76: never replay a persisted thought part into a re-opened
+        # transcript — same filter the live reply builder applies.
+        texts = visible_texts(event.content.parts)
         if not texts:
             continue
         if event.author == "user":

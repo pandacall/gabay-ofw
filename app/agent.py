@@ -58,6 +58,8 @@ from google.adk.apps import App
 from google.adk.apps._configs import EventsCompactionConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 from google.adk.models import BaseLlm
+from google.adk.planners import BuiltInPlanner
+from google.genai import types
 
 from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
 from app.complaint.agent import COMPLAINT_DRAFTER_NAME, build_complaint_drafter
@@ -90,6 +92,44 @@ from app.tools import (
 # Gemini model string pinned exactly — never a -latest alias.
 GEMINI_MODEL = "gemini-3.6-flash"
 APP_NAME = "gabay-ofw"
+
+# DISPATCHER thinks before it routes (issue #76, parent #69). Only DISPATCHER
+# carries the built-in planner — it is the one multi-specialist voice, and a
+# planner fights a specialist's structured output schema. EMERGENCY carries
+# none either (the safety-critical artifact on that path is the zero-model
+# hotline card; what waits on reasoning latency is comfort and triage, a cost
+# accepted deliberately).
+#
+# A thinking LEVEL, never a token budget. From Gemini 3.5 onward the older
+# ``thinking_budget`` is rejected outright by the generative-AI SDK against a
+# pinned model, and a silently-ignored budget is worse than an error — the
+# work would ship believing thinking was capped when it was not. So
+# ``thinking_budget`` is left unset here and asserted absent tree-wide by
+# tests/test_thinking_planner.py.
+#
+# LOW is the stated fallback: if a turn invoking both DEBUNKER and
+# FILING_SEQUENCER stops fitting a ~10-second budget, change MEDIUM -> LOW
+# here and re-measure. It is a one-constant change.
+DISPATCHER_THINKING_LEVEL = types.ThinkingLevel.MEDIUM
+
+# Thought summaries OFF. The Progress Trail (issue #75) is what the user sees
+# while a turn runs; raw model reasoning arrives in English during a crisis
+# and must never reach her. The thought-part FILTER in app.chat / app.history
+# is the real safety guarantee (it holds regardless of this setting); turning
+# summaries off here is configuration on top of it.
+DISPATCHER_INCLUDE_THOUGHTS = False
+
+
+def build_dispatcher_planner() -> BuiltInPlanner:
+    """The built-in planner wrapping Gemini native thinking for DISPATCHER
+    only — thinking level MEDIUM, thought summaries disabled, no token
+    budget (issue #76)."""
+    return BuiltInPlanner(
+        thinking_config=types.ThinkingConfig(
+            thinking_level=DISPATCHER_THINKING_LEVEL,
+            include_thoughts=DISPATCHER_INCLUDE_THOUGHTS,
+        )
+    )
 
 # Bounded context growth (issue #49): compaction trigger policy for
 # build_events_compaction_config below. Two independent triggers, either
@@ -690,6 +730,9 @@ def build_adk_app(llm: BaseLlm) -> App:
         model=llm,
         description="The only voice: absorbs the story, replies warmly.",
         instruction=_dispatcher_instruction,
+        # issue #76: the planner lives on DISPATCHER and nowhere else — not
+        # on EMERGENCY, not on any single_turn specialist.
+        planner=build_dispatcher_planner(),
         before_agent_callback=make_absorb_narrative_callback(llm),
         tools=[office_directory, action_card, safe_floor_card, mark_plan_step_done],
         # FILING_SEQUENCER (issue #42) is NOT listed in tools=[...]: as a

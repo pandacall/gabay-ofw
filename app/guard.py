@@ -412,7 +412,14 @@ class RoutingGuardPlugin(BasePlugin):
         changed = False
         new_parts: list[types.Part] = []
         for part in content.parts:
-            if not part.text:
+            # A model thought part (issue #76: gemini native thinking, now
+            # on for DISPATCHER) rides in the same content as the reply.
+            # It is English reasoning she never sees — app.reply_text
+            # strips it before it becomes visible text — so it is NOT a
+            # voice-integrity subject: diffing it would re-emit
+            # thought-sourced numbers or mangle it for no benefit. Pass it
+            # through untouched, like any non-text part.
+            if not part.text or getattr(part, "thought", None):
                 new_parts.append(part)
                 continue
             clean, misses = diff_reply(part.text, allowed, tool_values)
