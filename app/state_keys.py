@@ -47,3 +47,36 @@ CASE_MUTATIONS = State.TEMP_PREFIX + "case_mutations"
 
 #: This turn's recorded Plan mutations. See module docstring.
 PLAN_MUTATIONS = State.TEMP_PREFIX + "plan_mutations"
+
+# ---------------------------------------------------------------------------
+# The Imminent Danger latch (ADR-0009, issue #74). It answers "is THIS
+# Conversation the Emergency one" — Conversation state, never the Case. The
+# Safety Flags that provoke it stay on her user-scoped Case; the latch
+# rides with the Conversation and is gone the moment that Conversation is
+# deleted. These are SESSION-scoped (no prefix): one per Conversation.
+# ---------------------------------------------------------------------------
+
+#: ``{"active": bool, "opened_at": iso|None, "marked_safe_at": iso|None}``.
+#: ``active`` is written only at open (``create_session``, no race) and by
+#: ``mark_safe`` — never by a turn — so a ``mark_safe`` racing an in-flight
+#: Emergency turn can never be re-latched.
+EMERGENCY_LATCH = "emergency_latch"
+
+#: ``{"last_turn_at": iso|None, "resume_check_at": iso|None}`` — the
+#: long-gap-resume bookkeeping (issue #41). A DISJOINT key from
+#: ``EMERGENCY_LATCH`` on purpose: a turn writes only this, so it never
+#: clobbers ``active``.
+EMERGENCY_RESUME = "emergency_resume"
+
+#: The Escalation Handoff carried into an Emergency Conversation at open
+#: time and never after: ``{"country", "reason_category", "summary",
+#: "source_session_id"}``. Never the source transcript.
+ESCALATION_HANDOFF = "escalation_handoff"
+
+#: A ``user:``-scoped pointer to the one live Emergency Conversation's
+#: session id (ADR-0009: at most one live at a time). Set when one opens,
+#: cleared by ``mark_safe`` and by deleting that Conversation. This is
+#: what lets ``mark_safe`` keep working with no Conversation id from the
+#: UI.
+EMERGENCY_CONVERSATION_ID_RAW = "emergency_conversation_id"
+EMERGENCY_CONVERSATION_ID = State.USER_PREFIX + EMERGENCY_CONVERSATION_ID_RAW

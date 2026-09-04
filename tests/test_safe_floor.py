@@ -16,6 +16,7 @@ from app.agent import GEMINI_MODEL
 from app.chat import ChatService
 from app.directory import Channel, Country
 from app.main import create_app
+from app.emergency import open_latch
 from app.safe_floor import (
     ACUTE_SAFETY_FLAGS,
     CACHED_CARDS,
@@ -25,9 +26,9 @@ from app.safe_floor import (
     SafeFloorReason,
     build_card,
     cached_card,
-    is_imminent_danger,
+    is_emergency_conversation,
 )
-from app.state_keys import CASE
+from app.state_keys import CASE, EMERGENCY_LATCH
 from tests.test_chat_api import FakeVerifier, TAGLISH_EXTRACTION, auth
 
 ALL_CARD_COUNTRIES = list(CARD_KEYS)
@@ -187,11 +188,16 @@ class TestCardFixtures:
 
 class TestImminentDangerPredicate:
     """Integration-level checks that Safe Floor's predicate hook is the
-    real one from app.case. The exhaustive pure-predicate suite (acute
-    set membership, button press, mark_safe) lives in
-    tests/test_case_merge.py as the CI-gating suite."""
+    real one from app.emergency — "this Conversation is the Emergency
+    one", read off the Conversation latch (ADR-0009). The exhaustive
+    pure suite lives in tests/test_emergency_latch.py."""
 
-    def test_acute_flag_trips_the_predicate_via_merge(self):
+    def test_latch_active_state_is_emergency(self):
+        assert is_emergency_conversation(
+            {EMERGENCY_LATCH: open_latch(now="2024-01-01T00:00:00Z")}
+        ) is True
+
+    def test_a_flag_on_the_case_alone_is_not_an_emergency_conversation(self):
         from app.case import merge_case
 
         case = merge_case(
@@ -199,39 +205,31 @@ class TestImminentDangerPredicate:
             {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]},
             now="2024-01-01T00:00:00Z",
         )
-        assert is_imminent_danger(case) is True
+        # A disclosure records a Pending Escalation; it does NOT make the
+        # Conversation the Emergency one.
+        assert is_emergency_conversation({CASE: case}) is False
 
-    def test_chronic_flags_alone_do_not(self):
-        from app.case import merge_case
-
-        # CONFINED and PASSPORT_WITHHELD are the Gulf baseline — chronic.
-        case = merge_case(
-            None,
-            {"safety_flags": ["CONFINED", "PASSPORT_WITHHELD"]},
-            now="2024-01-01T00:00:00Z",
-        )
-        assert is_imminent_danger(case) is False
-
-    def test_no_case_is_not_danger(self):
-        assert is_imminent_danger(None) is False
-        assert is_imminent_danger({}) is False
+    def test_no_state_is_not_an_emergency_conversation(self):
+        assert is_emergency_conversation(None) is False
+        assert is_emergency_conversation({}) is False
 
     def test_acute_set_is_a_frozenset_in_code(self):
         assert isinstance(ACUTE_SAFETY_FLAGS, frozenset)
         assert "PHYSICAL_ASSAULT_ONGOING" in ACUTE_SAFETY_FLAGS
         assert "PHYSICAL_ASSAULT_PAST" not in ACUTE_SAFETY_FLAGS
 
-    def test_safe_floor_card_tool_suppresses_hold_line_under_danger(self):
-        """End-to-end through app.tools.safe_floor_card (not just
-        build_card directly): an acute flag on the Case suppresses the
-        hold_line via the real predicate, and clearing it via mark_safe
-        restores the line on the next call."""
-        from app.case import mark_safe, merge_case
+    def test_safe_floor_card_tool_suppresses_hold_line_in_an_emergency_conversation(
+        self,
+    ):
+        """End-to-end through app.tools.safe_floor_card: the hold_line is
+        suppressed only when THIS Conversation holds the latch, not merely
+        because an acute flag is on her Case."""
+        from app.case import merge_case
         from app.tools import safe_floor_card
 
         class FakeToolContext:
-            def __init__(self, case):
-                self.state = {CASE: case}
+            def __init__(self, state):
+                self.state = state
 
         case = merge_case(
             None,
@@ -241,12 +239,18 @@ class TestImminentDangerPredicate:
             },
             now="2024-01-01T00:00:00Z",
         )
-        result = safe_floor_card("NO_VERIFIED_PLAN", FakeToolContext(case))
-        assert result["card"]["hold_line"] is None
-
-        cleared = mark_safe(case, now="2024-01-01T00:10:00Z")
-        result = safe_floor_card("NO_VERIFIED_PLAN", FakeToolContext(cleared))
+        # A normal Conversation: acute flag on the Case, but no latch.
+        result = safe_floor_card("NO_VERIFIED_PLAN", FakeToolContext({CASE: case}))
         assert result["card"]["hold_line"] == HOLD_LINE
+
+        # The Emergency Conversation: latch active -> hold_line suppressed.
+        result = safe_floor_card(
+            "NO_VERIFIED_PLAN",
+            FakeToolContext(
+                {CASE: case, EMERGENCY_LATCH: open_latch(now="2024-01-01T00:05:00Z")}
+            ),
+        )
+        assert result["card"]["hold_line"] is None
 
 
 class TestHardFallbackHttpSeam:

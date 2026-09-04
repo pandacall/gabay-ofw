@@ -75,6 +75,10 @@ class NonceIn(BaseModel):
     nonce: str = Field(min_length=1, max_length=200)
 
 
+class EscalateIn(BaseModel):
+    source_session_id: str = Field(min_length=1)
+
+
 def _production_chat_service() -> ChatService:
     """Built lazily on the first chat request so tests and health checks
     never touch Firestore or the Gemini key."""
@@ -300,6 +304,25 @@ def create_app(
             service.press_emergency_button(uid=uid),
             media_type="application/x-ndjson",
         )
+
+    @app.post("/api/emergency/escalate")
+    async def emergency_escalate(
+        body: EscalateIn,
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """Confirming an Escalation Prompt (ADR-0009, issue #74): opens (or
+        reopens) her one Emergency Conversation carrying an Escalation
+        Handoff derived from the source Conversation's Case — never its
+        transcript — and leaves the source Conversation exactly as it was.
+        404 for an unknown or another user's source id (mirrors
+        ``/api/chat``)."""
+        result = await service.escalate_from_prompt(
+            uid=uid, source_session_id=body.source_session_id
+        )
+        if result is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return result
 
     @app.post("/api/mark-safe/nonce")
     def mark_safe_nonce(

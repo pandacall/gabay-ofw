@@ -30,11 +30,22 @@ mean two orderings of identical facts with no way to reconcile what she
 has already filed — the exact wobble ADR-0006 exists to prevent.
 
 **Writes persist the mutation, not the merged blob.** An event carries
-the CaseDelta (or the named mutator, for `press_emergency_button` /
-`mark_safe` / a one-tap correction) plus its source and timestamp. The
-session service re-runs the pure merge *inside* the Firestore
-transaction, against the freshly-read stored Case, and writes the
-result.
+the CaseDelta (or the named mutator, for a one-tap correction) plus its
+source and timestamp. The session service re-runs the pure merge
+*inside* the Firestore transaction, against the freshly-read stored
+Case, and writes the result.
+
+> **Amended by ADR-0009 (issue #74).** The Imminent Danger latch left the
+> Case for Conversation (session) state, so the former `merge_case` named
+> mutators for it are gone — `merge` is the only op
+> `app.case.apply_mutations` still handles. The latch lives in
+> `app.emergency` now: the button opens a *new* Emergency Conversation
+> rather than writing her shared Case, so the in-flight-turn race below
+> no longer applies to the press. The latch's `active` field
+> (`EMERGENCY_LATCH`) and the long-gap-resume timestamps
+> (`EMERGENCY_RESUME`, written by `emergency.record_turn`) are disjoint
+> session keys, so a `mark_safe` racing an in-flight Emergency turn is
+> likewise never undone.
 
 The previous shape — compute the merged Case in memory, then
 `stored_user.update({"case": <blob>})` inside the transaction — is a

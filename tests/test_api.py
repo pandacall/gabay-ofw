@@ -23,9 +23,9 @@ from app.retention import get_retention_sweeper
 
 
 class _NeverCalledLlm(BaseLlm):
-    """mark_safe never runs the model (app.chat.apply_mark_safe mutates
-    the Case directly, outside the Runner) — this fake fails the test
-    if it is ever asked to generate."""
+    """mark_safe never runs the model (app.chat.apply_mark_safe clears the
+    Conversation latch outside the Runner) — this fake fails the test if
+    it is ever asked to generate."""
 
     model: str = GEMINI_MODEL
 
@@ -252,7 +252,9 @@ class TestMarkSafe:
         )
         assert r.status_code == 200
         assert r.json()["marked_safe"] is True
-        assert r.json()["case"]["emergency"]["active"] is False
+        # ADR-0009: the latch is Conversation state, not on the Case — the
+        # Case comes back untouched (no "emergency" key at all).
+        assert "emergency" not in r.json()["case"]
         # mark_safe never deletes anything.
         assert deleter.calls == []
 

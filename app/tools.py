@@ -20,7 +20,7 @@ from app.directory import (
     resolve_case_country,
     resolve_keys,
 )
-from app.safe_floor import SafeFloorReason, build_card, is_imminent_danger
+from app.safe_floor import SafeFloorReason, build_card, is_emergency_conversation
 from app.sequencer import Plan
 from app.staleness import mark_step_done
 from app.state_keys import CASE, PLAN, PLAN_ACTIVE, PLAN_MUTATIONS
@@ -100,7 +100,7 @@ def safe_floor_card(reason: str, tool_context: ToolContext) -> dict[str, Any]:
         "card": build_card(
             country,
             reason=parsed,
-            imminent_danger=is_imminent_danger(case),
+            imminent_danger=is_emergency_conversation(tool_context.state),
         )
     }
 

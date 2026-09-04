@@ -831,6 +831,25 @@ p { color: var(--body); line-height: 1.55; }
 .chat-message.agent.stale-plan:hover { color: var(--ink); }
 .chat-message.typing { flex-direction: row; gap: 0.35rem; align-items: center; }
 
+/* The Escalation Prompt (ADR-0009): a two-tap offer beside the Safe Floor
+   card. "Not now" removes this card only, never the disclosure. */
+.chat-message.agent.escalation-prompt {
+  align-self: flex-start;
+  max-width: 30rem;
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--urgent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.15rem 1.3rem;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+.escalation-prompt-title { margin: 0 0 0.3rem; font-weight: 600; }
+.escalation-prompt-body { margin: 0 0 0.9rem; font-size: 0.92rem; color: var(--muted); }
+.escalation-prompt-actions { display: grid; gap: 0.5rem; }
+.escalation-prompt-actions .button { width: 100%; }
+
 /* Contact / action cards — findings arrive here, in the thread, verbatim
    from the streamed payload (ADR-0002). Never a separate screen. */
 .chat-message.agent.contact-card {

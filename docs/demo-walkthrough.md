@@ -227,14 +227,16 @@ try means starting over, at 1am, with less trust left.
 2. Watch how fast the action card renders — it should feel instant, not
    like a normal chat turn. This path (`POST /api/emergency/button`) never
    touches Gemini; it renders a fixed, cached MWO/OWWA action card and
-   trips the Imminent Danger predicate with zero model latency.
+   opens an **Emergency Conversation** holding the Imminent Danger latch,
+   with zero model latency (ADR-0009). The view switches to that
+   Conversation; a second press just reopens it.
 3. Once EMERGENCY has been pressed, an **"I'm safe now"** button appears
    next to it (this is the mark_safe affordance — PRD user story 28/33; it
-   only shows while `case.emergency.active` is true). Tap it.
+   shows while the open Conversation holds the latch — carried on the
+   `emergency_latch` stream line). Tap it.
 4. A confirmation dialog appears ("Confirm you are safe") — this is the
    deliberate second tap so a coerced pocket-tap on the visible button
-   alone can't clear the predicate (user story 32). Tap **"Yes, I am
-   safe"**.
+   alone can't clear the latch (user story 32). Tap **"Yes, I am safe"**.
 
 **Expected:**
 - The action card renders immediately after step 1 — MWO/OWWA contacts,
