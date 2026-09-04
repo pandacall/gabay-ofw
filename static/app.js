@@ -290,6 +290,26 @@ Object.assign(copy.ceb, {
   deleteConversationFailed: "Wala kini makuha karon. Sulayi pag-usab.",
 });
 
+// A11y and prototype-affordance copy (design-fidelity audit follow-up).
+Object.assign(copy.en, {
+  skipToEmergency: "Skip to emergency help",
+  emergencyRegion: "Emergency help",
+  attachLabel: "Add a photo",
+  attachUnavailable: "Adding a photo isn't available yet — tell Gabay what it shows instead.",
+});
+Object.assign(copy.tl, {
+  skipToEmergency: "Dumiretso sa tulong pang-emergency",
+  emergencyRegion: "Tulong pang-emergency",
+  attachLabel: "Magdagdag ng larawan",
+  attachUnavailable: "Hindi pa puwedeng magdagdag ng larawan — sabihin na lang kay Gabay ang nakikita rito.",
+});
+Object.assign(copy.ceb, {
+  skipToEmergency: "Diretso sa tabang pang-emergency",
+  emergencyRegion: "Tabang pang-emergency",
+  attachLabel: "Pagdugang og litrato",
+  attachUnavailable: "Dili pa mahimo ang pagdugang og litrato — isulti na lang kang Gabay ang makita niini.",
+});
+
 const screen = document.getElementById("screen");
 const screenLoading = document.getElementById("screen-loading");
 const app = document.getElementById("signed-in");
@@ -322,9 +342,15 @@ const CHAT_OPENERS = [
 ];
 let chatSessionId = null;
 let chatMessages = [];
+// How many of chatMessages are already painted into #chat-messages, so
+// refreshChatScreen can append new bubbles instead of re-rendering the
+// whole transcript on every stream line. Reset to 0 whenever the
+// transcript is cleared; kept in sync by renderScreen and refreshChatScreen.
+let renderedMessageCount = 0;
 let chatCase = {};
 let chatBusy = false;
 let editingCaseField = null;
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 // The rail's Conversation list (issue #72): [{session_id, last_update_time}],
 // most-recent first as the backend returns them. A row appears only once
 // a Conversation actually exists (her first message) — "new conversation"
@@ -574,16 +600,17 @@ async function confirmDeleteConversation() {
   }
 }
 
-function chatMessagesHtml() {
-  const bubbles = chatMessages.map(chatMessageHtml).join("");
-  // The Progress Trail replaces the meaningless typing animation with
-  // fixed, code-owned labels of what the app is actually doing (issue
-  // #75, ADR-0010) — rendered whenever any are queued, never added to
-  // chatMessages so it can never become part of the transcript. Keyed
-  // on chatTrail itself, not chatBusy, so it renders identically no
-  // matter which stream populated it (the EMERGENCY button's response
-  // reuses this same handleChatLine, per ADR-0010: "shown in every
-  // Conversation").
+function chatBubblesHtml(messages) {
+  return messages.map(chatMessageHtml).join("");
+}
+
+// The transient tail under the transcript: the Progress Trail / typing
+// indicator (issue #75, ADR-0010 — code-owned, never part of the
+// transcript) and the "What Gabay knows" Case block (issue #44 — folded
+// into the thread, pinned below the last message). This is rebuilt on
+// every refresh; the bubbles above it are appended, not re-rendered, so
+// a long transcript does not re-parse on every stream line.
+function chatTailHtml() {
   const trail = chatTrail.length
     ? chatTrail
         .map(
@@ -594,15 +621,14 @@ function chatMessagesHtml() {
   const typing = chatBusy && !chatTrail.length
     ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>'
     : "";
-  // "What Gabay knows" (issue #44): the Case has no panel and no screen
-  // of its own any more — it folds into the thread as a quiet block
-  // pinned below the last message, so one-tap correction and conflict
-  // resolution sit right where she is reading and the composer stays put
-  // under it. Rendered only when the Case actually carries something.
   const caseBlock = caseHasContent()
     ? `<div class="case-inline" id="chat-case"><p class="case-inline-title">${t("caseTitle")}</p>${chatCaseHtml()}</div>`
     : "";
-  return bubbles + trail + typing + caseBlock;
+  return trail + typing + caseBlock;
+}
+
+function messagesInnerHtml() {
+  return `${chatBubblesHtml(chatMessages)}<div class="chat-tail" id="chat-tail">${chatTailHtml()}</div>`;
 }
 
 function caseFieldLabel(field) {
@@ -650,7 +676,7 @@ function caseClaimHtml(field, claim) {
     return `<li class="case-claim">
       <span class="case-field">${escapeHtml(caseFieldLabel(field))}</span>
       <form class="case-edit-form" data-form="case-edit" data-field="${escapeHtml(field)}">
-        <input type="text" class="case-edit-input" value="${escapeHtml(String(claim.value))}" maxlength="2000" required />
+        <input type="text" class="case-edit-input" value="${escapeHtml(String(claim.value))}" maxlength="2000" required aria-label="${escapeHtml(caseFieldLabel(field))}" />
         <button type="submit" class="button ink-button case-edit-confirm">${t("caseConfirm")}</button>
         <button type="button" class="case-edit-cancel" data-action="cancel-case-edit">${t("caseCancel")}</button>
       </form>
@@ -699,12 +725,12 @@ function homeTemplate() {
         <h1>${escapeHtml(t("greeting", firstName))}</h1>
         <p>${t("chatBody")}</p>
       </div>
-      <div class="messages" id="chat-messages" aria-live="polite">${chatMessagesHtml()}</div>
+      <div class="messages" id="chat-messages" aria-live="polite">${messagesInnerHtml()}</div>
       <form class="composer-pill" data-form="chat">
-        <span class="composer-plus" aria-hidden="true">+</span>
-        <textarea id="chat-input" rows="1" maxlength="4000" required placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
+        <button type="button" class="composer-plus" data-action="composer-attach" aria-label="${escapeHtml(t("attachLabel"))}">+</button>
+        <textarea id="chat-input" rows="1" maxlength="4000" required aria-label="${escapeHtml(t("chatPlaceholder"))}" placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
         <button class="composer-send" type="submit" aria-label="${escapeHtml(t("chatSend"))}" ${chatBusy ? "disabled" : ""}>
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 1 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 11.5V12a6 6 0 0 0 12 0v-.5M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
       </form>
       <div class="chat-openers${isEmpty ? "" : " hidden"}" id="chat-openers">
@@ -733,7 +759,23 @@ function refreshChatScreen() {
   if (openersBlock) openersBlock.classList.toggle("hidden", chatMessages.length > 0);
   const messagesEl = document.getElementById("chat-messages");
   if (messagesEl) {
-    messagesEl.innerHTML = chatMessagesHtml();
+    // Append-only: the transcript bubbles are added, never re-rendered,
+    // so re-opening a long Conversation doesn't re-parse N messages N
+    // times. A full rebuild happens only when the transcript was reset
+    // (new/opened Conversation) or the tail node is missing.
+    const tail = document.getElementById("chat-tail");
+    if (!tail || chatMessages.length < renderedMessageCount) {
+      messagesEl.innerHTML = messagesInnerHtml();
+    } else {
+      if (chatMessages.length > renderedMessageCount) {
+        tail.insertAdjacentHTML(
+          "beforebegin",
+          chatBubblesHtml(chatMessages.slice(renderedMessageCount)),
+        );
+      }
+      tail.innerHTML = chatTailHtml();
+    }
+    renderedMessageCount = chatMessages.length;
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
   const sendButton = document.querySelector('.composer-pill button[type="submit"]');
@@ -869,7 +911,13 @@ function renderScreen(name = currentScreen) {
   currentScreen = name;
   screen.dataset.screen = name;
   screen.innerHTML = templates[name]();
-  screen.focus({ preventScroll: true });
+  // homeTemplate paints the current transcript inline; keep the
+  // append-only counter in step with what was just rendered.
+  if (name === "home") renderedMessageCount = chatMessages.length;
+  // Focus is moved to #screen only on an explicit route change (see
+  // navigate), never on the first render or a re-render — otherwise a
+  // keyboard user who just signed in can never tab *back* to the skip
+  // link and the emergency control that sit before #screen.
 }
 
 function navigate(name) {
@@ -880,6 +928,9 @@ function navigate(name) {
     window.scrollTo(0, 0);
     screenLoading.classList.add("hidden");
     screen.classList.remove("hidden");
+    // A deliberate route change moves focus to the new screen so the
+    // next Tab starts in its content and a screen reader announces it.
+    screen.focus({ preventScroll: true });
   }, 120);
 }
 
@@ -1069,11 +1120,17 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "composer-attach") {
+    // Prototype affordance: photo capture isn't built. Acknowledge the
+    // tap without claiming a capability (PRD safety constraint).
+    showStatus(t("attachUnavailable"));
+    return;
+  }
   if (action === "view-current-plan") {
     // The one live Plan / Case surface is #77's; for now, take her to
     // "What Gabay knows", the Case block folded into the thread.
     (document.getElementById("chat-case") || document.getElementById("chat-messages"))
-      ?.scrollIntoView({ behavior: "smooth", block: "end" });
+      ?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "end" });
     return;
   }
   if (action === "home" && currentScreen === "home") return;
@@ -1143,6 +1200,12 @@ languageSelects.forEach((select) => {
 
 document.getElementById("accept-disclaimer").addEventListener("click", () => {
   localStorage.setItem(`gabay-disclaimer-accepted:${userId}`, "true");
+});
+
+// Escape (or any other close path) on the delete-conversation dialog must
+// drop the pending target, not leave it armed for the next confirm.
+deleteConversationDialog.addEventListener("close", () => {
+  pendingDeleteSessionId = null;
 });
 
 applyCopy();

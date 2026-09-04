@@ -45,6 +45,10 @@
   --shadow-md: 0 1px 3px rgba(31, 31, 31, 0.08), 0 12px 34px rgba(31, 31, 31, 0.08);
   --shadow-lg: 0 20px 50px rgba(26, 28, 27, 0.16);
 
+  --ring: rgba(31, 94, 74, 0.35);
+  --tint-urgent: rgba(206, 17, 38, 0.07);
+  --backdrop: rgba(31, 31, 31, 0.32);
+
   --radius-composer: 32px;
   --radius-lg: 24px;
   --radius-md: 18px;
@@ -68,9 +72,49 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button, select, .rail-conversation, .chat-opener { cursor: pointer; }
 button { background: none; border: none; padding: 0; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 3px solid rgba(31, 94, 74, 0.35);
+  outline: 3px solid var(--ring);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+/* Browser surfaces carry the palette too — the cheap tell of a page
+   that was built rather than assembled. */
+::selection { background: rgba(31, 94, 74, 0.16); }
+.messages, .rail-conversations-list, textarea {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dim) transparent;
+}
+
+/* Skip link: the first focusable element on the signed-in shell, so a
+   keyboard or screen-reader user in a crisis reaches the emergency
+   control before any screen content. */
+.skip-link {
+  position: fixed;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 30;
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  color: var(--urgent);
+  font-weight: 500;
+  font-size: 0.9rem;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+.skip-link:focus, .skip-link:focus-visible { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Preserve state changes (instant), drop the ambient motion: freeze
+     the pulsing loader dots to a static row and cut the glow fade. */
+  .dawn-loader span,
+  .content-skeleton span,
+  .chat-message.typing span { animation: none; opacity: 0.55; transform: none; }
+  .ph-glow,
+  .button, .composer-send, .chat-opener, .google-button,
+  .emergency-button, .rail-control, .skip-link { transition: none; }
 }
 
 h1, h2, h3, p { margin-top: 0; }
@@ -291,7 +335,6 @@ p { color: var(--body); line-height: 1.55; }
   font-weight: 700;
   font-size: 0.85rem;
   color: #1a73e8;
-  font-family: Arial, sans-serif;
 }
 .trust-line {
   margin: 1rem 0 0;
@@ -339,7 +382,7 @@ p { color: var(--body); line-height: 1.55; }
   background: var(--surface);
   color: var(--ink);
 }
-.disclaimer-dialog::backdrop { background: rgba(31, 31, 31, 0.32); backdrop-filter: blur(2px); }
+.disclaimer-dialog::backdrop { background: var(--backdrop); backdrop-filter: blur(2px); }
 .disclaimer-dialog h2 { margin-bottom: 0.5rem; }
 .disclaimer-dialog > form { display: flex; flex-direction: column; }
 .dialog-symbol {
@@ -367,10 +410,10 @@ p { color: var(--body); line-height: 1.55; }
 }
 
 /* The left rail: a flat panel on its own ground, one shade off the page
-   — no shadow, no line. Brand, the Conversation list, a quiet record of
-   what Gabay knows, then the account controls. */
+   — no shadow, no line. Brand, the Conversation list, then the account
+   controls. Width in rem so it scales with the user's text zoom. */
 .rail {
-  width: 264px;
+  width: 16.5rem;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -386,7 +429,7 @@ p { color: var(--body); line-height: 1.55; }
   margin: 0.35rem 0.6rem 0.15rem;
   font-size: 0.78rem;
   font-weight: 500;
-  color: var(--dim);
+  color: var(--muted);
 }
 .rail-new-conversation {
   display: flex;
@@ -418,11 +461,15 @@ p { color: var(--body); line-height: 1.55; }
 .rail-conversation-dot { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
 .rail-conversation-delete {
   flex-shrink: 0;
-  padding: 0.3rem 0.55rem;
+  display: grid;
+  place-items: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0.3rem;
   margin-right: 0.15rem;
   font-size: 1.05rem;
   line-height: 1;
-  color: var(--dim);
+  color: var(--muted);
   border-radius: var(--radius-sm);
   opacity: 0;
 }
@@ -495,6 +542,9 @@ p { color: var(--body); line-height: 1.55; }
   padding: 0.25rem 0.25rem 0.5rem;
 }
 .home-shell:not(.has-messages) .messages { flex: 0 0 auto; overflow: visible; }
+/* The transient tail (trail / typing / Case block) is a passthrough
+   wrapper so its children are direct flex items of .messages. */
+.chat-tail { display: contents; }
 
 .chat-openers { text-align: center; margin: 1.1rem auto auto; max-width: 47rem; }
 .chat-openers p { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.7rem; }
@@ -510,24 +560,39 @@ p { color: var(--body); line-height: 1.55; }
 .chat-opener:hover { box-shadow: var(--shadow-sm); }
 
 /* The composer: a floating pill that is on screen for every state —
-   empty greeting, mid-conversation, EMERGENCY card. A "+" at the head, a
-   mic at the tail; the mic is the submit control and Enter also sends,
-   so there is no separate Send button (canvas). */
+   empty greeting, mid-conversation, EMERGENCY card. A "+" (add a photo —
+   a prototype affordance that acknowledges the tap) at the head, the
+   send control at the tail. Enter sends; Shift+Enter is a newline. */
 .composer-pill {
   margin: 1rem auto 0;
   display: flex;
   align-items: flex-end;
-  gap: 0.55rem;
+  gap: 0.4rem;
   background: var(--surface);
   border-radius: var(--radius-composer);
   box-shadow: var(--shadow-md);
-  padding: 0.4rem 0.5rem 0.4rem 1.1rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.65rem;
   max-width: 47rem;
   width: 100%;
 }
-.composer-plus { font-size: 1.6rem; font-weight: 300; color: var(--muted); line-height: 1; padding-bottom: 0.55rem; }
+.composer-plus {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1;
+  margin-bottom: 0.15rem;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.composer-plus:hover { background: var(--faint); color: var(--ink); }
 .composer-pill textarea {
   flex: 1;
+  min-width: 0;
   border: none;
   resize: none;
   background: none;
@@ -536,6 +601,7 @@ p { color: var(--body); line-height: 1.55; }
   font-size: 1rem;
   line-height: 1.45;
   color: var(--ink);
+  caret-color: var(--pine);
 }
 .composer-pill textarea::placeholder { color: var(--muted); }
 .composer-pill textarea:focus { outline: none; }
@@ -546,15 +612,17 @@ p { color: var(--body); line-height: 1.55; }
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: var(--body);
+  color: var(--muted);
   transition: background 0.14s ease, color 0.14s ease;
 }
 .composer-send:hover { background: var(--faint); color: var(--ink); }
+/* Once there is something to send, the control takes Gabay's colour. */
+.composer-pill textarea:not(:placeholder-shown) + .composer-send { color: var(--pine); }
 .composer-send svg { width: 1.15rem; height: 1.15rem; display: block; }
 .composer-send:disabled { opacity: 0.4; cursor: default; }
 
 /* ---------- Thread: markless agent replies, warm-grey user turns ---------- */
-.chat-message { max-width: 100%; font-size: 1rem; line-height: 1.55; }
+.chat-message { max-width: 100%; font-size: 1rem; line-height: 1.55; overflow-wrap: break-word; }
 
 .chat-message.user {
   align-self: flex-end;
@@ -653,7 +721,7 @@ p { color: var(--body); line-height: 1.55; }
   flex-direction: column;
   gap: 0.6rem;
 }
-.case-inline-title { margin: 0; font-size: 0.8rem; font-weight: 500; color: var(--dim); }
+.case-inline-title { margin: 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 .case-empty { font-size: 0.88rem; color: var(--muted); margin: 0; }
 .case-claims, .case-flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
 .case-claim { padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--faint); }
@@ -671,7 +739,7 @@ p { color: var(--body); line-height: 1.55; }
   font-size: 0.88rem;
 }
 .case-edit-confirm, .case-edit-cancel { font-size: 0.8rem; padding: 0.35rem 0.7rem; }
-.case-claim.has-conflict { background: rgba(206, 17, 38, 0.06); }
+.case-claim.has-conflict { background: var(--tint-urgent); }
 .case-conflict-prompt { font-size: 0.83rem; margin: 0.3rem 0 0.5rem; color: var(--body); }
 .case-conflict-options { display: grid; gap: 0.4rem; }
 .case-option {
@@ -690,12 +758,12 @@ p { color: var(--body); line-height: 1.55; }
 .case-flag {
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
-  background: rgba(206, 17, 38, 0.08);
+  background: var(--tint-urgent);
   color: var(--urgent-dark);
   font-size: 0.84rem;
   text-transform: capitalize;
 }
-.case-inline h3 { margin: 0.3rem 0 0; font-size: 0.8rem; font-weight: 500; color: var(--dim); }
+.case-inline h3 { margin: 0.3rem 0 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 
 /* ---------- Profile / flow screens ---------- */
 .flow-shell { position: relative; z-index: 1; padding: clamp(1.5rem, 4vw, 3rem); max-width: 40rem; }
@@ -792,36 +860,55 @@ p { color: var(--body); line-height: 1.55; }
    so it costs little width on a phone. */
 @media (max-width: 900px) {
   .rail {
-    width: 68px;
-    padding: 1rem 0.35rem;
-    gap: 1rem;
+    width: 4.25rem;
+    padding: 1rem 0.25rem;
+    gap: 0.9rem;
   }
   .rail-heading,
   .rail-brand span:not(.brand-dot),
   .rail-conversation-label,
   .account-name { display: none; }
-  .rail-brand { justify-content: center; padding: 0.35rem 0; }
-  .rail-new-conversation { justify-content: center; font-size: 0; padding: 0.6rem 0.3rem; }
+  .rail-brand { justify-content: center; padding: 0.35rem 0; min-height: 2.75rem; }
+  .rail-new-conversation { justify-content: center; font-size: 0; padding: 0.6rem 0.3rem; min-height: 2.75rem; }
   .rail-new-conversation::before { font-size: 1.2rem; }
-  .rail-conversation-open, .rail-control { justify-content: center; padding: 0.55rem 0.3rem; }
+  /* Touch targets: every rail control clears 44px on a phone. */
+  .rail-conversation-open, .rail-control { justify-content: center; padding: 0.55rem 0.3rem; min-height: 2.75rem; }
   .rail-control { font-size: 0; }
   .rail-footer .language-control { padding: 0; }
-  .rail .language-select { width: 100%; padding: 0.4rem 0.15rem; font-size: 0.6rem; text-align: center; }
-  .rail-conversation-delete { opacity: 1; padding: 0.25rem; margin: 0; }
+  .rail .language-select {
+    width: 100%;
+    padding: 0.5rem 0.1rem;
+    min-height: 2.6rem;
+    font-size: 0.72rem;
+    text-align: center;
+  }
+  .rail-conversation-delete { opacity: 1; min-width: 2.25rem; min-height: 2.25rem; margin: 0; }
   .case-inline { max-width: 100%; }
   .welcome-nav { padding: 1rem; }
   .emergency-controls { top: 0.7rem; right: 0.7rem; }
-  .emergency-button { padding: 0.5rem 0.8rem; font-size: 0.8rem; }
+  .emergency-button { padding: 0.7rem 1rem; font-size: 0.84rem; min-height: 2.75rem; }
+  .mark-safe-button { min-height: 2.5rem; }
   .messages { gap: 1.15rem; }
   .chat-message.agent { font-size: 1.02rem; }
   .chat-message.user { max-width: 85%; }
   /* Keep content clear of the fixed help affordance in the top-right. */
-  .home-main { padding-top: 3.25rem; }
-  .flow-shell { padding-top: 3.25rem; }
-  /* Claw back width so the placeholder sits on one line in the pill. */
-  .composer-pill { padding: 0.35rem 0.4rem 0.35rem 0.85rem; gap: 0.4rem; }
-  .composer-plus { font-size: 1.3rem; padding-bottom: 0.5rem; }
-  .composer-pill textarea { font-size: 0.9rem; padding: 0.7rem 0; }
-  .composer-send { width: 2.4rem; height: 2.4rem; }
+  .home-main { padding-top: 3.5rem; }
+  .flow-shell { padding-top: 3.5rem; }
+  /* The pill has to hold two controls plus a one-line placeholder in a
+     narrow column: both controls stay above the 24px WCAG 2.5.8 floor,
+     the text shrinks a step, and the padding tightens. */
+  .composer-pill { padding: 0.3rem 0.35rem 0.3rem 0.4rem; gap: 0.2rem; }
+  .composer-plus { width: 2.25rem; height: 2.25rem; font-size: 1.25rem; margin-bottom: 0; }
+  .composer-pill textarea { font-size: 0.86rem; padding: 0.7rem 0; }
+  .composer-send { width: 2.25rem; height: 2.25rem; }
   .composer-send svg { width: 1rem; height: 1rem; }
+  .chat-opener { padding: 0.7rem 1.05rem; }
+}
+
+/* The narrowest phones: drop the prototype photo button so the one-line
+   placeholder still fits beside the send control. */
+@media (max-width: 360px) {
+  .composer-plus { display: none; }
+  .composer-pill { padding-left: 1rem; }
+  .home-greeting p { font-size: 0.92rem; }
 }

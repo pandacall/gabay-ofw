@@ -198,6 +198,10 @@ only as light.
   glow, at low alpha. If you are filling a shape with flag blue or gold, you are
   off-system.
 
+### External
+- **Google Blue** (`#1a73e8`): used for the single "G" glyph in the
+  Sign-in-with-Google button only. Not a Gabay color — never reuse it.
+
 ### Neutral
 - **Ground** (`#fbfbfa`): the one page background, everywhere, signed-in and
   signed-out. The default. Most of the screen is this color.
@@ -241,7 +245,9 @@ message, or dialog is a bug.
 Hierarchy comes from size and weight, never a second family. Headings are set at
 weight **400** — the same weight as body text — and made to feel like headings
 only through scale and tight tracking. The effect is quiet and even; nothing on
-the page shouts through boldness.
+the page shouts through boldness. The one place a non-Figtree letterform could
+be justified — the "G" in the Sign-in-with-Google button — still uses Figtree
+(bold, in Google blue); context, not the letterform, names the provider.
 
 ### Hierarchy
 - **Display** (400, `clamp(1.9rem, 4.6vw, 3rem)`, 1.16, `-0.015em`): the screen's
@@ -336,6 +342,12 @@ blur together, the fix is more space or a ground-shift, then a shadow — a
 compete with content. It is present and saturated on the empty home screen and
 animates to `opacity: 0` (`0.5s ease`) the instant the thread has a message.
 
+**The Quiet-Motion Rule.** Motion is state feedback, never spectacle — shadow
+and color shifts under 150ms, one glow fade, three pulsing loader dots. Under
+`prefers-reduced-motion: reduce` the loader dots freeze to a static dimmed row,
+the glow fade and control transitions cut to instant, and smooth-scroll is
+dropped — the state change survives, the animation does not.
+
 ## Shapes
 
 Everything is rounded, and rounded generously — the form language is soft to the
@@ -350,6 +362,9 @@ a `~0.75rem` square, `3–5px` radius, turned 45°. It is the brand mark in the
 rail and on the loading screen, and it reappears at `~0.95rem` as the speaker
 mark before every one of Gabay's replies. It is the system's only geometric
 motif and it is always pine, never outlined, never filled with anything else.
+
+Icons are single-path SVG, ~1.7–1.9 stroke width, `stroke-linecap: round`, no
+fills — the send arrow is the main one. One stroke weight throughout.
 
 ## Components
 
@@ -409,10 +424,13 @@ never motion that demands attention.
 
 ### The Composer (signature component)
 A white pill, `32px` radius, `md` shadow, that never leaves the screen. A muted
-`+` glyph at the head (attach, prototype), a borderless auto-growing textarea in
-the middle, and a **circular mic button at the tail that is the submit control** —
-there is no separate "Send" button. Enter sends; Shift+Enter inserts a newline.
-Placeholder is "Tell Gabay what is happening" in the detected language.
+**"add a photo" button** at the head (photo capture is a prototype affordance, so
+the tap is acknowledged with a toast, never a silent no-op), a borderless
+auto-growing textarea in the middle, and a **circular send button at the tail**
+(an upward-arrow glyph; it takes Gabay's pine once the field has text). There is
+no visible "Send" label — Enter sends, Shift+Enter inserts a newline. Placeholder
+is "Tell Gabay what is happening" in the detected language, mirrored to
+`aria-label`.
 
 ### The Emergency Affordance (signature component)
 A calm white pill fixed to the top-right of every signed-in screen (and repeated,
@@ -420,7 +438,11 @@ full-width and red, inside the first-run dialog): a small flag-red dot and
 "I need help now" in flag red, `sm` shadow. When the Imminent Danger predicate is
 live, an "I'm safe now" pill stacks beneath it. It is quiet on purpose — but it
 is always present, always reachable, and always renders its cached action card
-with zero model calls.
+with zero model calls. It is **first in the DOM** of the signed-in shell, and a
+visually-hidden skip link (`.skip-link`, the first focusable element, reveals on
+`:focus`) jumps straight to it — a keyboard or screen-reader user in a crisis
+reaches the exit before any screen content, matching the mouse user's instant
+access to the fixed pill.
 
 ## Do's and Don'ts
 
@@ -438,7 +460,15 @@ with zero model calls.
 - **Do** use the rotated pine square as the only geometric motif — brand mark and
   agent speaker mark, always pine.
 - **Do** keep the emergency affordance always on screen and on the zero-model
-  path, however quiet it looks.
+  path, however quiet it looks — and first in the DOM, reachable by the skip
+  link, so assistive-tech users reach it as fast as mouse users do.
+- **Do** give every interactive target ≥44px on a phone (the emergency pill
+  first) and honor `prefers-reduced-motion` with a static alternative, not a
+  blanket `0.01ms` kill.
+- **Do** label every input with `aria-label` or `<label>` — a placeholder is not
+  a name.
+- **Do** theme the browser surfaces from the palette: selection, caret,
+  scrollbars, focus ring.
 
 ### Don't:
 - **Don't** add a `1px` border to separate anything. The system has none.
