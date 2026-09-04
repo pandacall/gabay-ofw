@@ -82,6 +82,9 @@ def test_panic_wipe_leaves_zero_documents_under_the_user_subtree():
     db = _db()
     uid = f"wipe-{uuid4().hex}"
     bystander = f"bystander-{uuid4().hex}"
+    # She holds several Conversations (issue #72) — delete-everything must
+    # still take the whole subtree, every session doc included.
+    _seed_conversation(db, uid)
     _seed_conversation(db, uid)
     _seed_conversation(db, bystander)
 

@@ -35,6 +35,11 @@ async function openApp(
   await page.route("**/api/notes", (route) =>
     route.fulfill({ json: { notes: [] } }),
   );
+  // The rail loads her Conversation list on sign-in (issue #72). Default
+  // to an empty list; specs that exercise the rail override this route.
+  await page.route("**/api/conversations", (route) =>
+    route.fulfill({ json: { conversations: [] } }),
+  );
   await page.goto("/");
 }
 

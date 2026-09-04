@@ -10,7 +10,10 @@ test("signed-in user lands directly on the home screen: a centred greeting, the 
 
   await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
   await expect(page.locator(".rail")).toBeVisible();
-  await expect(page.locator(".rail-conversation.active")).toBeVisible();
+  // Creation is implicit (issue #72): no Conversation row exists until
+  // she sends her first message — the rail offers "new conversation".
+  await expect(page.getByRole("button", { name: "New conversation" })).toBeVisible();
+  await expect(page.locator(".rail-conversation")).toHaveCount(0);
   await expect(page.locator("#chat-input")).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });

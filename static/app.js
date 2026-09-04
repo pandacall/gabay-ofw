@@ -250,6 +250,46 @@ Object.assign(copy.ceb, {
   trustNoAds: "Walay ads",
 });
 
+// Conversations (issue #72): the rail list, the "new conversation"
+// affordance, and the delete-confirm copy. The delete body must state
+// plainly that her Case survives and that the real wipe is elsewhere
+// (ADR-0007 amendment) — a frightened person must not assume otherwise.
+Object.assign(copy.en, {
+  newConversation: "New conversation",
+  viewCurrentPlan: "View your current plan steps",
+  deleteConversationLabel: "Delete this conversation",
+  deleteConversationTitle: "Remove this conversation?",
+  deleteConversationBody:
+    "This removes the conversation. What you told Gabay about your situation stays. To remove everything, use Delete everything.",
+  deleteConversationConfirm: "Remove conversation",
+  deleteConversationCancel: "Cancel",
+  deleteConversationFailed: "Could not remove it right now. Try again.",
+});
+
+Object.assign(copy.tl, {
+  newConversation: "Bagong usapan",
+  viewCurrentPlan: "Tingnan ang kasalukuyang mga hakbang ng plano mo",
+  deleteConversationLabel: "Burahin ang usapang ito",
+  deleteConversationTitle: "Alisin ang usapang ito?",
+  deleteConversationBody:
+    "Inaalis nito ang usapan. Mananatili ang sinabi mo kay Gabay tungkol sa sitwasyon mo. Para burahin ang lahat, gamitin ang Burahin ang lahat.",
+  deleteConversationConfirm: "Alisin ang usapan",
+  deleteConversationCancel: "Kanselahin",
+  deleteConversationFailed: "Hindi ito naalis ngayon. Subukan muli.",
+});
+
+Object.assign(copy.ceb, {
+  newConversation: "Bag-ong panag-istorya",
+  viewCurrentPlan: "Tan-awa ang imong kasamtangang mga lakang sa plano",
+  deleteConversationLabel: "Papasa kining panag-istorya",
+  deleteConversationTitle: "Kuhaon kining panag-istorya?",
+  deleteConversationBody:
+    "Kini mokuha sa panag-istorya. Magpabilin ang imong gisulti kang Gabay bahin sa imong kahimtang. Aron papason ang tanan, gamita ang Papasa ang tanan.",
+  deleteConversationConfirm: "Kuhaa ang panag-istorya",
+  deleteConversationCancel: "Kanselaha",
+  deleteConversationFailed: "Wala kini makuha karon. Sulayi pag-usab.",
+});
+
 const screen = document.getElementById("screen");
 const screenLoading = document.getElementById("screen-loading");
 const app = document.getElementById("signed-in");
@@ -259,6 +299,7 @@ const dialog = document.getElementById("first-run-dialog");
 const languageSelects = document.querySelectorAll(".language-select");
 const markSafeButton = document.getElementById("mark-safe-button");
 const markSafeDialog = document.getElementById("mark-safe-dialog");
+const deleteConversationDialog = document.getElementById("delete-conversation-dialog");
 const status = document.getElementById("status");
 
 const supportedLanguages = Object.keys(copy);
@@ -284,6 +325,13 @@ let chatMessages = [];
 let chatCase = {};
 let chatBusy = false;
 let editingCaseField = null;
+// The rail's Conversation list (issue #72): [{session_id, last_update_time}],
+// most-recent first as the backend returns them. A row appears only once
+// a Conversation actually exists (her first message) — "new conversation"
+// just clears the screen. pendingDeleteSessionId holds the row the
+// confirm dialog is about to remove.
+let conversations = [];
+let pendingDeleteSessionId = null;
 // The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
 // shown while a turn runs, never part of chatMessages/the transcript —
 // cleared as soon as the "reply" line lands (see handleChatLine) and
@@ -402,11 +450,126 @@ function chatMessageHtml(message) {
   if (message.kind === "card") {
     return contactCardHtml(message.card || {});
   }
+  if (message.kind === "stale-plan") {
+    // A deadline-bearing Plan card seen in a past turn (issue #72,
+    // ADR-0006): never replayed as actionable — one line that points to
+    // the one live Plan instead of an expired filing order.
+    return `<button type="button" class="chat-message agent stale-plan" data-action="view-current-plan">${escapeHtml(t("viewCurrentPlan"))}</button>`;
+  }
   if (message.role === "user") {
     return `<div class="chat-message user">${escapeHtml(message.text)}</div>`;
   }
   const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : "";
   return `<div class="chat-message agent${extra}">${escapeHtml(message.text)}</div>`;
+}
+
+// The rail's Conversation list (issue #72). Rows are rendered from
+// `conversations` (most-recent first, as the backend returns them); the
+// label is a neutral date derived from last-activity — denormalised
+// topic labels arrive in a later slice (#73). Never loads a
+// Conversation's state to build this list.
+function conversationDateLabel(lastUpdateTime) {
+  if (!lastUpdateTime) return "";
+  const date = new Date(lastUpdateTime * 1000);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(language, { month: "short", day: "numeric" }).format(date);
+}
+
+function renderRail() {
+  const listEl = document.getElementById("rail-conversations-list");
+  if (!listEl) return;
+  listEl.innerHTML = conversations
+    .map((row) => {
+      const active = row.session_id === chatSessionId ? " active" : "";
+      const label = conversationDateLabel(row.last_update_time) || t("thisConversation");
+      return `<div class="rail-conversation${active}" data-session-id="${escapeHtml(row.session_id)}">
+        <button type="button" class="rail-conversation-open" data-action="open-conversation">
+          <span class="rail-conversation-dot" aria-hidden="true"></span>
+          <span class="rail-conversation-label">${escapeHtml(label)}</span>
+        </button>
+        <button type="button" class="rail-conversation-delete" data-action="delete-conversation" aria-label="${escapeHtml(t("deleteConversationLabel"))}">&times;</button>
+      </div>`;
+    })
+    .join("");
+}
+
+async function loadConversations() {
+  if (!auth?.currentUser) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/conversations", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`conversations failed: ${response.status}`);
+    const data = await response.json();
+    conversations = Array.isArray(data.conversations) ? data.conversations : [];
+  } catch {
+    // A failed load just leaves the rail as it was — never blocks the
+    // conversation surface itself.
+    conversations = [];
+  }
+  renderRail();
+}
+
+// Re-opening a Conversation (issue #72): load its stored transcript and
+// replay it through the identical handleChatLine path the live stream
+// uses. A different thread's transcript never enters this one's context
+// — each Conversation keeps its own.
+async function openConversation(sessionId) {
+  if (!auth?.currentUser || chatBusy) return;
+  chatSessionId = sessionId;
+  chatMessages = [];
+  chatCase = {};
+  chatTrail = [];
+  if (currentScreen !== "home") renderScreen("home");
+  renderRail();
+  refreshChatScreen();
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok || !response.body) throw new Error(`open failed: ${response.status}`);
+    await readNdjsonLines(response, handleChatLine);
+  } catch {
+    chatMessages.push({ role: "agent", kind: "error", text: t("chatError") });
+  } finally {
+    chatTrail = [];
+    refreshChatScreen();
+  }
+}
+
+// "New conversation" only clears the screen — the Conversation comes
+// into existence on her first message (issue #72, ADR-0008), so an
+// empty, unlabellable row is structurally impossible.
+function newConversation() {
+  chatSessionId = null;
+  chatMessages = [];
+  chatCase = {};
+  chatTrail = [];
+  editingCaseField = null;
+  if (currentScreen !== "home") renderScreen("home");
+  renderRail();
+  refreshChatScreen();
+  document.getElementById("chat-input")?.focus();
+}
+
+async function confirmDeleteConversation() {
+  const sessionId = pendingDeleteSessionId;
+  pendingDeleteSessionId = null;
+  if (!sessionId || !auth?.currentUser) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`delete failed: ${response.status}`);
+    if (sessionId === chatSessionId) newConversation();
+    await loadConversations();
+  } catch {
+    showStatus(t("deleteConversationFailed"));
+  }
 }
 
 function chatMessagesHtml() {
@@ -612,6 +775,10 @@ async function sendChatTurn(text) {
     // even if the stream broke before a "reply" line ever arrived.
     chatTrail = [];
     refreshChatScreen();
+    // Refresh the rail (issue #72): her first message in a fresh thread
+    // just created a Conversation, and any turn moves its row to the top
+    // (rows are listed most-recent first).
+    loadConversations();
   }
 }
 
@@ -625,6 +792,13 @@ function handleChatLine(line) {
   if (line.session_id) chatSessionId = line.session_id;
   if (line.type === "ack") {
     chatMessages.push({ role: "agent", kind: "ack", text: line.text });
+  } else if (line.type === "user") {
+    // Only seen when replaying a re-opened Conversation (issue #72):
+    // her own past turns, rendered as her bubbles.
+    if (line.text) chatMessages.push({ role: "user", text: line.text });
+  } else if (line.type === "stale_plan_ref") {
+    // A past deadline-bearing Plan card, collapsed (issue #72, ADR-0006).
+    chatMessages.push({ role: "agent", kind: "stale-plan" });
   } else if (line.type === "trail") {
     // The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
     // of what the app is doing, transient — never pushed to
@@ -853,6 +1027,38 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "new-conversation") {
+    newConversation();
+    return;
+  }
+  if (action === "open-conversation") {
+    openConversation(button.closest(".rail-conversation")?.dataset.sessionId);
+    return;
+  }
+  if (action === "delete-conversation") {
+    pendingDeleteSessionId = button.closest(".rail-conversation")?.dataset.sessionId;
+    deleteConversationDialog.showModal();
+    return;
+  }
+  if (action === "delete-conversation-cancel") {
+    pendingDeleteSessionId = null;
+    deleteConversationDialog.close();
+    return;
+  }
+  if (action === "delete-conversation-confirm") {
+    deleteConversationDialog.close();
+    button.disabled = true;
+    confirmDeleteConversation().finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
+  if (action === "view-current-plan") {
+    // The one live Plan / Case surface is #77's; for now, take her to
+    // the Case panel where the current picture lives.
+    document.getElementById("chat-case-panel")?.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
   if (action === "home" && currentScreen === "home") return;
   navigate(action);
 });
@@ -887,7 +1093,10 @@ languageSelects.forEach((select) => {
     localStorage.setItem("gabay-language", language);
     renderLanguageOptions();
     applyCopy();
-    if (!app.classList.contains("hidden")) renderScreen();
+    if (!app.classList.contains("hidden")) {
+      renderScreen();
+      renderRail();
+    }
   });
 });
 
@@ -926,8 +1135,11 @@ if (auth) {
       chatSessionId = null;
       chatMessages = [];
       chatCase = {};
+      conversations = [];
+      pendingDeleteSessionId = null;
       editingCaseField = null;
       if (markSafeDialog.open) markSafeDialog.close();
+      if (deleteConversationDialog.open) deleteConversationDialog.close();
       refreshEmergencyControls();
       return;
     }
@@ -936,6 +1148,7 @@ if (auth) {
     document.getElementById("account-name").textContent = userName;
     document.getElementById("avatar-initial").textContent = userName.trim().charAt(0).toUpperCase() || "G";
     renderScreen("home");
+    loadConversations();
     if (!localStorage.getItem(`gabay-disclaimer-accepted:${userId}`)) {
       dialog.showModal();
     }

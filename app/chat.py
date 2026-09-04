@@ -71,6 +71,7 @@ from app.case import mark_safe as case_mark_safe
 from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
 from app.directory import Country, resolve_case_country, resolve_keys
+from app.history import cards_in, replay_conversation
 from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card, is_imminent_danger
 from app.state_keys import CASE, CASE_MUTATIONS, CASE_RAW, PLAN_ACTIVE
 
@@ -81,45 +82,11 @@ def _line(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
-#: Every key under a tool result whose dict value is fixed, non-model data
-#: to render as a card, never framed as free text (ADR-0002). ``card`` is
-#: the original convention (office_directory/action_card/safe_floor_card);
-#: ``held_refusal`` and ``plan`` are FILING_SEQUENCER's own result shapes
-#: (issue #42) — a HELD-jurisdiction refusal and a verified Plan, each
-#: already typed as its own ``"type"`` for the UI to render directly.
-_CARD_KEYS = ("card", "held_refusal", "plan")
-
 #: Card types that already tell her the state of her Plan (or its
 #: replacement, per ADR-0006) — the auto-rendered inactive-plan Safe
 #: Floor (below) is skipped when one of these already streamed this turn,
 #: so she never sees two contradicting cards.
 _PLAN_STATUS_CARD_TYPES = frozenset({"plan", "safe_floor", "held_refusal"})
-
-
-def _cards_in(response: object) -> list[dict]:
-    """Every card-shaped value in one tool-call result, in a fixed key
-    order. A verified Plan carries no ``"type"`` of its own (ADR-0006's
-    Plan shape), so one is added here rather than by the caller. A
-    regenerated plan's ``delta`` / ``was_stale`` (issue #43) ride
-    alongside it on the SAME response dict, never nested inside the plan
-    itself — they are folded onto the rendered card here."""
-    if not isinstance(response, dict):
-        return []
-    found: list[dict] = []
-    for key in _CARD_KEYS:
-        value = response.get(key)
-        if not isinstance(value, dict):
-            continue
-        if key != "plan":
-            found.append(value)
-            continue
-        card = {"type": "plan", **value}
-        if isinstance(response.get("delta"), dict):
-            card["delta"] = response["delta"]
-        if response.get("was_stale"):
-            card["was_stale"] = True
-        found.append(card)
-    return found
 
 
 def _default_action_card(country: Country) -> dict:
@@ -171,6 +138,68 @@ class ChatService:
         return await self._session_service.get_session(
             app_name=APP_NAME, user_id=uid, session_id=session_id
         )
+
+    async def list_conversations(self, *, uid: str) -> list[dict]:
+        """Her Conversations, most-recent first (issue #72, ADR-0008).
+
+        Deliberately loads no per-Conversation state — the rail is a
+        list of threads, not their contents. Rows carry only an id and a
+        last-activity time; the neutral date label the UI shows is
+        derived from that, and denormalised topic labels arrive in a
+        later slice (#73). ``list_sessions`` sorts ascending, so the
+        most-recent-first ordering the rail wants is applied here.
+        """
+        response = await self._session_service.list_sessions(
+            app_name=APP_NAME, user_id=uid
+        )
+        rows = [
+            {
+                "session_id": session.id,
+                "last_update_time": session.last_update_time,
+            }
+            for session in (response.sessions or [])
+        ]
+        rows.sort(key=lambda row: row["last_update_time"], reverse=True)
+        return rows
+
+    async def load_conversation(
+        self, *, uid: str, session_id: str
+    ) -> list[dict] | None:
+        """A past Conversation's transcript as replayable stream lines
+        (issue #72, ADR-0008), or ``None`` when it does not exist or
+        belongs to another user — the caller renders 404 either way,
+        matching ``/api/chat``'s own session lookup.
+
+        The lines are the same NDJSON types ``stream_turn`` emits live
+        (minus the transient ``ack``/``trail``), so the client renders a
+        re-opened Conversation through the identical handler. A past
+        deadline-bearing Plan card collapses here rather than replaying
+        as actionable (``app.history``).
+        """
+        session = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        if session is None:
+            return None
+        return replay_conversation(session.events)
+
+    async def delete_conversation(self, *, uid: str, session_id: str) -> bool:
+        """Removes one Conversation's transcript and nothing else (issue
+        #72, ADR-0007 amendment). Her Case and Plan are user-scoped and
+        untouched; ``delete_session`` recursively deletes only
+        ``users/{uid}/sessions/{session_id}`` and its events. Returns
+        whether the Conversation existed (``False`` → the caller renders
+        404, never leaking another user's session id as "found").
+        """
+        session = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        if session is None:
+            return False
+        await self._session_service.delete_session(
+            app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        return True
 
     async def _most_recent_session(self, *, uid: str) -> Session | None:
         """The uid's most-recently-updated session, or None with no
@@ -443,7 +472,7 @@ class ChatService:
                 # (ADR-0002): the card is fixed data, DISPATCHER only frames it.
                 for function_response in event.get_function_responses():
                     response = function_response.response
-                    cards.extend(_cards_in(response))
+                    cards.extend(cards_in(response))
                     if not isinstance(response, dict):
                         continue
                     # search_corpus results — already guard-filtered by
