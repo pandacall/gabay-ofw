@@ -224,6 +224,22 @@
     </form>
   </dialog>
 
+  <!-- Rename one Conversation (issue #73): her own word for it wins over
+       any derived label, permanently. -->
+  <dialog id="rename-conversation-dialog" class="disclaimer-dialog" aria-labelledby="rename-conversation-title">
+    <form method="dialog">
+      <h2 id="rename-conversation-title" data-copy="renameConversationTitle"></h2>
+      <label class="rename-conversation-field">
+        <span data-copy="renameConversationInput"></span>
+        <input type="text" id="rename-conversation-input" maxlength="80" autocomplete="off" />
+      </label>
+      <div class="dialog-actions">
+        <button class="button full-width" type="button" data-action="rename-conversation-confirm" data-copy="renameConversationConfirm"></button>
+        <button class="button text-button full-width" type="button" data-action="rename-conversation-cancel" data-copy="renameConversationCancel"></button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="status" class="toast hidden" role="status" aria-live="polite"></div>
   <script type="module" src="/static/app.js"></script>
 </body>

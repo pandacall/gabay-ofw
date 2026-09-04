@@ -753,13 +753,12 @@ def test_get_user_state_and_append_user_mutation_need_no_session():
 
 def test_emergency_button_resolves_country_from_stored_case_not_a_stateless_listing():
     """Regression pin (issue #79). ``FirestoreSessionService.list_sessions``
-    returns sessions with NO state at all (the real Firestore contract:
-    ``Session(app_name=..., user_id=..., id=snapshot.id, ...)`` carries
-    no ``state=`` at all) — unlike the in-memory fake the HTTP-seam tests
-    inject, whose ``list_sessions`` DOES populate state on listed
-    sessions and would silently mask a regression back to reading the
-    Case off ``_most_recent_session()``. Exercised against the REAL
-    backend: the EMERGENCY button must resolve her recorded country from
+    carries only the denormalised Conversation-label keys (issue #73) —
+    never the per-user Case/Plan, never other session state, never the
+    events. So a caller that needs her Case still cannot get it from a
+    listing and must read ``adkUserState`` (via ``get_user_state``).
+    Exercised against the REAL backend: the EMERGENCY button must resolve
+    her recorded country from
     ``adkUserState`` (via ``get_user_state``), so the cached card it
     renders unconditionally is for the RIGHT country rather than always
     UNKNOWN. A test that only ran against the in-memory fake could never
@@ -880,5 +879,43 @@ def test_conversations_list_and_delete_leave_the_shared_case_and_siblings_intact
         )
         assert sibling.state.get(CASE)["claims"]["country"]["value"] == "SA"
         assert sibling.state.get(PLAN)["steps"] == [{"id": "s1"}]
+
+    asyncio.run(scenario())
+
+
+def test_list_sessions_carries_the_denormalised_conversation_label():
+    """Issue #73 (ADR-0008): the Conversation label is stored in the
+    session document's own state and surfaced by ``list_sessions`` — no
+    per-Conversation state is loaded to build the rail, and the label
+    rides on the doc that listing already reads."""
+    from app.labels import CONVERSATION_LABEL, CONVERSATION_LABEL_SOURCE
+
+    service = FirestoreSessionService(_db())
+    uid = f"label-{uuid4().hex}"
+
+    async def scenario():
+        labelled = await service.create_session(app_name=APP_NAME, user_id=uid)
+        plain = await service.create_session(app_name=APP_NAME, user_id=uid)
+        await service.append_event(
+            labelled,
+            _event(
+                {
+                    CONVERSATION_LABEL: "passport",
+                    CONVERSATION_LABEL_SOURCE: "derived",
+                }
+            ),
+        )
+
+        listed = {
+            s.id: s
+            for s in (
+                await service.list_sessions(app_name=APP_NAME, user_id=uid)
+            ).sessions
+        }
+        assert listed[labelled.id].state.get(CONVERSATION_LABEL) == "passport"
+        assert listed[labelled.id].state.get(CONVERSATION_LABEL_SOURCE) == "derived"
+        assert listed[plain.id].state.get(CONVERSATION_LABEL) is None
+        # The per-user Case is still NOT loaded by a listing.
+        assert CASE not in listed[labelled.id].state
 
     asyncio.run(scenario())
