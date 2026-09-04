@@ -29,7 +29,7 @@ from google.cloud import firestore
 from app.firestore_session_service import FirestoreSessionService
 from app.rules import Citation, Grievance, Jurisdiction, SourceTier, TenureBucket
 from app.sequencer import ActionClass, PlanStep, SequencerIn
-from app.state_keys import CASE, CASE_MUTATIONS, PLAN, PLAN_MUTATIONS
+from app.state_keys import CASE, CASE_MUTATIONS, PLAN, PLAN_ACTIVE, PLAN_MUTATIONS
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FIRESTORE_EMULATOR_HOST"),
@@ -804,5 +804,81 @@ def test_emergency_button_resolves_country_from_stored_case_not_a_stateless_list
         cards = [json.loads(line) for line in lines if json.loads(line)["type"] == "card"]
         assert cards, "the button must render a card unconditionally"
         assert cards[0]["card"]["country"] == "QA"
+
+    asyncio.run(scenario())
+
+
+def test_conversations_list_and_delete_leave_the_shared_case_and_siblings_intact():
+    """Issue #72 (ADR-0008): Conversations are threads over one
+    user-scoped Case. Deleting one removes only its own document tree —
+    the other Conversations and the ``adkUserState`` Case survive, so a
+    frightened person's disclosures are never lost with a thread."""
+    service = FirestoreSessionService(_db())
+    uid = f"conversations-{uuid4().hex}"
+
+    async def scenario():
+        first = await service.create_session(app_name=APP_NAME, user_id=uid)
+        second = await service.create_session(app_name=APP_NAME, user_id=uid)
+        third = await service.create_session(app_name=APP_NAME, user_id=uid)
+
+        # A fact disclosed in the first Conversation lands on the shared
+        # user-scoped Case (a ``user:``-prefixed state delta).
+        await service.append_event(
+            first,
+            _event(
+                {
+                    CASE: {"claims": {"country": {"value": "SA"}}},
+                    CASE_MUTATIONS: [
+                        {
+                            "op": "merge",
+                            "delta": {
+                                "claims": {
+                                    "country": {"value": "SA", "confidence": "high"}
+                                }
+                            },
+                            "source": "extraction",
+                            "now": "2026-09-04T00:00:00+00:00",
+                        }
+                    ],
+                }
+            ),
+        )
+
+        listed = await service.list_sessions(app_name=APP_NAME, user_id=uid)
+        assert {s.id for s in listed.sessions} == {first.id, second.id, third.id}
+
+        await service.delete_session(
+            app_name=APP_NAME, user_id=uid, session_id=second.id
+        )
+
+        remaining = await service.list_sessions(app_name=APP_NAME, user_id=uid)
+        assert {s.id for s in remaining.sessions} == {first.id, third.id}
+        assert (
+            await service.get_session(
+                app_name=APP_NAME, user_id=uid, session_id=second.id
+            )
+            is None
+        )
+
+        # A Plan published from the first Conversation is the ONE live
+        # Plan (ADR-0008): asking for filing steps in another Conversation
+        # must surface this one, never build a rival. It is user-scoped
+        # state, so a sibling Conversation reads exactly it.
+        await service.append_event(
+            first,
+            _event({PLAN: {"steps": [{"id": "s1"}]}, PLAN_ACTIVE: True}),
+        )
+
+        # The shared Case is untouched by the Conversation delete, and is
+        # still visible from a sibling Conversation — one Case, many
+        # threads.
+        user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
+        assert user_state["case"]["claims"]["country"]["value"] == "SA"
+        assert user_state["plan"]["steps"] == [{"id": "s1"}]
+        sibling = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=third.id
+        )
+        assert sibling.state.get(CASE)["claims"]["country"]["value"] == "SA"
+        assert sibling.state.get(PLAN)["steps"] == [{"id": "s1"}]
 
     asyncio.run(scenario())

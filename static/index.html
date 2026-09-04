@@ -80,10 +80,13 @@
       </button>
       <nav class="rail-conversations" data-copy-aria="conversationsNavigation">
         <p class="rail-heading" data-copy="conversationsHeading"></p>
-        <button class="rail-conversation active" type="button" data-action="home">
-          <span class="rail-conversation-dot" aria-hidden="true"></span>
-          <span class="rail-conversation-label" data-copy="thisConversation"></span>
-        </button>
+        <!-- The Conversation list (issue #72): a row per thread over her
+             one shared Case, most-recent first, rendered from
+             GET /api/conversations by renderRail() in app.js. "New
+             conversation" only clears the screen — the row appears once
+             she has actually sent a message. -->
+        <button class="rail-new-conversation" type="button" data-action="new-conversation" data-copy="newConversation"></button>
+        <div id="rail-conversations-list" class="rail-conversations-list"></div>
       </nav>
       <div class="rail-footer">
         <label class="language-control rail-control">
@@ -155,6 +158,21 @@
       <div class="dialog-actions">
         <button class="button urgent-button full-width" type="button" data-action="mark-safe-confirm" data-copy="markSafeConfirm"></button>
         <button class="button full-width" type="button" data-action="mark-safe-cancel" data-copy="markSafeCancel"></button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Deleting a Conversation removes that transcript and nothing else
+       (issue #72, ADR-0007 amendment). The copy must say so plainly
+       before she confirms — her Case and the real "delete everything"
+       are separate. -->
+  <dialog id="delete-conversation-dialog" class="disclaimer-dialog" data-copy-aria="deleteConversationTitle">
+    <form method="dialog">
+      <h2 data-copy="deleteConversationTitle"></h2>
+      <p data-copy="deleteConversationBody"></p>
+      <div class="dialog-actions">
+        <button class="button urgent-button full-width" type="button" data-action="delete-conversation-confirm" data-copy="deleteConversationConfirm"></button>
+        <button class="button full-width" type="button" data-action="delete-conversation-cancel" data-copy="deleteConversationCancel"></button>
       </div>
     </form>
   </dialog>

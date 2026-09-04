@@ -1,6 +1,7 @@
 """Gabay OFW FastAPI application."""
 
 import hmac
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -179,6 +180,51 @@ def create_app(
         if updated is None:
             raise HTTPException(status_code=404, detail="Session not found")
         return {"case": updated}
+
+    @app.get("/api/conversations")
+    async def list_conversations(
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """Her Conversations for the rail (issue #72, ADR-0008): id and
+        last-activity time only, most-recent first, no per-Conversation
+        state loaded."""
+        return {"conversations": await service.list_conversations(uid=uid)}
+
+    @app.get("/api/conversations/{session_id}")
+    async def read_conversation(
+        session_id: str,
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """Re-open a Conversation (issue #72): its stored transcript
+        streamed back as the same NDJSON line types ``/api/chat`` emits,
+        so the client replays it through the identical handler. An
+        unknown or another user's session id is 404, never a leak of its
+        existence (mirrors ``/api/chat``)."""
+        lines = await service.load_conversation(uid=uid, session_id=session_id)
+        if lines is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        async def _stream():
+            for line in lines:
+                yield json.dumps(line, ensure_ascii=False) + "\n"
+
+        return StreamingResponse(_stream(), media_type="application/x-ndjson")
+
+    @app.delete("/api/conversations/{session_id}")
+    async def delete_conversation(
+        session_id: str,
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """Delete one Conversation's transcript and nothing else (issue
+        #72, ADR-0007 amendment): her user-scoped Case and Plan survive,
+        and ``delete_user_subtree`` remains the only routine that removes
+        a user's data. 404 for an unknown or another user's id."""
+        if not await service.delete_conversation(uid=uid, session_id=session_id):
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return {"deleted": True}
 
     @app.get("/api/notes")
     def list_notes(

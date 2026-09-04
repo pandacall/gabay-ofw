@@ -346,16 +346,36 @@ p { font-weight: 300; color: var(--body); line-height: 1.55; }
   text-transform: uppercase;
   color: var(--muted);
 }
+.rail-new-conversation {
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--radius-md);
+  color: var(--body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+}
+.rail-new-conversation::before { content: "+ "; color: var(--muted); }
+.rail-new-conversation:hover { background: var(--faint); }
+.rail-conversations-list { display: flex; flex-direction: column; gap: 0.15rem; overflow-y: auto; }
+/* A Conversation row (issue #72): the open target fills the row, with a
+   quiet delete affordance that only shows its weight on hover. */
 .rail-conversation {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.7rem 0.85rem;
   border-radius: var(--radius-md);
+}
+.rail-conversation-open {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex: 1;
+  min-width: 0;
+  padding: 0.7rem 0.85rem;
   color: var(--body);
   font-size: 0.92rem;
   text-align: left;
 }
+.rail-conversation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-conversation-dot {
   width: 0.45rem;
   height: 0.45rem;
@@ -363,6 +383,20 @@ p { font-weight: 300; color: var(--body); line-height: 1.55; }
   background: var(--muted);
   flex-shrink: 0;
 }
+.rail-conversation-delete {
+  flex-shrink: 0;
+  padding: 0.3rem 0.6rem;
+  margin-right: 0.2rem;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: var(--radius-sm);
+  opacity: 0;
+}
+.rail-conversation:hover .rail-conversation-delete,
+.rail-conversation-delete:focus-visible { opacity: 1; }
+.rail-conversation-delete:hover { background: var(--faint); color: var(--body); }
+.rail-conversation:hover { background: var(--faint); }
 .rail-conversation.active {
   background: var(--faint);
   color: var(--ink);
@@ -501,6 +535,17 @@ p { font-weight: 300; color: var(--body); line-height: 1.55; }
    styled like .ack (muted/italic) so it reads as in-progress status,
    not a message she needs to keep. */
 .chat-message.agent.trail { color: var(--muted); font-style: italic; }
+/* A past deadline-bearing Plan card, collapsed on re-open (issue #72,
+   ADR-0006): a quiet pointer to the one live Plan, never the expired
+   steps themselves. */
+.chat-message.agent.stale-plan {
+  color: var(--body);
+  font-style: italic;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.chat-message.agent.stale-plan:hover { color: var(--ink); }
 .chat-message.typing { display: flex; gap: 0.35rem; align-items: center; }
 
 /* Contact/action cards — findings arrive here, in the conversation,
@@ -680,7 +725,11 @@ p { font-weight: 300; color: var(--body); line-height: 1.55; }
   .account-name {
     display: none;
   }
-  .rail-conversation, .rail-control { justify-content: center; padding: 0.6rem 0.3rem; text-align: center; font-size: 0.7rem; }
+  .rail-conversation-open, .rail-control { justify-content: center; padding: 0.6rem 0.3rem; text-align: center; font-size: 0.7rem; }
+  .rail-new-conversation { text-align: center; font-size: 0; padding: 0.6rem 0.3rem; }
+  .rail-new-conversation::before { font-size: 1rem; content: "+"; }
+  /* No hover on touch — the delete affordance is always visible here. */
+  .rail-conversation-delete { opacity: 1; padding: 0.3rem; margin: 0; }
   .home-shell { flex-direction: column; }
   .case-panel {
     width: auto;
