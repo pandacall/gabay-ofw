@@ -557,7 +557,15 @@ p { color: var(--body); line-height: 1.55; }
   font-size: 0.9rem;
   text-align: left;
 }
-.rail-conversation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-conversation-open { flex-wrap: wrap; }
+.rail-conversation-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+/* The date subline keeps two same-labelled threads (issue #73) apart. */
+.rail-conversation-date {
+  flex-basis: 100%;
+  margin-left: 0.95rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 /* The dot is the open-conversation marker — it holds a fixed slot on
    every row for alignment, but only shows its weight on the active one. */
 .rail-conversation-dot {
@@ -568,7 +576,8 @@ p { color: var(--body); line-height: 1.55; }
   flex-shrink: 0;
   opacity: 0;
 }
-.rail-conversation-delete {
+.rail-conversation-delete,
+.rail-conversation-rename {
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -581,11 +590,28 @@ p { color: var(--body); line-height: 1.55; }
   opacity: 0;
   transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
 }
-.rail-conversation-delete svg { width: 1rem; height: 1rem; display: block; }
+.rail-conversation-delete svg,
+.rail-conversation-rename svg { width: 1rem; height: 1rem; display: block; }
 .rail-conversation:hover .rail-conversation-delete,
+.rail-conversation:hover .rail-conversation-rename,
 .rail-conversation.active .rail-conversation-delete,
-.rail-conversation-delete:focus-visible { opacity: 1; }
+.rail-conversation.active .rail-conversation-rename,
+.rail-conversation-delete:focus-visible,
+.rail-conversation-rename:focus-visible { opacity: 1; }
 .rail-conversation-delete:hover { background: var(--rail-row-active); color: var(--urgent); }
+.rail-conversation-rename:hover { background: var(--rail-row-active); color: var(--ink); }
+.rename-conversation-field { display: block; text-align: left; margin: 0.75rem 0; font-size: 0.85rem; color: var(--body); }
+.rename-conversation-field input {
+  display: block;
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
 .rail-conversation:hover { background: var(--rail-row); }
 .rail-conversation.active { background: var(--rail-row-active); color: var(--ink); }
 .rail-conversation.active .rail-conversation-open { color: var(--ink); font-weight: 500; }
@@ -1078,7 +1104,8 @@ p { color: var(--body); line-height: 1.55; }
   .rail-brand { padding-right: 2.75rem; }
   /* The drawer has full width — labels, delete affordance, and the
      conversation list all read normally. */
-  .rail-conversation-delete { opacity: 1; }
+  .rail-conversation-delete,
+  .rail-conversation-rename { opacity: 1; }
   .rail-conversation-open, .rail-control, .rail-new-conversation { min-height: 2.75rem; }
 
   .case-inline { max-width: 100%; }

@@ -264,6 +264,19 @@ Object.assign(copy.en, {
   deleteConversationConfirm: "Remove conversation",
   deleteConversationCancel: "Cancel",
   deleteConversationFailed: "Could not remove it right now. Try again.",
+  // Derived Conversation labels (issue #73): a closed set, localised
+  // here. Names a subject, never an allegation — never from a Safety Flag.
+  convLabel_passport: "Passport and papers",
+  convLabel_wages: "Wages",
+  convLabel_contract: "Your contract",
+  convLabel_agency: "Your agency",
+  convLabel_job: "Your job",
+  renameConversationLabel: "Rename this conversation",
+  renameConversationTitle: "Rename this conversation",
+  renameConversationInput: "Conversation name",
+  renameConversationConfirm: "Save name",
+  renameConversationCancel: "Cancel",
+  renameConversationFailed: "Could not rename it right now. Try again.",
 });
 
 Object.assign(copy.tl, {
@@ -276,6 +289,17 @@ Object.assign(copy.tl, {
   deleteConversationConfirm: "Alisin ang usapan",
   deleteConversationCancel: "Kanselahin",
   deleteConversationFailed: "Hindi ito naalis ngayon. Subukan muli.",
+  convLabel_passport: "Pasaporte at mga papeles",
+  convLabel_wages: "Sahod",
+  convLabel_contract: "Ang kontrata mo",
+  convLabel_agency: "Ang ahensya mo",
+  convLabel_job: "Ang trabaho mo",
+  renameConversationLabel: "Palitan ang pangalan ng usapang ito",
+  renameConversationTitle: "Palitan ang pangalan ng usapang ito",
+  renameConversationInput: "Pangalan ng usapan",
+  renameConversationConfirm: "I-save ang pangalan",
+  renameConversationCancel: "Kanselahin",
+  renameConversationFailed: "Hindi napalitan ang pangalan ngayon. Subukan muli.",
 });
 
 Object.assign(copy.ceb, {
@@ -288,6 +312,17 @@ Object.assign(copy.ceb, {
   deleteConversationConfirm: "Kuhaa ang panag-istorya",
   deleteConversationCancel: "Kanselaha",
   deleteConversationFailed: "Wala kini makuha karon. Sulayi pag-usab.",
+  convLabel_passport: "Pasaporte ug mga papeles",
+  convLabel_wages: "Suhol",
+  convLabel_contract: "Ang imong kontrata",
+  convLabel_agency: "Ang imong ahensya",
+  convLabel_job: "Ang imong trabaho",
+  renameConversationLabel: "Usba ang ngalan niining panag-istorya",
+  renameConversationTitle: "Usba ang ngalan niining panag-istorya",
+  renameConversationInput: "Ngalan sa panag-istorya",
+  renameConversationConfirm: "I-save ang ngalan",
+  renameConversationCancel: "Kanselaha",
+  renameConversationFailed: "Wala mausbi ang ngalan karon. Sulayi pag-usab.",
 });
 
 // A11y and prototype-affordance copy (design-fidelity audit follow-up).
@@ -351,6 +386,7 @@ const languageSelects = document.querySelectorAll(".language-select");
 const markSafeButton = document.getElementById("mark-safe-button");
 const markSafeDialog = document.getElementById("mark-safe-dialog");
 const deleteConversationDialog = document.getElementById("delete-conversation-dialog");
+const renameConversationDialog = document.getElementById("rename-conversation-dialog");
 const status = document.getElementById("status");
 
 // The rail on a phone (<=900px) is an off-canvas drawer opened from the
@@ -414,6 +450,7 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 // confirm dialog is about to remove.
 let conversations = [];
 let pendingDeleteSessionId = null;
+let pendingRenameSessionId = null;
 // The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
 // shown while a turn runs, never part of chatMessages/the transcript —
 // cleared as soon as the "reply" line lands (see handleChatLine) and
@@ -620,17 +657,40 @@ function conversationDateLabel(lastUpdateTime) {
   }).format(date);
 }
 
+// The row's headline label (issue #73): her own rename verbatim, else
+// the localised derived topic key, else the neutral date. When a topic
+// or custom label leads, the date still shows as a subline so two
+// same-labelled threads stay distinguishable.
+function conversationRowLabel(row) {
+  if (row.label && row.label_source === "user") return row.label;
+  if (row.label && copy[language]?.[`convLabel_${row.label}`]) {
+    return t(`convLabel_${row.label}`);
+  }
+  return conversationDateLabel(row.last_update_time) || t("thisConversation");
+}
+
 function renderRail() {
   const listEl = document.getElementById("rail-conversations-list");
   if (!listEl) return;
   listEl.innerHTML = conversations
     .map((row) => {
       const active = row.session_id === chatSessionId ? " active" : "";
-      const label = conversationDateLabel(row.last_update_time) || t("thisConversation");
+      const label = conversationRowLabel(row);
+      const dateLabel = conversationDateLabel(row.last_update_time);
+      const hasTopic = label !== dateLabel;
+      const subline =
+        hasTopic && dateLabel
+          ? `<span class="rail-conversation-date">${escapeHtml(dateLabel)}</span>`
+          : "";
+      const aria = hasTopic && dateLabel ? `${label} — ${dateLabel}` : label;
       return `<div class="rail-conversation${active}" data-session-id="${escapeHtml(row.session_id)}">
-        <button type="button" class="rail-conversation-open" data-action="open-conversation" aria-label="${escapeHtml(label)}"${active ? ' aria-current="page"' : ""}>
+        <button type="button" class="rail-conversation-open" data-action="open-conversation" aria-label="${escapeHtml(aria)}"${active ? ' aria-current="page"' : ""}>
           <span class="rail-conversation-dot" aria-hidden="true"></span>
           <span class="rail-conversation-label">${escapeHtml(label)}</span>
+          ${subline}
+        </button>
+        <button type="button" class="rail-conversation-rename" data-action="rename-conversation" aria-label="${escapeHtml(t("renameConversationLabel"))}">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 6.5l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <button type="button" class="rail-conversation-delete" data-action="delete-conversation" aria-label="${escapeHtml(t("deleteConversationLabel"))}">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M10 4h4M9 7l.7 12a2 2 0 0 0 2 1.9h.6a2 2 0 0 0 2-1.9L17 7M10.5 10.5v6M13.5 10.5v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -726,6 +786,35 @@ async function confirmDeleteConversation() {
     await loadConversations();
   } catch {
     showStatus(t("deleteConversationFailed"));
+  }
+}
+
+// Her own rename (issue #73): PATCH the label, source "user" — it wins
+// over any derived label and survives every later turn.
+async function confirmRenameConversation() {
+  const sessionId = pendingRenameSessionId;
+  const input = document.getElementById("rename-conversation-input");
+  const label = (input?.value || "").trim();
+  if (!sessionId || !auth?.currentUser || !label) {
+    renameConversationDialog.close();
+    return;
+  }
+  pendingRenameSessionId = null;
+  renameConversationDialog.close();
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch(`/api/conversations/${encodeURIComponent(sessionId)}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ label }),
+    });
+    if (!response.ok) throw new Error(`rename failed: ${response.status}`);
+    await loadConversations();
+  } catch {
+    showStatus(t("renameConversationFailed"));
   }
 }
 
@@ -1370,6 +1459,29 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "rename-conversation") {
+    pendingRenameSessionId = button.closest(".rail-conversation")?.dataset.sessionId;
+    const row = conversations.find((r) => r.session_id === pendingRenameSessionId);
+    const input = document.getElementById("rename-conversation-input");
+    if (input) {
+      input.value = row && row.label_source === "user" ? row.label : "";
+    }
+    renameConversationDialog.showModal();
+    input?.focus();
+    return;
+  }
+  if (action === "rename-conversation-cancel") {
+    pendingRenameSessionId = null;
+    renameConversationDialog.close();
+    return;
+  }
+  if (action === "rename-conversation-confirm") {
+    button.disabled = true;
+    confirmRenameConversation().finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
   if (action === "composer-attach") {
     // Prototype affordance: photo capture isn't built. Acknowledge the
     // tap without claiming a capability (PRD safety constraint).
@@ -1474,6 +1586,13 @@ deleteConversationDialog.addEventListener("click", (event) => {
   if (event.target === deleteConversationDialog) deleteConversationDialog.close();
 });
 
+renameConversationDialog.addEventListener("close", () => {
+  pendingRenameSessionId = null;
+});
+renameConversationDialog.addEventListener("click", (event) => {
+  if (event.target === renameConversationDialog) renameConversationDialog.close();
+});
+
 applyCopy();
 renderLanguageOptions();
 
@@ -1509,9 +1628,11 @@ if (auth) {
       renderedMessageCount = 0;
       conversations = [];
       pendingDeleteSessionId = null;
+      pendingRenameSessionId = null;
       editingCaseField = null;
       if (markSafeDialog.open) markSafeDialog.close();
       if (deleteConversationDialog.open) deleteConversationDialog.close();
+      if (renameConversationDialog.open) renameConversationDialog.close();
       app.classList.remove("rail-open");
       refreshEmergencyControls();
       return;

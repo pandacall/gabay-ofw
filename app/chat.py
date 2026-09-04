@@ -81,6 +81,13 @@ from app.emergency import (
     reason_category_for,
 )
 from app.history import cards_in, replay_conversation
+from app.labels import (
+    CONVERSATION_LABEL,
+    CONVERSATION_LABEL_SOURCE,
+    EMERGENCY_CONVERSATION,
+    label_state_delta,
+    rename_state_delta,
+)
 from app.reply_text import visible_texts
 from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card
 from app.state_keys import (
@@ -176,6 +183,12 @@ class ChatService:
             {
                 "session_id": session.id,
                 "last_update_time": session.last_update_time,
+                # The denormalised topic label (issue #73), or None → the
+                # UI keeps the neutral date label. Read from the session's
+                # own state, which list_sessions already carries — no
+                # per-Conversation state is loaded to build the rail.
+                "label": (session.state or {}).get(CONVERSATION_LABEL),
+                "label_source": (session.state or {}).get(CONVERSATION_LABEL_SOURCE),
             }
             for session in (response.sessions or [])
         ]
@@ -247,6 +260,32 @@ class ChatService:
             )
         await self._session_service.delete_session(
             app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        return True
+
+    async def rename_conversation(
+        self, *, uid: str, session_id: str, label: str
+    ) -> bool:
+        """Her own rename (issue #73): writes the literal text she typed
+        to the Conversation's session state with source ``"user"`` — it
+        overwrites any derived label and suppresses every later
+        derivation. Returns whether the Conversation existed (``False`` →
+        the caller renders 404, never leaking another user's session id).
+        """
+        session = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=session_id
+        )
+        if session is None:
+            return False
+        await self._session_service.append_event(
+            session,
+            Event(
+                id=Event.new_id(),
+                invocation_id=f"rename-{uuid4().hex}",
+                author="user",
+                timestamp=time.time(),
+                actions=EventActions(state_delta=dict(rename_state_delta(label))),
+            ),
         )
         return True
 
@@ -345,6 +384,11 @@ class ChatService:
                 EMERGENCY_RESUME: empty_resume(),
                 ESCALATION_HANDOFF: handoff,
                 EMERGENCY_CONVERSATION_ID: sid,
+                # issue #73/#89: this marker keeps the Emergency
+                # Conversation's rail label a neutral date forever — a
+                # topic label derived from her (shared) Case claims would
+                # be a disclosure to whoever picks up the phone.
+                EMERGENCY_CONVERSATION: True,
             },
         )
         return sid, (created.state.get(CASE) or case or {})
@@ -716,6 +760,25 @@ class ChatService:
         updated_case = (updated.state.get(CASE) if updated else None) or {}
         updated_state = updated.state if updated else session.state
         in_emergency = is_emergency_conversation(updated_state)
+
+        # The Conversation label (issue #73, ADR-0008): derived once, from
+        # Case claims only, at the end of the first turn where an
+        # identifiable topic fires — then it sticks. Written to the
+        # session's own state so listing the rail loads no per-Conversation
+        # state. Never from a Safety Flag; her rename always wins.
+        if updated is not None:
+            label_delta = label_state_delta(updated.state, updated_case)
+            if label_delta is not None:
+                await self._session_service.append_event(
+                    updated,
+                    Event(
+                        id=Event.new_id(),
+                        invocation_id=f"label-{uuid4().hex}",
+                        author="system",
+                        timestamp=time.time(),
+                        actions=EventActions(state_delta=dict(label_delta)),
+                    ),
+                )
 
         # An inactive Plan (issue #43, ADR-0006 — an input-hash mismatch
         # detected by pure code every turn, never DISPATCHER's judgement)

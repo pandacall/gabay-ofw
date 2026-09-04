@@ -46,6 +46,18 @@ class ChatTurnIn(BaseModel):
     session_id: str | None = None
 
 
+class ConversationRenameIn(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+
+    @field_validator("label")
+    @classmethod
+    def _trimmed_nonempty(cls, value: str) -> str:
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("label must not be blank")
+        return trimmed
+
+
 class CaseCorrectionIn(BaseModel):
     session_id: str = Field(min_length=1)
     field: str
@@ -215,6 +227,23 @@ def create_app(
                 yield json.dumps(line, ensure_ascii=False) + "\n"
 
         return StreamingResponse(_stream(), media_type="application/x-ndjson")
+
+    @app.patch("/api/conversations/{session_id}")
+    async def rename_conversation(
+        session_id: str,
+        body: ConversationRenameIn,
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """Rename one Conversation (issue #73): her own word for it wins
+        over any derived label, permanently, and survives every later
+        turn. 404 for an unknown or another user's id (mirrors
+        ``/api/chat``)."""
+        if not await service.rename_conversation(
+            uid=uid, session_id=session_id, label=body.label
+        ):
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        return {"label": body.label}
 
     @app.delete("/api/conversations/{session_id}")
     async def delete_conversation(

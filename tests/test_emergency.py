@@ -129,6 +129,10 @@ def conversation_ids(client, uid="maria") -> list[str]:
     return [row["session_id"] for row in r.json()["conversations"]]
 
 
+def conversation_rows(client, uid="maria") -> list[dict]:
+    return client.get("/api/conversations", headers=auth(uid)).json()["conversations"]
+
+
 class TestHardcodedButtonZeroModelCalls:
     """(1) The hardcoded UI button renders the cached action card OFFLINE
     with ZERO model turns, and opens an Emergency Conversation."""
@@ -198,6 +202,32 @@ class TestAtMostOneLiveEmergencyConversation:
         second, _ = press_button(client)
         assert first != second
         assert set(conversation_ids(client)) == {first, second}
+
+    def test_the_emergency_conversation_never_gets_a_topic_label(
+        self, client, fake_model
+    ):
+        # issue #73/#89 integration: a topic label derived from her shared
+        # Case claims would be a disclosure to whoever holds the phone.
+        # She first discloses unpaid wages in an ordinary thread (which
+        # DOES get a "wages" label), then taps the button.
+        fake_model.extraction_results.append(
+            json.dumps(
+                {
+                    "language": "taglish",
+                    "claims": {"months_unpaid": {"value": "6", "confidence": "high"}},
+                    "safety_flags": [],
+                }
+            )
+        )
+        fake_model.responses.append("Naiintindihan ko.")
+        by_type, _ = turn(client, "anim na buwan na akong hindi nababayaran")
+        ordinary = by_type["case"]["session_id"]
+        emergency, _ = press_button(client)
+
+        rows = {row["session_id"]: row for row in conversation_rows(client)}
+        assert rows[ordinary]["label"] == "wages"
+        assert rows[emergency]["label"] is None
+        assert rows[emergency]["label_source"] is None
 
 
 class TestEmergencyTransfer:

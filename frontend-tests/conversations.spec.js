@@ -175,6 +175,63 @@ test("deleting a conversation shows the plain-language line, then removes the ro
   await expect(page.locator('[data-session-id="s-keep"]')).toHaveCount(1);
 });
 
+test("the rail shows the derived topic label, with the date kept as a subline", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+  await useConversations(page, {
+    list: [
+      { session_id: "s-a", last_update_time: NOW, label: "passport", label_source: "derived" },
+      { session_id: "s-b", last_update_time: NOW - DAY, label: "wages", label_source: "derived" },
+    ],
+  });
+
+  const rows = page.locator(".rail-conversation");
+  await expect(rows.nth(0).locator(".rail-conversation-label")).toHaveText("Passport and papers");
+  await expect(rows.nth(0).locator(".rail-conversation-date")).toHaveCount(1);
+  await expect(rows.nth(1).locator(".rail-conversation-label")).toHaveText("Wages");
+});
+
+test("she can rename a conversation and her name is shown verbatim", async ({ page }) => {
+  await openAsSignedInUser(page);
+  await useConversations(page, {
+    list: [{ session_id: "s-a", last_update_time: NOW, label: "passport", label_source: "derived" }],
+  });
+
+  let patched = null;
+  await page.route(/\/api\/conversations\/[^/]+$/, (route) => {
+    if (route.request().method() === "PATCH") {
+      patched = JSON.parse(route.request().postData());
+      return route.fulfill({ json: { label: patched.label } });
+    }
+    return route.fallback();
+  });
+
+  await openRailIfDrawer(page);
+  await page
+    .locator('.rail-conversation[data-session-id="s-a"]')
+    .locator("[data-action='rename-conversation']")
+    .click();
+
+  const dialog = page.getByRole("dialog", { name: /rename this conversation/i });
+  await dialog.locator("#rename-conversation-input").fill("the passport one");
+
+  await page.unroute("**/api/conversations");
+  await page.route("**/api/conversations", (route) =>
+    route.fulfill({
+      json: {
+        conversations: [
+          { session_id: "s-a", last_update_time: NOW, label: "the passport one", label_source: "user" },
+        ],
+      },
+    }),
+  );
+  await dialog.getByRole("button", { name: "Save name" }).click();
+
+  await expect.poll(() => patched && patched.label).toBe("the passport one");
+  await expect(page.locator(".rail-conversation-label")).toHaveText("the passport one");
+});
+
 test("delete-everything is still one tap in the profile screen", async ({ page }) => {
   await openAsSignedInUser(page);
   await openRailIfDrawer(page);
