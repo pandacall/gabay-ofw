@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-04T00:00:00Z",
+  "title": "Design System: Gabay OFW",
+  "extensions": {
+    "colorMeta": {
+      "pine": {
+        "role": "primary",
+        "displayName": "Pine",
+        "canonical": "#1f5e4a",
+        "tonalRamp": ["#0d2b21", "#0f3226", "#143f31", "#184c3b", "#1f5e4a", "#3c7d67", "#6ba593", "#a9ccc0", "#dcebe5"]
+      },
+      "urgent": {
+        "role": "secondary",
+        "displayName": "Flag Red",
+        "canonical": "#ce1126",
+        "tonalRamp": ["#3f0209", "#5c050f", "#7d0715", "#a30e1f", "#ce1126", "#dc4350", "#ec7079", "#f4a9ae", "#fbdde0"]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Ground",
+        "canonical": "#fbfbfa",
+        "tonalRamp": ["#232322", "#3a3a38", "#54544f", "#727269", "#9a9a90", "#c2c2b8", "#e3e3dc", "#f1f1ee", "#fbfbfa"]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail Ground",
+        "canonical": "#f0efed",
+        "tonalRamp": ["#26251f", "#3d3c34", "#57564c", "#747266", "#9b9a8d", "#c3c2b7", "#e0dfd9", "#ebeae6", "#f0efed"]
+      },
+      "user-bubble": {
+        "role": "neutral",
+        "displayName": "Warm Grey",
+        "canonical": "#efeeec",
+        "tonalRamp": ["#252523", "#3c3b38", "#55544f", "#727168", "#9a988d", "#c1c0b6", "#dedcd6", "#e9e8e4", "#efeeec"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1f1f1f",
+        "tonalRamp": ["#1f1f1f", "#333333", "#474746", "#5e5d5b", "#7b7a76", "#a0a09a", "#c6c6c0", "#e2e2dd", "#f4f4f0"]
+      },
+      "flag-blue": {
+        "role": "tertiary",
+        "displayName": "Flag Blue (light only)",
+        "canonical": "#0038a8",
+        "tonalRamp": ["#000f2e", "#001947", "#002468", "#003089", "#0038a8", "#2f5ec2", "#6187d5", "#a3bce8", "#dbe4f7"]
+      },
+      "flag-gold": {
+        "role": "tertiary",
+        "displayName": "Flag Gold (light only)",
+        "canonical": "#fcd116",
+        "tonalRamp": ["#3d3200", "#5c4c00", "#7d6800", "#a68a00", "#ccac00", "#fcd116", "#fddf5c", "#feeca0", "#fff7d6"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The one big line per screen. Weight 400, never bolder." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles inside a flow." },
+      "title": { "displayName": "Title", "purpose": "A card's own heading. First place weight 500 appears." },
+      "reply": { "displayName": "Reply", "purpose": "Signature style: Gabay's replies in the thread, larger and looser than a bubble." },
+      "body": { "displayName": "Body", "purpose": "Paragraph and supporting copy." },
+      "caption": { "displayName": "Caption", "purpose": "Dense sub-body tier (0.78-0.95rem, centered on 0.88): card reason lines, contact labels, trust line, timestamps, ack/trail status." },
+      "label": { "displayName": "Label", "purpose": "Rail headings, eyebrows, quiet metadata. Small but weight 500." }
+    },
+    "shadows": [
+      { "name": "xs", "value": "0 1px 2px rgba(31,31,31,.06), 0 3px 10px rgba(31,31,31,.05)", "purpose": "Faintest lift: opener chips, language select, claim rows, icon-button hover." },
+      { "name": "sm", "value": "0 1px 3px rgba(31,31,31,.08), 0 6px 18px rgba(31,31,31,.06)", "purpose": "Default floating surface: cards, calm emergency pill, quiet buttons, in-thread Case block." },
+      { "name": "md", "value": "0 1px 3px rgba(31,31,31,.08), 0 12px 34px rgba(31,31,31,.08)", "purpose": "The composer, and the hover state of an sm surface." },
+      { "name": "lg", "value": "0 20px 50px rgba(26,28,27,.16)", "purpose": "Modal dialogs and the toast only." },
+      { "name": "focus-ring", "value": "0 0 0 3px rgba(31,94,74,.35)", "purpose": "Focus-visible on every interactive element, offset 3px." }
+    ],
+    "motion": [
+      { "name": "state", "value": "0.14s ease", "purpose": "Default for box-shadow / background / color state changes on controls." },
+      { "name": "glow-fade", "value": "opacity 0.5s ease", "purpose": "The .ph-glow layer animating to 0 once the thread has a message." },
+      { "name": "pulse", "value": "1.1s ease-in-out infinite", "purpose": "Loader dots (auth, screen, typing indicator)." }
+    ],
+    "breakpoints": [
+      { "name": "rail-collapse", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Confirm / commit action. Pine fill, no shadow — it sits in the page rather than floating.",
+      "html": "<button class=\"ds-btn-primary\">I understand</button>",
+      "css": ".ds-btn-primary { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; background:#1f5e4a; color:#fff; font:500 .95rem 'Figtree',system-ui,sans-serif; padding:.8rem 1.4rem; border:none; border-radius:999px; cursor:pointer; transition:background .14s ease; } .ds-btn-primary:hover { background:#163f32; } .ds-btn-primary:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "The default button. White pill that floats on the ground; hover raises the shadow.",
+      "html": "<button class=\"ds-btn-quiet\">Save a copy</button>",
+      "css": ".ds-btn-quiet { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; background:#fff; color:#1f1f1f; font:500 .95rem 'Figtree',system-ui,sans-serif; padding:.8rem 1.4rem; border:none; border-radius:999px; cursor:pointer; box-shadow:0 1px 3px rgba(31,31,31,.08),0 6px 18px rgba(31,31,31,.06); transition:box-shadow .14s ease; } .ds-btn-quiet:hover { box-shadow:0 1px 3px rgba(31,31,31,.08),0 12px 34px rgba(31,31,31,.08); } .ds-btn-quiet:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+    },
+    {
+      "name": "Composer",
+      "kind": "custom",
+      "refersTo": "composer",
+      "description": "The floating input that never leaves the screen. A + at the head, an auto-growing textarea, and a circular mic that IS the submit control — no separate Send button. Enter sends.",
+      "html": "<form class=\"ds-composer\"><span class=\"ds-composer-plus\" aria-hidden=\"true\">+</span><textarea class=\"ds-composer-input\" rows=\"1\" placeholder=\"Tell Gabay what is happening\"></textarea><button class=\"ds-composer-send\" type=\"submit\" aria-label=\"Send\"><svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 1 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5Z\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M6 11.5V12a6 6 0 0 0 12 0v-.5M12 18v3\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\"/></svg></button></form>",
+      "css": ".ds-composer { display:flex; align-items:flex-end; gap:.55rem; background:#fff; border-radius:32px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 12px 34px rgba(31,31,31,.08); padding:.4rem .5rem .4rem 1.1rem; max-width:47rem; } .ds-composer-plus { font:300 1.6rem/1 'Figtree',system-ui,sans-serif; color:#6e7370; padding-bottom:.55rem; } .ds-composer-input { flex:1; border:none; resize:none; background:none; padding:.85rem 0; font:400 1rem/1.45 'Figtree',system-ui,sans-serif; color:#1f1f1f; } .ds-composer-input::placeholder { color:#6e7370; } .ds-composer-input:focus { outline:none; } .ds-composer-send { flex-shrink:0; width:2.9rem; height:2.9rem; border:none; background:none; border-radius:50%; display:grid; place-items:center; color:#444746; cursor:pointer; transition:background .14s ease,color .14s ease; } .ds-composer-send svg { width:1.15rem; height:1.15rem; } .ds-composer-send:hover { background:#f1f1ee; color:#1f1f1f; } .ds-composer-send:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+    },
+    {
+      "name": "User Chat Bubble",
+      "kind": "custom",
+      "refersTo": "chat-bubble-user",
+      "description": "The visitor's own chat turn. A warm grey, deliberately quieter than a saturated sent-message blue; right-aligned.",
+      "html": "<div class=\"ds-bubble-user\">About sixteen. Six in the morning until ten at night.</div>",
+      "css": ".ds-bubble-user { align-self:flex-end; max-width:32rem; background:#efeeec; color:#1f1f1f; font:400 1rem/1.55 'Figtree',system-ui,sans-serif; padding:.85rem 1.2rem; border-radius:20px; }"
+    },
+    {
+      "name": "Agent Reply",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Gabay's reply in the thread. No bubble, no card — the rotated pine square, then markless prose set larger and looser than a bubble.",
+      "html": "<div class=\"ds-agent-reply\">Your contract says eight hours a day. On a normal day, how many hours do you really work?</div>",
+      "css": ".ds-agent-reply { align-self:flex-start; max-width:40rem; display:flex; flex-direction:column; gap:.7rem; color:#1f1f1f; font:400 1.08rem/1.62 'Figtree',system-ui,sans-serif; } .ds-agent-reply::before { content:''; width:.95rem; height:.95rem; border-radius:4px; background:#1f5e4a; transform:rotate(45deg); }"
+    },
+    {
+      "name": "Contact Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A findings / routing card that renders inside the thread. Title, optional reason line, phone rows on the recessed faint fill, optional urgent hold-line in red.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Saudi Arabia — Real offices that can help</h3><p class=\"ds-card-reason\">We are rendering from cache.</p><ul class=\"ds-card-list\"><li class=\"ds-card-row\"><span class=\"ds-card-label\">MWO Riyadh (Migrant Workers Office)</span><a class=\"ds-card-phone\" href=\"#\">+966 50 285 0944</a></li></ul><p class=\"ds-card-hold\">Do not leave before speaking to the MWO.</p></div>",
+      "css": ".ds-card { align-self:flex-start; max-width:30rem; background:#fff; border-radius:24px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 6px 18px rgba(31,31,31,.06); padding:1.15rem 1.3rem; font:400 1rem/1.55 'Figtree',system-ui,sans-serif; } .ds-card-title { margin:0 0 .3rem; font-weight:500; font-size:1.05rem; color:#1f1f1f; } .ds-card-reason { margin:0 0 .85rem; font-size:.9rem; color:#6e7370; } .ds-card-list { list-style:none; margin:0; padding:0; display:grid; gap:.5rem; } .ds-card-row { display:flex; flex-direction:column; gap:.15rem; padding:.7rem .9rem; border-radius:13px; background:#f1f1ee; } .ds-card-label { font-size:.82rem; color:#6e7370; } .ds-card-phone { font-weight:500; color:#1f5e4a; text-decoration:none; } .ds-card-hold { margin:.85rem 0 0; font-size:.88rem; color:#a30e1f; }"
+    },
+    {
+      "name": "Emergency Pill",
+      "kind": "custom",
+      "refersTo": "emergency-pill",
+      "description": "The calm-but-always-present emergency affordance, fixed to the top-right of every signed-in screen. Quiet white pill, flag-red dot and text; still renders a zero-model cached card.",
+      "html": "<button class=\"ds-emergency\"><span class=\"ds-emergency-dot\" aria-hidden=\"true\"></span>I need help now</button>",
+      "css": ".ds-emergency { display:inline-flex; align-items:center; gap:.5rem; background:#fff; color:#ce1126; font:500 .86rem 'Figtree',system-ui,sans-serif; padding:.6rem 1rem; border:none; border-radius:999px; cursor:pointer; box-shadow:0 1px 3px rgba(31,31,31,.08),0 6px 18px rgba(31,31,31,.06); transition:box-shadow .14s ease; } .ds-emergency-dot { width:.5rem; height:.5rem; border-radius:50%; background:#ce1126; } .ds-emergency:hover { box-shadow:0 1px 3px rgba(31,31,31,.08),0 12px 34px rgba(31,31,31,.08); } .ds-emergency:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+    },
+    {
+      "name": "Rail Row",
+      "kind": "nav",
+      "refersTo": "rail-item",
+      "description": "A conversation row in the left rail. Full pill, body text, transparent at rest, warm-grey on hover, darker + a pine dot when active.",
+      "html": "<div class=\"ds-rail-row ds-rail-row--active\"><span class=\"ds-rail-dot\" aria-hidden=\"true\"></span><span class=\"ds-rail-label\">Sep 4</span></div>",
+      "css": ".ds-rail-row { display:flex; align-items:center; gap:.6rem; padding:.62rem .85rem; border-radius:999px; color:#444746; font:400 .92rem 'Figtree',system-ui,sans-serif; cursor:pointer; } .ds-rail-row:hover { background:#e9e8e5; } .ds-rail-row--active { background:#e3e2df; color:#1f1f1f; font-weight:500; } .ds-rail-dot { width:.4rem; height:.4rem; border-radius:50%; background:#8c918d; } .ds-rail-row--active .ds-rail-dot { background:#1f5e4a; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "A form text field. Recessed faint fill, no border, small radius; focus is the pine ring, not a border shift.",
+      "html": "<input class=\"ds-input\" type=\"text\" value=\"Riyadh\" aria-label=\"Destination country\">",
+      "css": ".ds-input { width:100%; background:#f1f1ee; color:#1f1f1f; font:400 .95rem 'Figtree',system-ui,sans-serif; padding:.7rem .95rem; border:none; border-radius:13px; } .ds-input::placeholder { color:#6e7370; } .ds-input:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "One Surface, One Glow, One Bar",
+    "overview": "Gabay OFW is one calm surface an Overseas Filipino Worker talks to — often on a watched phone, in the middle of a bad situation, with a narrow window to act. The design borrows the shape of an assistant she already trusts how to use: a near-white ground, white lifted on soft shadow, a floating input at the foot of the screen. Everything that could be a border has been taken away; the only things that separate one region from another are a shadow and a stretch of empty space. Underneath that borrowed calm, the warmth is unmistakably hers — one diffuse glow drawn from the Philippine flag's blue, red and gold pools behind the greeting, the mark is a plain rotated square in pine green, and the first word is \"Kumusta\". The aesthetic is borrowed; the brand is not.\n\nThe system is built by radical subtraction. There is one ground color, not a palette of surfaces. There is one glow, and it fades the moment a conversation starts so it never competes with what Gabay is saying. There is one input, and it never leaves the screen — findings, contact cards, and the record of what Gabay understood all arrive inside the thread rather than on a screen she has to navigate to. Stillness is the feature. Type is large and light, weight 400 for even the biggest headings, so nothing on the page raises its voice.\n\nExactly one thing is allowed to break the calm: flag red. It marks the EMERGENCY exit, the delete-everything action, and an urgent finding — and nothing else, ever. Its rarity is what makes it legible under stress. The explicit anti-reference is a generic assistant blue: the glow is the flag's #0038a8, never a borrowed brand color, and the design never leans on another product's identity to feel trustworthy.",
+    "keyCharacteristics": [
+      "Single near-white ground (#fbfbfa); white (#ffffff) only for surfaces that float",
+      "Zero borders in the current implementation — shadow and space do all separation",
+      "Figtree only, 300–500; headings are large, weight 400, tight-tracked",
+      "One flag-colored glow on the home screen, faded out once messaging begins",
+      "Flag red (#ce1126) reserved for urgent affordances, never decoration",
+      "One conversation, one composer that never leaves; no modes, no dashboard",
+      "Rotated pine square as both the brand mark and the agent's speaker mark"
+    ],
+    "rules": [
+      { "name": "The One Red Line Rule", "body": "Flag red appears on at most one element per screen and only ever means act now — EMERGENCY, delete-everything, or a single urgent finding line. Everything else, however important, stays ink. The red's scarcity is the signal; dilute it and the screen loses its one alarm.", "section": "colors" },
+      { "name": "The Borrowed Light Rule", "body": "Flag blue and flag gold are light, never material. They may only appear inside the .ph-glow gradient at low alpha. No fill, no text, no border, no icon uses them.", "section": "colors" },
+      { "name": "The One Ground Rule", "body": "#fbfbfa is the background of every screen. White is a signal that an element floats. A white section that isn't a card, input, message, or dialog is a bug.", "section": "colors" },
+      { "name": "The Weight-400 Headline Rule", "body": "Display and headline text is weight 400 — the body weight. If a heading is set in 600/700 to \"make it a heading\", the calm is broken. Reach for size and negative tracking instead.", "section": "typography" },
+      { "name": "The Detected-Language Rule", "body": "Copy is rendered in whichever of English, Filipino, or Cebuano Gabay detected — never chosen by the user. Institution names (DMW, OWWA, MWO, DOLE-SEnA) stay verbatim in every language so she can match them against a physical sign.", "section": "typography" },
+      { "name": "The No-Line Rule", "body": "Don't add a border to create separation. If two regions blur together, the fix is more space or a ground-shift, then a shadow — a 1px solid line is the wrong tool in this system.", "section": "elevation" },
+      { "name": "The Glow-Recedes Rule", "body": "The .ph-glow layer is decoration that must never compete with content. It is present and saturated on the empty home screen and animates to opacity: 0 (0.5s ease) the instant the thread has a message.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do put every new surface on the #fbfbfa ground and reserve white for things that genuinely float (cards, inputs, messages, dialogs, chips).",
+      "Do separate regions with space, then a one-shade ground shift, then a two-layer shadow — in that order.",
+      "Do set headings at weight 400 and create hierarchy with size and negative tracking (-0.01em to -0.015em).",
+      "Do keep the reading column near 47rem and agent replies near 40rem, even on a wide screen.",
+      "Do render findings, contact cards, and the Case as messages inside the thread; the composer must stay visible while she reads them.",
+      "Do use the rotated pine square as the only geometric motif — brand mark and agent speaker mark, always pine.",
+      "Do keep the emergency affordance always on screen and on the zero-model path, however quiet it looks."
+    ],
+    "donts": [
+      "Don't add a 1px border to separate anything. The system has none.",
+      "Don't use flag red for anything that isn't act now — no red headings, no red dividers, no red hover states, no more than one red element per screen.",
+      "Don't fill a shape with flag blue or flag gold; they exist only inside the home glow at low alpha.",
+      "Don't let the glow sit under an active conversation — it fades to zero once the thread has a message.",
+      "Don't introduce a second font family or a bold heading weight.",
+      "Don't give Gabay's replies a bubble or a card; they are markless text after the pine square.",
+      "Don't build a settings screen, a mode picker, or a separate findings page — one conversation, one composer, one Case.",
+      "Don't show a phone number, office name, distance, or citation that the server didn't send (ADR-0002)."
+    ]
+  }
+}
