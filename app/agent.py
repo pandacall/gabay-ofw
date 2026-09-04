@@ -151,9 +151,14 @@ PROGRESS_TRAIL_OPENING = {
 #: specialist, for the verification entry) may fire, keyed exactly to the
 #: name google-adk exposes the call under — never a raw tool name, an
 #: agent name, or JSON shown to her. Every key here names the TASK, never
-#: a hypothesis about her situation (ADR-0010): "Looking up your agency",
-#: never a claim about whether that agency is legitimate; "Checking what
-#: the rules actually say", never a claim about whether she was lied to.
+#: a hypothesis about her situation (ADR-0010): "Checking what the rules
+#: actually say", never a claim about whether she was lied to. The ADR's
+#: own "Looking up your agency" example names COMPLAINT_DRAFTER's
+#: INTERNAL agency-license check (``complaint_check_agency_license``) —
+#: an internal tool, so per the granularity rule below it gets no line of
+#: its own; COMPLAINT_DRAFTER's ONE line names what the specialist as a
+#: whole is doing (drafting/filling the complaint), never the narrower
+#: internal check.
 #:
 #: Granularity (ADR-0010's "one line per specialist, plus one for
 #: verification"): FILING_SEQUENCER's OWN internal tools
@@ -163,9 +168,10 @@ PROGRESS_TRAIL_OPENING = {
 #: (sequencer_verify_plan) get a line, so a single filing turn never
 #: stutters four lines through what she asked as one question. The same
 #: reasoning drops DEBUNKER's own search_corpus, COMPLAINT_DRAFTER's four
-#: gate/fill tools, and RECOURSE_ROUTER's recourse_build_routes — each is
-#: covered by its specialist's one line already. Contact-directory and
-#: card-rendering tools (office_directory, action_card, safe_floor_card,
+#: gate/fill tools (including complaint_check_agency_license), and
+#: RECOURSE_ROUTER's recourse_build_routes — each is covered by its
+#: specialist's one line already. Contact-directory and card-rendering
+#: tools (office_directory, action_card, safe_floor_card,
 #: mark_plan_step_done) are absent too: the card itself appears, which
 #: says more than a label could. Any call whose name is not a key here
 #: renders NOTHING (the quiet-gap failure mode ADR-0010 requires).
@@ -195,10 +201,14 @@ PROGRESS_TRAIL_LABELS: dict[str, dict[str, str]] = {
         "tl": "Tinitingnan kung tama ang mga hakbang na ito ayon sa batas.",
         "ceb": "Gisusi kung husto kini nga mga lakang base sa balaod.",
     },
+    # Names the specialist's whole task (drafting/filling the complaint
+    # form), never the narrower internal agency-license check it also
+    # runs — that check (complaint_check_agency_license) is an internal
+    # tool and stays silent, per the granularity rule above.
     "COMPLAINT_DRAFTER": {
-        "en": "Looking up your agency.",
-        "tl": "Tinitingnan ang iyong ahensya.",
-        "ceb": "Gitan-aw ang imong ahensya.",
+        "en": "Putting your complaint into the right form.",
+        "tl": "Inilalagay ang reklamo mo sa tamang porma.",
+        "ceb": "Gibutang ang imong reklamo sa hustong porma.",
     },
     "RECOURSE_ROUTER": {
         "en": "Working out where you can take this next.",
