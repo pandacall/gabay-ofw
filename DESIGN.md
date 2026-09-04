@@ -302,11 +302,16 @@ match them against a physical sign.
 
 ## Layout
 
-A two-part shell: a fixed-width left **rail** and a fluid main column. The rail
-is `16.5rem` on desktop and collapses to a `~68px` icon strip below `900px` — it
-stays a rail on every viewport, never a top bar or a hamburger drawer. The main
-column holds one of two screens (home or profile); everything else is a message
-in the thread.
+A two-part shell: a left **rail** and a fluid main column. The rail is `16.5rem`
+and always visible above `900px`. Below `900px` it becomes an **off-canvas
+drawer** (Gemini-style) — the main column goes full-width, a slim burger bar
+(`☰` + wordmark) sits top-left, and tapping it slides the rail in over a scrim.
+(This revises issue #71's "never a hamburger drawer" on the strength of direct
+user feedback — a `68px` strip could not carry a labelled conversation list on a
+phone.) The drawer closes on the X, the scrim, `Escape`, or picking anything in
+it; the scrimmed background goes `inert`, but the emergency controls — outside
+`#screen` — never do. The main column holds one of two screens (home or
+profile); everything else is a message in the thread.
 
 **The viewport is the frame.** `.app` is exactly `100dvh` and clips; the page
 itself never scrolls. The rail is fixed chrome — only its conversation list
@@ -331,8 +336,9 @@ with `rem` values and `clamp()` for page padding. Message-to-message gap is
 `clamp(1.1rem, 4vw, 3rem)` horizontal, with `3.25rem` of top padding on mobile to
 clear the fixed emergency pill.
 
-**Single breakpoint:** `900px`. Below it the rail collapses to icons, cards go
-full-width, the emergency pill shrinks, and touch targets stay large.
+**Single breakpoint:** `900px`. Below it the rail becomes the drawer, the burger
+bar appears, cards go full-width, the emergency pill shrinks, and touch targets
+stay large.
 
 ## Elevation & Depth
 
@@ -468,9 +474,11 @@ never motion that demands attention.
 - Conversation labels are **relative** — today's threads show the time, yesterday
   says so, the last week shows the weekday, older shows the date — so a list of
   same-day threads stays scannable before topic labels land.
-- Below `900px` the labels drop and every row centers its icon in the strip; the
-  conversation list becomes a column of tappable dots (the open one is pine), and
-  the per-row delete shows only on the open conversation.
+- Below `900px` the rail is an off-canvas **drawer** — `min(19rem, 84vw)` wide,
+  `lg` shadow, slides in from the left over a `backdrop` scrim, opened from the
+  burger bar and closed on the X / scrim / `Escape` / any selection. Full labels,
+  the full conversation list, and the per-row delete all show (there is room);
+  nothing collapses to icons.
 
 ### The Composer (signature component)
 A white pill, `32px` radius, `md` shadow, that never leaves the screen. Two

@@ -91,14 +91,32 @@
       </button>
     </div>
 
-    <!-- The left rail (issue #71): brand, the Conversation list (#72),
-         and account controls. A flat panel one shade off the page:
-         separation is the ground colour, never a line or shadow. The
-         right-hand Case panel is gone — "what Gabay knows" now folds
-         into the thread (see chatMessagesHtml in app.js). Never "check":
-         CONTEXT.md reserves that word for the verb Gabay performs inside
-         a Conversation. -->
-    <aside class="rail">
+    <!-- Mobile only (<=900px): the rail is an off-canvas drawer, opened
+         from this bar — a burger + wordmark, Gemini-style. On wider
+         screens the rail is always visible and this bar is display:none. -->
+    <div class="mobile-topbar">
+      <button class="topbar-menu" type="button" data-action="toggle-rail" aria-expanded="false" data-copy-aria="menuLabel">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="topbar-brand brand" type="button" data-action="home">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <span>Gabay OFW</span>
+      </button>
+    </div>
+    <div class="rail-scrim" data-action="close-rail" aria-hidden="true"></div>
+
+    <!-- The left rail (issue #71 as revised): brand, the Conversation
+         list (#72), and account controls. Always visible on wide
+         screens; an off-canvas drawer on a phone (opened from the burger
+         above). A flat panel one shade off the page — separation is the
+         ground colour, never a line or shadow. The right-hand Case panel
+         is gone — "what Gabay knows" folds into the thread. Never
+         "check": CONTEXT.md reserves that word for the verb Gabay
+         performs inside a Conversation. -->
+    <aside class="rail" id="rail" aria-label="Gabay OFW navigation">
+      <button class="rail-close" type="button" data-action="close-rail" data-copy-aria="closeLabel">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
       <button class="brand rail-brand" type="button" data-action="home">
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>

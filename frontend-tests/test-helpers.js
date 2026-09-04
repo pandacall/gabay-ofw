@@ -54,4 +54,14 @@ const SAMPLE_CONTACTS = [
 
 const openAsSignedInUser = (page, options) => openApp(page, options);
 
-module.exports = { openApp, openAsSignedInUser, SAMPLE_CONTACTS };
+// On a phone (<=900px) the rail is an off-canvas drawer opened from the
+// burger bar; on wider screens it is always visible and this is a no-op.
+async function openRailIfDrawer(page) {
+  const menu = page.locator(".topbar-menu");
+  if (await menu.isVisible()) {
+    await menu.click();
+    await page.locator(".app.rail-open").waitFor();
+  }
+}
+
+module.exports = { openApp, openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer };

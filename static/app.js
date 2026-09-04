@@ -296,18 +296,24 @@ Object.assign(copy.en, {
   emergencyRegion: "Emergency help",
   attachLabel: "Add a photo",
   attachUnavailable: "Adding a photo isn't available yet — tell Gabay what it shows instead.",
+  menuLabel: "Menu",
+  closeLabel: "Close",
 });
 Object.assign(copy.tl, {
   skipToEmergency: "Dumiretso sa tulong pang-emergency",
   emergencyRegion: "Tulong pang-emergency",
   attachLabel: "Magdagdag ng larawan",
   attachUnavailable: "Hindi pa puwedeng magdagdag ng larawan — sabihin na lang kay Gabay ang nakikita rito.",
+  menuLabel: "Menu",
+  closeLabel: "Isara",
 });
 Object.assign(copy.ceb, {
   skipToEmergency: "Diretso sa tabang pang-emergency",
   emergencyRegion: "Tabang pang-emergency",
   attachLabel: "Pagdugang og litrato",
   attachUnavailable: "Dili pa mahimo ang pagdugang og litrato — isulti na lang kang Gabay ang makita niini.",
+  menuLabel: "Menu",
+  closeLabel: "Isira",
 });
 
 const screen = document.getElementById("screen");
@@ -321,6 +327,31 @@ const markSafeButton = document.getElementById("mark-safe-button");
 const markSafeDialog = document.getElementById("mark-safe-dialog");
 const deleteConversationDialog = document.getElementById("delete-conversation-dialog");
 const status = document.getElementById("status");
+
+// The rail on a phone (<=900px) is an off-canvas drawer opened from the
+// burger bar; on wider screens it is always visible and these are no-ops
+// (the CSS ignores .rail-open above the breakpoint).
+const railIsDrawer = () => window.matchMedia("(max-width: 900px)").matches;
+function applyRailState(open, { moveFocus = true } = {}) {
+  app.classList.toggle("rail-open", open);
+  document.querySelector(".topbar-menu")?.setAttribute("aria-expanded", String(open));
+  // Take the scrimmed background out of the tab order while the drawer is
+  // open — but never the emergency controls, which sit outside #screen.
+  const bg = open && railIsDrawer();
+  screen.inert = bg;
+  document.querySelector(".mobile-topbar")?.toggleAttribute("inert", bg);
+  if (!moveFocus || !railIsDrawer()) return;
+  (open ? document.querySelector(".rail-close") : document.querySelector(".topbar-menu"))?.focus();
+}
+// The burger / X / scrim / Escape path — moves focus with the drawer.
+const setRailOpen = (open) => applyRailState(open);
+// A navigation closed the drawer as a side effect — clear it without
+// stealing focus from whatever the navigation target focuses.
+const closeRailAfterNav = () => {
+  if (railIsDrawer() && app.classList.contains("rail-open")) {
+    applyRailState(false, { moveFocus: false });
+  }
+};
 
 const supportedLanguages = Object.keys(copy);
 const savedLanguage = localStorage.getItem("gabay-language");
@@ -1170,12 +1201,22 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "toggle-rail") {
+    setRailOpen(!app.classList.contains("rail-open"));
+    return;
+  }
+  if (action === "close-rail") {
+    setRailOpen(false);
+    return;
+  }
   if (action === "new-conversation") {
     newConversation();
+    closeRailAfterNav();
     return;
   }
   if (action === "open-conversation") {
     openConversation(button.closest(".rail-conversation")?.dataset.sessionId);
+    closeRailAfterNav();
     return;
   }
   if (action === "delete-conversation") {
@@ -1209,8 +1250,19 @@ document.addEventListener("click", (event) => {
       ?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "end" });
     return;
   }
-  if (action === "home" && currentScreen === "home") return;
+  if (action === "home" && currentScreen === "home") {
+    closeRailAfterNav();
+    return;
+  }
   navigate(action);
+  closeRailAfterNav();
+});
+
+// Escape closes the mobile drawer (matching the dialogs).
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && app.classList.contains("rail-open")) {
+    setRailOpen(false);
+  }
 });
 
 // The composer has no Send button — the mic is the submit control and
@@ -1327,6 +1379,7 @@ if (auth) {
       editingCaseField = null;
       if (markSafeDialog.open) markSafeDialog.close();
       if (deleteConversationDialog.open) deleteConversationDialog.close();
+      app.classList.remove("rail-open");
       refreshEmergencyControls();
       return;
     }
