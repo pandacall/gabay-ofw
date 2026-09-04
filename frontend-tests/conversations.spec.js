@@ -115,7 +115,7 @@ test("opening a conversation from the rail restores its transcript and cards", a
   await expect(page.locator(".chat-message.user")).toContainText("not been paid");
   await expect(page.locator(".contact-card")).toContainText("Real offices that can help");
   await expect(page.locator(".chat-message.agent").last()).toContainText("These offices can help");
-  await expect(page.locator(".case-panel")).toContainText("months unpaid");
+  await expect(page.locator(".case-inline")).toContainText("months unpaid");
 });
 
 test("a re-opened turn with a past plan card shows one 'view current plan' line, not an actionable card", async ({
