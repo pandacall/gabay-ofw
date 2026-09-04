@@ -106,17 +106,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 .skip-link:focus, .skip-link:focus-visible { transform: translateY(0); }
 
-@media (prefers-reduced-motion: reduce) {
-  /* Preserve state changes (instant), drop the ambient motion: freeze
-     the pulsing loader dots to a static row and cut the glow fade. */
-  .dawn-loader span,
-  .content-skeleton span,
-  .chat-message.typing span { animation: none; opacity: 0.55; transform: none; }
-  .ph-glow,
-  .button, .composer-send, .chat-opener, .google-button,
-  .emergency-button, .rail-control, .skip-link { transition: none; }
-}
-
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: clamp(1.9rem, 4.6vw, 3rem); font-weight: 400; letter-spacing: -0.015em; line-height: 1.16; }
 h2 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); font-weight: 400; letter-spacing: -0.01em; line-height: 1.22; }
@@ -911,4 +900,27 @@ p { color: var(--body); line-height: 1.55; }
   .composer-plus { display: none; }
   .composer-pill { padding-left: 1rem; }
   .home-greeting p { font-size: 0.92rem; }
+}
+
+/* ---------- Reduced motion ----------
+   Last in the file so it wins over the animation and transition
+   declarations it overrides. State changes stay (instant); the ambient
+   motion goes — the pulsing loader dots freeze to a static dimmed row,
+   the glow fade and control transitions cut to nothing. Not a blanket
+   `0.01ms` kill: the feedback survives, the animation does not. */
+@media (prefers-reduced-motion: reduce) {
+  .dawn-loader span,
+  .content-skeleton span,
+  .chat-message.typing span {
+    animation: none !important;
+    opacity: 0.55;
+    transform: none;
+  }
+  .ph-glow { transition: none; }
+  .button, .ink-button, .urgent-button, .text-button,
+  .composer-send, .composer-plus, .chat-opener, .google-button,
+  .emergency-button, .mark-safe-button, .rail-control, .rail-conversation,
+  .rail-new-conversation, .case-option, .case-edit-trigger, .skip-link {
+    transition: none;
+  }
 }
