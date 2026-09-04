@@ -4,7 +4,7 @@ transaction re-runs against the freshly-read stored Case instead of
 trusting a merged blob computed before a concurrent write landed.
 """
 
-from app.case import apply_mutations, empty_case, is_imminent_danger, merge_case
+from app.case import apply_mutations, empty_case, merge_case
 
 T1 = "2026-09-04T00:00:00+00:00"
 T2 = "2026-09-04T00:05:00+00:00"
@@ -13,49 +13,6 @@ T3 = "2026-09-04T00:10:00+00:00"
 
 def claims(**fields):
     return {name: {"value": value, "confidence": "high"} for name, value in fields.items()}
-
-
-class TestEmergencyPressSurvivesInFlightCommit:
-    """The concrete failure ADR-0008 exists to close: a DISPATCHER turn is
-    in flight when she taps EMERGENCY. Replaying the button-press
-    mutation against whatever the OTHER turn actually left behind must
-    never lose the press, regardless of which mutation is recorded (and
-    replayed) first."""
-
-    def test_button_press_recorded_before_the_in_flight_merge_still_wins(self):
-        # The button lands first; the in-flight DISPATCHER turn's
-        # narrative merge (computed before the tap) is replayed after.
-        mutations = [
-            {"op": "press_emergency_button", "now": T1},
-            {
-                "op": "merge",
-                "delta": {"claims": claims(country="Saudi Arabia")},
-                "source": "extraction",
-                "now": T2,
-            },
-        ]
-        case = apply_mutations(None, mutations)
-        assert is_imminent_danger(case) is True
-        assert case["claims"]["country"]["value"] == "Saudi Arabia"
-
-    def test_in_flight_merge_recorded_first_still_yields_active_after_the_press(self):
-        # The reverse order: the stale in-flight turn's merge was recorded
-        # (and would have been persisted) before the button press. Even
-        # so, the press must still land — it is never silently erased by
-        # replaying "the same stale blob" the way a whole-blob write
-        # would.
-        mutations = [
-            {
-                "op": "merge",
-                "delta": {"claims": claims(country="Saudi Arabia")},
-                "source": "extraction",
-                "now": T1,
-            },
-            {"op": "press_emergency_button", "now": T2},
-        ]
-        case = apply_mutations(None, mutations)
-        assert is_imminent_danger(case) is True
-        assert case["claims"]["country"]["value"] == "Saudi Arabia"
 
 
 class TestSafetyFlagSurvivesConcurrentCommit:
@@ -113,10 +70,15 @@ class TestUnknownMutationLeavesCaseIntact:
         stored = empty_case()
         mutations = [
             {"op": "mystery", "now": T1},
-            {"op": "press_emergency_button", "now": T2},
+            {
+                "op": "merge",
+                "delta": {"claims": claims(country="Qatar")},
+                "source": "extraction",
+                "now": T2,
+            },
         ]
         replayed = apply_mutations(stored, mutations)
-        assert is_imminent_danger(replayed) is True
+        assert replayed["claims"]["country"]["value"] == "Qatar"
 
     def test_non_dict_entries_are_ignored(self):
         stored = merge_case(None, {"claims": claims(country="Qatar")}, now=T1)
@@ -125,7 +87,9 @@ class TestUnknownMutationLeavesCaseIntact:
 
     def test_missing_now_is_a_no_op(self):
         stored = empty_case()
-        replayed = apply_mutations(stored, [{"op": "press_emergency_button"}])
+        replayed = apply_mutations(
+            stored, [{"op": "merge", "delta": {"claims": claims(country="Qatar")}}]
+        )
         assert replayed == stored
 
     def test_merge_with_unrecognised_source_is_a_no_op(self):
@@ -154,14 +118,28 @@ class TestPurity:
 
         stored = merge_case(None, {"claims": claims(country="Qatar")}, now=T1)
         snapshot = copy.deepcopy(stored)
-        mutations = [{"op": "press_emergency_button", "now": T2}]
+        mutations = [
+            {
+                "op": "merge",
+                "delta": {"claims": claims(employer_name="Al Rashid")},
+                "source": "extraction",
+                "now": T2,
+            }
+        ]
         apply_mutations(stored, mutations)
         assert stored == snapshot
 
     def test_mutation_list_not_mutated(self):
         import copy
 
-        mutations = [{"op": "press_emergency_button", "now": T1}]
+        mutations = [
+            {
+                "op": "merge",
+                "delta": {"claims": claims(country="Qatar")},
+                "source": "extraction",
+                "now": T1,
+            }
+        ]
         snapshot = copy.deepcopy(mutations)
         apply_mutations(None, mutations)
         assert mutations == snapshot
@@ -174,28 +152,23 @@ class TestPurity:
         assert apply_mutations(stored, []) == stored
 
 
-class TestRecordEmergencyTurnMutation:
-    def test_replays_last_turn_timestamp(self):
-        stored = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
-        mutations = [
-            {"op": "record_emergency_turn", "now": T2, "resume_check_issued": False}
-        ]
-        replayed = apply_mutations(stored, mutations)
-        assert replayed["emergency"]["last_turn_at"] == T2
+class TestEmergencyOpsAreNoLongerCaseMutations:
+    """ADR-0009: the latch moved to Conversation state, so the button /
+    mark_safe / record-turn ops are no longer Case mutations — replaying
+    one is an unknown op and a strict no-op, never a data loss."""
 
-    def test_resume_check_issued_flag_replays_too(self):
-        stored = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
-        mutations = [
-            {"op": "record_emergency_turn", "now": T2, "resume_check_issued": True}
-        ]
-        replayed = apply_mutations(stored, mutations)
-        assert replayed["emergency"]["resume_check_at"] == T2
+    def test_button_press_op_is_now_an_unknown_no_op(self):
+        stored = merge_case(None, {"claims": claims(country="Qatar")}, now=T1)
+        assert apply_mutations(stored, [{"op": "press_emergency_button", "now": T2}]) == stored
 
-
-class TestMarkSafeMutation:
-    def test_replayed_late_clears_latch_but_never_the_flag(self):
+    def test_mark_safe_op_is_now_an_unknown_no_op(self):
         stored = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
-        assert is_imminent_danger(stored) is True
         replayed = apply_mutations(stored, [{"op": "mark_safe", "now": T2}])
-        assert is_imminent_danger(replayed) is False
+        assert replayed == stored
         assert "PHYSICAL_ASSAULT_ONGOING" in replayed["safety_flags"]
+
+    def test_record_emergency_turn_op_is_now_an_unknown_no_op(self):
+        stored = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
+        assert apply_mutations(
+            stored, [{"op": "record_emergency_turn", "now": T2}]
+        ) == stored

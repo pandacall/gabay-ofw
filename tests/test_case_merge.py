@@ -13,12 +13,7 @@ from app.case import (
     SAFETY_FLAGS,
     SEQUENCER_FIELDS,
     empty_case,
-    is_imminent_danger,
-    mark_safe,
     merge_case,
-    needs_resume_check,
-    press_emergency_button,
-    record_emergency_turn,
     unresolved_sequencer_conflict,
 )
 
@@ -248,13 +243,11 @@ class TestDeterminism:
         assert case["language"] == "taglish"
 
 
-class TestImminentDangerPredicate:
-    """Issue #41's core contract, CI-gating (no infra, pure functions).
-
-    True iff an acute-class flag is present OR the EMERGENCY button was
-    pressed. mark_safe clears only the predicate, never the flag, and
-    the predicate never expires by clock — nothing here reads elapsed
-    time to decide.
+class TestPendingEscalation:
+    """ADR-0009 / issue #74: a NEW acute flag records a Pending Escalation
+    on the Case — never a latch, never a transfer. The Imminent Danger
+    latch lives on the Conversation now (``app.emergency``); see
+    ``tests/test_emergency_latch.py``.
     """
 
     def test_acute_set_is_a_frozenset_in_code(self):
@@ -263,139 +256,62 @@ class TestImminentDangerPredicate:
         assert "PHYSICAL_ASSAULT_PAST" not in ACUTE_SAFETY_FLAGS
         assert ACUTE_SAFETY_FLAGS <= SAFETY_FLAGS
 
-    def test_no_case_or_empty_case_is_not_danger(self):
-        assert is_imminent_danger(None) is False
-        assert is_imminent_danger({}) is False
-        assert is_imminent_danger(empty_case()) is False
+    def test_empty_case_has_no_pending_escalation_and_no_latch(self):
+        case = empty_case()
+        assert case["pending_escalation"] is None
+        assert "emergency" not in case
 
-    def test_acute_flag_alone_trips_the_predicate(self):
+    def test_new_acute_flag_records_a_pending_escalation(self):
         case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
-        assert is_imminent_danger(case) is True
+        assert case["pending_escalation"] == {
+            "flag": "PHYSICAL_ASSAULT_ONGOING",
+            "at": T1,
+        }
+        # No latch anywhere on the Case.
+        assert "emergency" not in case
 
-    def test_threat_of_harm_trips_the_predicate(self):
+    def test_threat_of_harm_also_records_one(self):
         case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
-        assert is_imminent_danger(case) is True
+        assert case["pending_escalation"]["flag"] == "THREAT_OF_HARM"
 
-    def test_past_assault_alone_does_not(self):
+    def test_past_assault_records_nothing(self):
         case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_PAST"]}, now=T1)
-        assert is_imminent_danger(case) is False
+        assert case["pending_escalation"] is None
 
-    def test_chronic_flags_alone_do_not_trip_it(self):
-        # CONFINED / PASSPORT_WITHHELD: near-universal per Amnesty, so
-        # chronic baseline — acute only combined with an active threat.
+    def test_chronic_flags_alone_record_nothing(self):
         case = merge_case(None, {"safety_flags": ["CONFINED"]}, now=T1)
         case = merge_case(case, {"safety_flags": ["PASSPORT_WITHHELD"]}, now=T2)
-        assert is_imminent_danger(case) is False
+        assert case["pending_escalation"] is None
 
-    def test_chronic_plus_active_threat_trips_it(self):
-        case = merge_case(None, {"safety_flags": ["CONFINED"]}, now=T1)
-        case = merge_case(case, {"safety_flags": ["THREAT_OF_HARM"]}, now=T2)
-        assert is_imminent_danger(case) is True
-
-    def test_button_press_alone_trips_it_with_no_flags(self):
-        case = press_emergency_button(None, now=T1)
-        assert is_imminent_danger(case) is True
-        assert case["safety_flags"] == {}
-
-    def test_button_press_does_not_mutate_input(self):
-        base = empty_case()
-        snapshot = copy.deepcopy(base)
-        press_emergency_button(base, now=T1)
-        assert base == snapshot
-
-    def test_mark_safe_clears_predicate_but_never_the_flag(self):
+    def test_a_second_different_acute_flag_updates_the_record(self):
         case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
-        assert is_imminent_danger(case) is True
-        cleared = mark_safe(case, now=T2)
-        assert is_imminent_danger(cleared) is False
-        # The disclosure survives a coerced tap.
-        assert "PHYSICAL_ASSAULT_ONGOING" in cleared["safety_flags"]
-        assert cleared["safety_flags"] == case["safety_flags"]
-
-    def test_mark_safe_does_not_mutate_input(self):
-        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
-        snapshot = copy.deepcopy(case)
-        mark_safe(case, now=T2)
-        assert case == snapshot
-
-    def test_mark_safe_clears_button_press_too(self):
-        case = press_emergency_button(None, now=T1)
-        cleared = mark_safe(case, now=T2)
-        assert is_imminent_danger(cleared) is False
-        # The press timestamp is preserved for audit; only "active" flips.
-        assert cleared["emergency"]["button_pressed_at"] == T1
-        assert cleared["emergency"]["marked_safe_at"] == T2
-
-    def test_predicate_re_evaluates_after_mark_safe_on_new_acute_flag(self):
-        # A re-evaluation next turn, not a permanent clear: a fresh acute
-        # disclosure after mark_safe trips the predicate again.
-        case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
-        case = mark_safe(case, now=T2)
-        assert is_imminent_danger(case) is False
         t3 = "2026-09-03T00:10:00+00:00"
         case = merge_case(case, {"safety_flags": ["THREAT_OF_HARM"]}, now=t3)
-        assert is_imminent_danger(case) is True
+        assert case["pending_escalation"] == {"flag": "THREAT_OF_HARM", "at": t3}
 
-    def test_predicate_never_expires_by_clock(self):
-        # No "now"/elapsed-time argument is even accepted by the reader —
-        # the predicate is a pure latch read, not a time-boxed one.
-        case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
-        import inspect
+    def test_re_adding_the_same_acute_flag_does_not_re_record(self):
+        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
+        case = merge_case(case, {"safety_flags": ["THREAT_OF_HARM"]}, now=T2)
+        # Add-only: the flag is not new the second time, so the Pending
+        # Escalation keeps its original ``at`` — a declined prompt can
+        # never re-fire for the same hazard by construction.
+        assert case["pending_escalation"] == {"flag": "THREAT_OF_HARM", "at": T1}
 
-        params = inspect.signature(is_imminent_danger).parameters
-        assert list(params) == ["case"]
-        assert is_imminent_danger(case) is True
-
-    def test_textual_im_okay_does_not_clear_it(self):
-        # A textual claim is just another claim — it is not a code path
-        # that touches "emergency"; only mark_safe (a nonce-gated UI tap,
-        # exercised at the HTTP seam) may clear the predicate.
-        case = merge_case(None, {"safety_flags": ["PHYSICAL_ASSAULT_ONGOING"]}, now=T1)
+    def test_a_non_flag_turn_leaves_the_record_in_place(self):
+        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=T1)
         case = merge_case(case, {"claims": claims(status="im_okay")}, now=T2)
-        assert is_imminent_danger(case) is True
+        assert case["pending_escalation"] == {"flag": "THREAT_OF_HARM", "at": T1}
 
-
-class TestLongGapResume:
-    """Issue #41: a long silence while the predicate is active re-asks
-    once instead of silently resuming inside EMERGENCY."""
-
-    T_START = "2026-09-03T00:00:00+00:00"
-    T_SOON = "2026-09-03T00:05:00+00:00"
-    T_LATER = "2026-09-03T01:00:00+00:00"  # 1h later: past the gap
-    T_AFTER_CHECKIN = "2026-09-03T01:05:00+00:00"
-    T_EVEN_LATER = "2026-09-03T02:00:00+00:00"
-
-    def test_no_gap_check_when_predicate_is_not_active(self):
-        case = empty_case()
-        case = record_emergency_turn(case, now=self.T_START)
-        assert needs_resume_check(case, now=self.T_LATER) is False
-
-    def test_short_gap_does_not_trigger_resume_check(self):
-        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=self.T_START)
-        case = record_emergency_turn(case, now=self.T_START)
-        assert needs_resume_check(case, now=self.T_SOON) is False
-
-    def test_long_gap_triggers_resume_check_exactly_once(self):
-        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=self.T_START)
-        case = record_emergency_turn(case, now=self.T_START)
-        assert needs_resume_check(case, now=self.T_LATER) is True
-        # The app records that it issued the re-ask this turn...
-        case = record_emergency_turn(case, now=self.T_LATER, resume_check_issued=True)
-        # ...so an immediate next turn does not ask again.
-        assert needs_resume_check(case, now=self.T_LATER) is False
-
-    def test_resume_check_can_fire_again_after_a_second_long_gap(self):
-        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=self.T_START)
-        case = record_emergency_turn(case, now=self.T_START)
-        assert needs_resume_check(case, now=self.T_LATER) is True
-        case = record_emergency_turn(case, now=self.T_LATER, resume_check_issued=True)
-        # A normal turn lands right after the check-in...
-        case = record_emergency_turn(case, now=self.T_AFTER_CHECKIN)
-        # ...and then another long silence passes.
-        assert needs_resume_check(case, now=self.T_EVEN_LATER) is True
-
-    def test_mark_safe_stops_the_resume_check(self):
-        case = merge_case(None, {"safety_flags": ["THREAT_OF_HARM"]}, now=self.T_START)
-        case = record_emergency_turn(case, now=self.T_START)
-        case = mark_safe(case, now=self.T_SOON)
-        assert needs_resume_check(case, now=self.T_LATER) is False
+    def test_a_pre_migration_case_sheds_its_dead_emergency_dict(self):
+        # ADR-0009: the latch left the Case. A Case persisted before the
+        # migration carries a now-dead ``emergency`` dict; the next write
+        # drops it.
+        legacy = {
+            "claims": {},
+            "safety_flags": {},
+            "language": None,
+            "emergency": {"active": True, "button_pressed_at": T1},
+        }
+        merged = merge_case(legacy, {"claims": claims(country="Qatar")}, now=T2)
+        assert "emergency" not in merged
+        assert merged["claims"]["country"]["value"] == "Qatar"

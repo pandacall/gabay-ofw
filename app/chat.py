@@ -67,14 +67,33 @@ from app.agent import (
     progress_trail_label_for,
     progress_trail_opening_for,
 )
-from app.case import mark_safe as case_mark_safe
-from app.case import merge_case
-from app.case import press_emergency_button as case_press_emergency_button
+from app.case import ACUTE_SAFETY_FLAGS, merge_case
 from app.directory import Country, resolve_case_country, resolve_keys
+from app.emergency import (
+    REASON_BUTTON,
+    build_handoff,
+    button_summary,
+    clear_latch,
+    disclosure_summary,
+    empty_resume,
+    is_emergency_conversation,
+    open_latch,
+    reason_category_for,
+)
 from app.history import cards_in, replay_conversation
 from app.reply_text import visible_texts
-from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card, is_imminent_danger
-from app.state_keys import CASE, CASE_MUTATIONS, CASE_RAW, PLAN_ACTIVE
+from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card
+from app.state_keys import (
+    CASE,
+    CASE_MUTATIONS,
+    CASE_RAW,
+    EMERGENCY_CONVERSATION_ID,
+    EMERGENCY_CONVERSATION_ID_RAW,
+    EMERGENCY_LATCH,
+    EMERGENCY_RESUME,
+    ESCALATION_HANDOFF,
+    PLAN_ACTIVE,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +201,13 @@ class ChatService:
         )
         if session is None:
             return None
-        return replay_conversation(session.events)
+        lines = replay_conversation(session.events)
+        if is_emergency_conversation(session.state):
+            # A re-opened Emergency Conversation (ADR-0009): tell the
+            # client this thread holds the latch so it shows the
+            # "I'm safe" control. Its transcript replays like any other.
+            lines = [{"type": "emergency_latch", "active": True}] + lines
+        return lines
 
     async def delete_conversation(self, *, uid: str, session_id: str) -> bool:
         """Removes one Conversation's transcript and nothing else (issue
@@ -191,12 +216,35 @@ class ChatService:
         ``users/{uid}/sessions/{session_id}`` and its events. Returns
         whether the Conversation existed (``False`` → the caller renders
         404, never leaking another user's session id as "found").
+
+        ADR-0009: deleting the Emergency Conversation is permitted
+        UNCONDITIONALLY, including while its latch is active — deletion is
+        a safety action, so refusing then would put bookkeeping above her
+        safety. The latch is Conversation state and dies with the
+        Conversation; only the user-scoped "one live Emergency
+        Conversation" pointer needs an explicit clear, done here before
+        the delete so nothing is orphaned. Her Safety Flags survive on
+        the Case.
         """
         session = await self._session_service.get_session(
             app_name=APP_NAME, user_id=uid, session_id=session_id
         )
         if session is None:
             return False
+        user_state = await self._user_state(uid=uid)
+        if user_state.get(EMERGENCY_CONVERSATION_ID_RAW) == session_id:
+            await self._session_service.append_event(
+                session,
+                Event(
+                    id=Event.new_id(),
+                    invocation_id=f"emergency-delete-{uuid4().hex}",
+                    author="system",
+                    timestamp=time.time(),
+                    actions=EventActions(
+                        state_delta={EMERGENCY_CONVERSATION_ID: None}
+                    ),
+                ),
+            )
         await self._session_service.delete_session(
             app_name=APP_NAME, user_id=uid, session_id=session_id
         )
@@ -206,12 +254,11 @@ class ChatService:
         """The uid's most-recently-updated session, or None with no
         sessions yet.
 
-        Used only by the fallback path in ``_mutate_case``/``_case_for_country``
-        below, for a ``BaseSessionService`` with no ``append_user_mutation``/
-        ``get_user_state`` seam (e.g. the in-memory service the test suite
-        injects). A real (Firestore) backend never calls this any more —
-        the Case moved to user-scoped state (ADR-0008), so there is no
-        longer a meaningful "her session" to find for it.
+        Used only by the ``_case_for_country`` fallback below, for a
+        ``BaseSessionService`` with no ``get_user_state`` seam. A real
+        (Firestore) backend never calls this — the Case moved to
+        user-scoped state (ADR-0008), so there is no longer a meaningful
+        "her session" to find for it.
         """
         response = await self._session_service.list_sessions(
             app_name=APP_NAME, user_id=uid
@@ -220,6 +267,16 @@ class ChatService:
         if not sessions:
             return None
         return max(sessions, key=lambda session: session.last_update_time)
+
+    async def _user_state(self, *, uid: str) -> dict:
+        """Her raw ``adkUserState`` dict (unprefixed keys), or ``{}`` for a
+        backend with no user-scoped read seam. Never gates anything."""
+        try:
+            return await self._session_service.get_user_state(
+                app_name=APP_NAME, user_id=uid
+            )
+        except NotImplementedError:
+            return {}
 
     async def _case_for_country(self, *, uid: str) -> dict | None:
         """Best-effort Case read for country resolution ONLY (ADR-0008's
@@ -239,72 +296,73 @@ class ChatService:
             session = await self._most_recent_session(uid=uid)
             return session.state.get(CASE) if session else None
 
-    async def _mutate_case(
-        self, *, uid: str, op: str
-    ) -> tuple[str | None, dict | None]:
-        """Records a Case mutation (``press_emergency_button`` /
-        ``mark_safe``) outside the Runner's turn flow.
+    async def _open_or_reopen_emergency_conversation(
+        self,
+        *,
+        uid: str,
+        source_session_id: str | None,
+        reason_category: str,
+        summary: str,
+        case: dict | None,
+    ) -> tuple[str, dict]:
+        """Opens THE Emergency Conversation, or reopens the live one
+        (ADR-0009: at most one at a time).
 
-        ADR-0008: the Case is user-scoped and belongs to her, not to any
-        one Conversation, so a real (Firestore) backend applies this
-        directly to her user-scoped state via ``append_user_mutation`` —
-        no Session is read, found, or created at all;
-        ``_most_recent_session`` stopped being a meaningful way to find
-        "her session" for this once the Case moved off per-Conversation
-        state. A ``BaseSessionService`` with no such seam (e.g. the
-        in-memory service the test suite injects) falls back to a
-        hand-built ``Event`` against an existing (or freshly created)
-        session, the same append_event path a normal turn uses.
+        A user-scoped pointer names the live Emergency Conversation. If it
+        is still latched, this reopens it with no writes — a second press
+        can never fragment her account across two rows. Otherwise a fresh
+        Conversation is created carrying its Escalation Handoff, latch,
+        and the pointer, all in one ``create_session`` (the state split
+        routes the ``user:`` pointer to ``adkUserState`` and the rest to
+        the session document). Zero model calls.
 
-        Returns ``(session_id, new_case)`` — ``session_id`` is ``None``
-        on the session-less (Firestore) path.
+        Returns ``(emergency_session_id, case)``.
         """
-        now_wall = time.time()
-        now_iso = datetime.fromtimestamp(now_wall, timezone.utc).isoformat()
-        mutation = {"op": op, "now": now_iso}
-
-        append_user_mutation = getattr(
-            self._session_service, "append_user_mutation", None
+        now_iso = datetime.now(timezone.utc).isoformat()
+        pointer = (await self._user_state(uid=uid)).get(
+            EMERGENCY_CONVERSATION_ID_RAW
         )
-        if append_user_mutation is not None:
-            stored_user = await append_user_mutation(
-                app_name=APP_NAME, user_id=uid, case_mutations=[mutation]
+        if pointer:
+            existing = await self._session_service.get_session(
+                app_name=APP_NAME, user_id=uid, session_id=pointer
             )
-            return None, stored_user.get(CASE_RAW) or {}
+            if existing is not None and is_emergency_conversation(existing.state):
+                return pointer, (existing.state.get(CASE) or case or {})
 
-        session = await self._most_recent_session(uid=uid)
-        if session is None:
-            session = await self._session_service.create_session(
-                app_name=APP_NAME, user_id=uid
-            )
-        case = session.state.get(CASE)
-        mutate = case_press_emergency_button if op == "press_emergency_button" else case_mark_safe
-        new_case = mutate(case, now=now_iso)
-        event = Event(
-            id=Event.new_id(),
-            invocation_id=f"emergency-{uuid4().hex}",
-            author="system",
-            timestamp=now_wall,
-            actions=EventActions(
-                state_delta={CASE: new_case, CASE_MUTATIONS: [mutation]}
-            ),
+        sid = uuid4().hex
+        handoff = build_handoff(
+            case=case,
+            source_session_id=source_session_id,
+            reason_category=reason_category,
+            summary=summary,
         )
-        await self._session_service.append_event(session, event)
-        # Reconcile to whatever append_event actually persisted (a
-        # concurrent write may have been folded in).
-        return session.id, session.state.get(CASE) or new_case
+        created = await self._session_service.create_session(
+            app_name=APP_NAME,
+            user_id=uid,
+            session_id=sid,
+            state={
+                EMERGENCY_LATCH: open_latch(now=now_iso),
+                EMERGENCY_RESUME: empty_resume(),
+                ESCALATION_HANDOFF: handoff,
+                EMERGENCY_CONVERSATION_ID: sid,
+            },
+        )
+        return sid, (created.state.get(CASE) or case or {})
 
     async def press_emergency_button(self, *, uid: str) -> AsyncIterator[str]:
         """The hardcoded EMERGENCY button: renders the cached action card
         with ZERO model calls, UNCONDITIONALLY — first, before anything
         else runs, and never gated on the session store succeeding (PRD
         #34 user story 28: "help survives a dead model, a dead session
-        store, or a dead connection"). Recording the press (Imminent
-        Danger predicate on, so DISPATCHER honors it starting next turn)
-        is attempted afterward as a best-effort side effect; if the
-        session store is down, that failure is surfaced but never
-        retracts the card she already has.
+        store, or a dead connection").
+
+        Then it opens (or reopens) her Emergency Conversation (ADR-0009),
+        still with zero model calls — the latch belongs to that
+        Conversation now, so DISPATCHER honours it there starting from her
+        next message. If the session store is down, that failure is
+        surfaced but never retracts the card she already has.
         """
+        case: dict | None = None
         try:
             case = await self._case_for_country(uid=uid)
             country = resolve_case_country(case)
@@ -316,23 +374,108 @@ class ChatService:
         )
 
         try:
-            session_id, case = await self._mutate_case(
-                uid=uid, op="press_emergency_button"
+            flags = (case or {}).get("safety_flags") or {}
+            acute = set(flags) & ACUTE_SAFETY_FLAGS
+            reason = reason_category_for(flags) if acute else REASON_BUTTON
+            session_id, updated_case = (
+                await self._open_or_reopen_emergency_conversation(
+                    uid=uid,
+                    source_session_id=None,
+                    reason_category=reason,
+                    summary=button_summary((case or {}).get("language")),
+                    case=case,
+                )
             )
         except Exception:
-            logger.exception("press_emergency_button: could not record the press")
+            logger.exception(
+                "press_emergency_button: could not open the Emergency Conversation"
+            )
             yield _line({"type": "error", "detail": "session store unavailable"})
             return
-        payload: dict = {"type": "case", "case": case or {}}
-        if session_id is not None:
-            payload["session_id"] = session_id
-        yield _line(payload)
+        yield _line(
+            {"type": "emergency_latch", "active": True, "session_id": session_id}
+        )
+        yield _line(
+            {"type": "case", "case": updated_case or {}, "session_id": session_id}
+        )
+
+    async def escalate_from_prompt(
+        self, *, uid: str, source_session_id: str
+    ) -> dict | None:
+        """Confirming an Escalation Prompt (ADR-0009): opens (or reopens)
+        her Emergency Conversation carrying an Escalation Handoff derived
+        from the source Conversation's Case — country, reason category, a
+        one-line code-owned summary, the source id. NEVER the transcript,
+        and it never writes to the source Conversation, which is left
+        exactly as it was.
+
+        Returns ``{"emergency_session_id", "case"}``, or ``None`` when the
+        source Conversation does not exist or belongs to another user (the
+        caller renders 404, matching ``/api/chat``).
+        """
+        source = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=source_session_id
+        )
+        if source is None:
+            return None
+        case = source.state.get(CASE) or {}
+        reason = reason_category_for(case.get("safety_flags") or {})
+        session_id, updated_case = (
+            await self._open_or_reopen_emergency_conversation(
+                uid=uid,
+                source_session_id=source_session_id,
+                reason_category=reason,
+                summary=disclosure_summary(reason, case.get("language")),
+                case=case,
+            )
+        )
+        return {"emergency_session_id": session_id, "case": updated_case or {}}
 
     async def apply_mark_safe(self, *, uid: str) -> dict:
-        """Clears the Imminent Danger PREDICATE (never the safety flag)
-        on the uid's Case. Returns the updated Case."""
-        _, case = await self._mutate_case(uid=uid, op="mark_safe")
-        return case or {}
+        """Clears the Imminent Danger latch on the ONE live Emergency
+        Conversation (ADR-0009) — never a Safety Flag, which this path
+        cannot even reach (flags live on the user Case). The per-user
+        nonce still identifies her with no Conversation id from the UI:
+        the user-scoped pointer names the single unambiguous target.
+
+        A coerced tap must not erase the disclosure, so this only flips
+        the latch off (timestamped) and clears the pointer, in one event
+        against that Conversation. Returns her Case, untouched.
+        """
+        user_state = await self._user_state(uid=uid)
+        pointer = user_state.get(EMERGENCY_CONVERSATION_ID_RAW)
+        case: dict = {}
+        if pointer:
+            session = await self._session_service.get_session(
+                app_name=APP_NAME, user_id=uid, session_id=pointer
+            )
+            if session is not None:
+                case = session.state.get(CASE) or {}
+                now_iso = datetime.now(timezone.utc).isoformat()
+                await self._session_service.append_event(
+                    session,
+                    Event(
+                        id=Event.new_id(),
+                        invocation_id=f"mark-safe-{uuid4().hex}",
+                        author="system",
+                        timestamp=time.time(),
+                        actions=EventActions(
+                            state_delta={
+                                EMERGENCY_LATCH: clear_latch(
+                                    session.state.get(EMERGENCY_LATCH),
+                                    now=now_iso,
+                                ),
+                                EMERGENCY_CONVERSATION_ID: None,
+                            }
+                        ),
+                    ),
+                )
+        if not case:
+            try:
+                case = await self._case_for_country(uid=uid) or {}
+            except Exception:
+                case = {}
+        return case
 
     async def correct_case(
         self, *, uid: str, session_id: str, field: str, value: str
@@ -403,6 +546,14 @@ class ChatService:
         """Yields the NDJSON lines of one turn: ack, trail, reply, case."""
         case = session.state.get(CASE) or {}
         language = case.get("language")
+        # ADR-0009: the Escalation Prompt fires when THIS turn records a
+        # NEW Pending Escalation — merge_case is the single decider of
+        # "a new acute flag was disclosed" (it is add-only, so a flag is
+        # only ever new once; a declined prompt needs no bookkeeping).
+        # Snapshot it before the Runner (which runs extraction +
+        # merge_case in the before-agent callback) so a genuinely-new
+        # record is a change, not a re-fire.
+        pre_pending = case.get("pending_escalation")
         # The acknowledgement is fixed and yielded before the Runner — and
         # therefore any model — is invoked.
         yield _line(
@@ -546,7 +697,7 @@ class ChatService:
                     "type": "card",
                     "card": cached_card(
                         resolve_case_country(case),
-                        imminent_danger=is_imminent_danger(case),
+                        imminent_danger=is_emergency_conversation(session.state),
                     ),
                     "session_id": session.id,
                 }
@@ -563,6 +714,8 @@ class ChatService:
             app_name=APP_NAME, user_id=uid, session_id=session.id
         )
         updated_case = (updated.state.get(CASE) if updated else None) or {}
+        updated_state = updated.state if updated else session.state
+        in_emergency = is_emergency_conversation(updated_state)
 
         # An inactive Plan (issue #43, ADR-0006 — an input-hash mismatch
         # detected by pure code every turn, never DISPATCHER's judgement)
@@ -580,7 +733,7 @@ class ChatService:
                     "card": build_card(
                         resolve_case_country(updated_case),
                         reason=SafeFloorReason.FACTS_CHANGED,
-                        imminent_danger=is_imminent_danger(updated_case),
+                        imminent_danger=in_emergency,
                     ),
                     "session_id": session.id,
                 }
@@ -596,6 +749,46 @@ class ChatService:
                 {
                     "type": "card",
                     "card": _default_action_card(resolve_case_country(updated_case)),
+                    "session_id": session.id,
+                }
+            )
+
+        # ADR-0009: a NEW Pending Escalation recorded this turn shows the
+        # Escalation Prompt — the Safe Floor card rendered at the SAME
+        # time and unconditionally (the card comes WITH the prompt, not
+        # after it, so the number she needs is on screen whether or not
+        # she taps), plus a two-tap offer to open an Emergency
+        # Conversation. It transfers nobody: not in an Emergency
+        # Conversation already, and DISPATCHER's instruction only
+        # transfers on the latch, which a disclosure never sets.
+        new_pending = updated_case.get("pending_escalation")
+        if (
+            isinstance(new_pending, dict)
+            and new_pending != pre_pending
+            and not in_emergency
+        ):
+            escalation_reason = reason_category_for(
+                updated_case.get("safety_flags") or {}
+            )
+            yield _line(
+                {
+                    "type": "card",
+                    "card": build_card(
+                        resolve_case_country(updated_case),
+                        reason=SafeFloorReason.ACUTE_DISCLOSURE,
+                        imminent_danger=True,
+                    ),
+                    "session_id": session.id,
+                }
+            )
+            yield _line(
+                {
+                    "type": "escalation_prompt",
+                    "escalation_prompt": {
+                        "reason_category": escalation_reason,
+                        "source_session_id": session.id,
+                        "country": resolve_case_country(updated_case).value,
+                    },
                     "session_id": session.id,
                 }
             )
@@ -640,6 +833,20 @@ class ChatService:
                 {
                     "type": "recourse_routes",
                     "recourse_routes": recourse,
+                    "session_id": session.id,
+                }
+            )
+
+        # ADR-0009: the latch is Conversation state now — the client keys
+        # the "I'm safe" control off THIS line, per Conversation, not off
+        # a user-wide Case flag. Emitted only for the Emergency
+        # Conversation, so an ordinary turn's stream shape is unchanged;
+        # ``mark_safe``'s own response clears the control on the client.
+        if in_emergency:
+            yield _line(
+                {
+                    "type": "emergency_latch",
+                    "active": True,
                     "session_id": session.id,
                 }
             )

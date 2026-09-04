@@ -29,7 +29,16 @@ from google.cloud import firestore
 from app.firestore_session_service import FirestoreSessionService
 from app.rules import Citation, Grievance, Jurisdiction, SourceTier, TenureBucket
 from app.sequencer import ActionClass, PlanStep, SequencerIn
-from app.state_keys import CASE, CASE_MUTATIONS, PLAN, PLAN_ACTIVE, PLAN_MUTATIONS
+from app.state_keys import (
+    CASE,
+    CASE_MUTATIONS,
+    EMERGENCY_CONVERSATION_ID_RAW,
+    EMERGENCY_LATCH,
+    EMERGENCY_RESUME,
+    PLAN,
+    PLAN_ACTIVE,
+    PLAN_MUTATIONS,
+)
 
 pytestmark = pytest.mark.skipif(
     not os.environ.get("FIRESTORE_EMULATOR_HOST"),
@@ -237,78 +246,80 @@ def _case_mutation_event(
     return _event(delta)
 
 
-def test_emergency_press_survives_a_turn_already_in_flight():
-    """The concrete failure ADR-0008 exists to close: a DISPATCHER turn
-    is already in flight (holding a stale in-memory Case) when she taps
-    EMERGENCY. The turn's eventual commit — a pre-merged blob computed
-    BEFORE the tap, plus its own recorded mutation — must never erase
-    the press, because the transaction re-runs the merge against the
-    freshly-stored (already-pressed) Case rather than trusting the blob.
+def test_mark_safe_is_not_undone_by_an_in_flight_emergency_turn():
+    """ADR-0009's disjoint-key guarantee against a real backend: she taps
+    "I'm safe" while an Emergency turn is already in flight (holding the
+    still-active latch in memory). The in-flight turn only ever writes
+    ``EMERGENCY_RESUME`` — never ``EMERGENCY_LATCH`` — so its commit
+    cannot re-latch the Conversation ``mark_safe`` just cleared.
     """
     db = _db()
     service = FirestoreSessionService(db)
-    uid = f"emergency-in-flight-{uuid4().hex}"
+    uid = f"mark-safe-race-{uuid4().hex}"
 
     async def scenario():
-        session = await service.create_session(app_name=APP_NAME, user_id=uid)
-        in_flight_writer = await service.get_session(
-            app_name=APP_NAME, user_id=uid, session_id=session.id
-        )
-        # She taps EMERGENCY: a session-less write straight to her
-        # user-scoped Case, exactly like ChatService.press_emergency_button.
-        pressed_at = "2026-09-04T00:00:00+00:00"
-        await service.append_user_mutation(
+        # The Emergency Conversation opens: latch + pointer, one write.
+        sid = uuid4().hex
+        await service.create_session(
             app_name=APP_NAME,
             user_id=uid,
-            case_mutations=[{"op": "press_emergency_button", "now": pressed_at}],
-        )
-
-        # The in-flight DISPATCHER turn now commits — its own pre-merged
-        # blob was computed BEFORE the tap (no emergency), but it also
-        # carries its own recorded mutation.
-        stale_blob = {
-            "claims": {"country": {"value": "Saudi Arabia", "source": "extraction"}},
-            "safety_flags": {},
-            "language": None,
-            "emergency": {
-                "active": False,
-                "button_pressed_at": None,
-                "marked_safe_at": None,
-                "flag_triggered_at": None,
-                "last_turn_at": None,
-                "resume_check_at": None,
+            session_id=sid,
+            state={
+                EMERGENCY_LATCH: {
+                    "active": True,
+                    "opened_at": "2026-09-04T00:00:00+00:00",
+                    "marked_safe_at": None,
+                },
+                EMERGENCY_RESUME: {"last_turn_at": None, "resume_check_at": None},
+                "user:" + EMERGENCY_CONVERSATION_ID_RAW: sid,
             },
-        }
+        )
+        in_flight_turn = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=sid
+        )
+        assert in_flight_turn.state[EMERGENCY_LATCH]["active"] is True
+
+        # She taps "I'm safe": latch off + pointer cleared, in one event.
+        marked_safe = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=sid
+        )
         await service.append_event(
-            in_flight_writer,
-            _case_mutation_event(
-                pre_merged_blob=stale_blob,
-                mutations=[
-                    {
-                        "op": "merge",
-                        "delta": {
-                            "claims": {
-                                "country": {
-                                    "value": "Saudi Arabia",
-                                    "confidence": "high",
-                                }
-                            }
-                        },
-                        "source": "extraction",
-                        "now": "2026-09-03T23:59:59+00:00",
-                    }
-                ],
+            marked_safe,
+            _event(
+                {
+                    EMERGENCY_LATCH: {
+                        "active": False,
+                        "opened_at": "2026-09-04T00:00:00+00:00",
+                        "marked_safe_at": "2026-09-04T00:10:00+00:00",
+                    },
+                    "user:" + EMERGENCY_CONVERSATION_ID_RAW: None,
+                }
             ),
         )
 
+        # The in-flight Emergency turn now commits its long-gap
+        # bookkeeping — EMERGENCY_RESUME ONLY, never the latch.
+        await service.append_event(
+            in_flight_turn,
+            _event(
+                {
+                    EMERGENCY_RESUME: {
+                        "last_turn_at": "2026-09-04T00:05:00+00:00",
+                        "resume_check_at": None,
+                    }
+                }
+            ),
+        )
+
+        fresh = await service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=sid
+        )
+        assert fresh.state[EMERGENCY_LATCH]["active"] is False
+        assert fresh.state[EMERGENCY_RESUME]["last_turn_at"] == (
+            "2026-09-04T00:05:00+00:00"
+        )
         user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
-        case = user_state["case"]
-        assert case["emergency"]["active"] is True
-        assert case["emergency"]["button_pressed_at"] == pressed_at
-        assert case["claims"]["country"]["value"] == "Saudi Arabia"
-        # The in-flight writer's own in-memory/event view is reconciled
-        # to the true persisted Case too, not left showing the stale blob.
-        assert in_flight_writer.state[CASE]["emergency"]["active"] is True
+        assert not user_state.get(EMERGENCY_CONVERSATION_ID_RAW)
 
     asyncio.run(scenario())
 
@@ -736,13 +747,20 @@ def test_get_user_state_and_append_user_mutation_need_no_session():
             app_name=APP_NAME,
             user_id=uid,
             case_mutations=[
-                {"op": "press_emergency_button", "now": "2026-09-04T00:00:00+00:00"}
+                {
+                    "op": "merge",
+                    "delta": {
+                        "claims": {"country": {"value": "Qatar", "confidence": "high"}}
+                    },
+                    "source": "extraction",
+                    "now": "2026-09-04T00:00:00+00:00",
+                }
             ],
         )
-        assert stored_user["case"]["emergency"]["active"] is True
+        assert stored_user["case"]["claims"]["country"]["value"] == "Qatar"
 
         user_state = await service.get_user_state(app_name=APP_NAME, user_id=uid)
-        assert user_state["case"]["emergency"]["active"] is True
+        assert user_state["case"]["claims"]["country"]["value"] == "Qatar"
 
         # No session was ever created for this uid.
         sessions = await service.list_sessions(app_name=APP_NAME, user_id=uid)

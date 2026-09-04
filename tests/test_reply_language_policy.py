@@ -28,7 +28,8 @@ from app.agent import (
     _emergency_instruction,
     acknowledgement_for,
 )
-from app.state_keys import CASE
+from app.emergency import open_latch
+from app.state_keys import CASE, EMERGENCY_LATCH
 
 
 class _FakeReadonlyContext:
@@ -119,11 +120,17 @@ class TestDispatcherInstructionNeverProducesTaglish:
         assert "same purity rule" in text
 
     def test_resume_check_branch_also_never_writes_taglish(self):
-        # The rare "long silence during Imminent Danger" branch (issue #67
-        # fix) must obey the same closed set as every other DISPATCHER
-        # reply, not the old ambiguous "reply warmly in her language".
-        case = {"language": "taglish", "emergency": {"active": True}}
-        text = self._instruction(case=case, **{"temp:resume_check": True})
+        # The rare "long silence in the Emergency Conversation" branch
+        # (issue #67 fix) must obey the same closed set as every other
+        # DISPATCHER reply, not the old ambiguous "reply warmly in her
+        # language". The latch is Conversation state now (ADR-0009).
+        text = self._instruction(
+            case={"language": "taglish"},
+            **{
+                EMERGENCY_LATCH: open_latch(now="2026-09-03T00:00:00+00:00"),
+                "temp:resume_check": True,
+            },
+        )
         _assert_never_instructed_to_write_taglish(text)
         assert "PURE Filipino" in text
         assert "ENGLISH" in text

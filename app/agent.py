@@ -28,9 +28,10 @@ against the pinned 2.8.0 wheel), ADK's own "resume last active sub-agent"
 routing does NOT keep her in EMERGENCY on the next turn — the fallback is
 ``root_agent`` (DISPATCHER). So DISPATCHER's own instruction re-transfers
 to EMERGENCY, unconditionally, on every turn while the Imminent Danger
-predicate is active on her Case — the predicate the app itself owns
-(``app.case.is_imminent_danger``), never a fact EMERGENCY's own words are
-trusted to set or clear.
+latch is active on THIS Conversation (ADR-0009) — the latch the app
+itself owns (``app.emergency.is_emergency_conversation``, read off
+Conversation state), never a fact EMERGENCY's own words are trusted to
+set or clear.
 
 Bounded context growth (issue #49): every specialist (FILING_SEQUENCER,
 DEBUNKER, PROOF_BUILDER, COMPLAINT_DRAFTER, RECOURSE_ROUTER) is a tool call
@@ -61,10 +62,15 @@ from google.adk.models import BaseLlm
 from google.adk.planners import BuiltInPlanner
 from google.genai import types
 
-from app.case import is_imminent_danger, merge_case, needs_resume_check, record_emergency_turn
+from app.case import merge_case
 from app.complaint.agent import COMPLAINT_DRAFTER_NAME, build_complaint_drafter
 from app.debunker import build_debunker
 from app.directory import resolve_case_country
+from app.emergency import (
+    is_emergency_conversation,
+    needs_resume_check,
+    record_turn,
+)
 from app.extraction import read_narrative
 from app.guard import RoutingGuardPlugin, guard_before_tool
 from app.proof.agent import build_proof_builder
@@ -76,6 +82,9 @@ from app.staleness import apply_step_expiry, is_input_stale
 from app.state_keys import (
     CASE,
     CASE_MUTATIONS,
+    EMERGENCY_LATCH,
+    EMERGENCY_RESUME,
+    ESCALATION_HANDOFF,
     PLAN,
     PLAN_ACTIVE,
     PLAN_MUTATIONS,
@@ -295,16 +304,16 @@ def _dispatcher_instruction(readonly_context: ReadonlyContext) -> str:
         if extraction_failed
         else ""
     )
-    if is_imminent_danger(case):
+    if is_emergency_conversation(readonly_context.state):
         if readonly_context.state.get("temp:resume_check"):
             # A long silence has passed while the predicate was active.
             # Re-ask once instead of silently resuming deep inside
             # EMERGENCY, as if the gap never happened.
             recorded_language = case.get("language") or "unknown"
             return f"""\
-You are DISPATCHER for Gabay OFW. The Imminent Danger predicate is still
-ACTIVE for this user, but a long silence has passed since her last
-message. Do NOT call any tool and do NOT transfer yet. Reply warmly,
+You are DISPATCHER for Gabay OFW. This IS the Emergency Conversation and
+its Imminent Danger latch is still ACTIVE, but a long silence has passed
+since her last message. Do NOT call any tool and do NOT transfer yet. Reply warmly,
 check in once — ask simply how she is doing right now — and let her
 answer before anything else happens. Language (issue #67 ruling, same
 closed set as every DISPATCHER reply): her Case records "language" as
@@ -312,20 +321,21 @@ closed set as every DISPATCHER reply): her Case records "language" as
 PURE Filipino for "tl" or "taglish" (Taglish is detected, never
 produced), PURE Cebuano/Bisaya for "ceb". Do this only this one turn.
 """
-        # The Imminent Danger predicate is code-owned (app.case), never a
-        # fact this instruction asks the model to judge. While it is
-        # active, EVERY turn transfers to EMERGENCY immediately — ADK does
-        # not resume a disallow_transfer_to_parent sub-agent across turns
-        # on its own (verified against google-adk==2.8.0), so this
+        # The Imminent Danger latch is code-owned (app.emergency) and is
+        # Conversation state (ADR-0009): this IS the Emergency Conversation,
+        # never a fact this instruction asks the model to judge. While it
+        # is active, EVERY turn transfers to EMERGENCY immediately — ADK
+        # does not resume a disallow_transfer_to_parent sub-agent across
+        # turns on its own (verified against google-adk==2.8.0), so this
         # instruction is what keeps her in EMERGENCY, turn after turn,
-        # until a UI tap (mark_safe) clears the predicate.
+        # until a UI tap (mark_safe) clears the latch.
         return """\
-You are DISPATCHER for Gabay OFW. The Imminent Danger predicate is
-currently ACTIVE for this user. You must NOT reply to her yourself and
-you must NOT call any tool. Your only action this turn is to call
-transfer_to_agent with agent_name="EMERGENCY". Do this immediately,
-every time, for every message, until the app tells you the predicate is
-no longer active.
+You are DISPATCHER for Gabay OFW. This Conversation IS the Emergency
+Conversation and its Imminent Danger latch is currently ACTIVE. You must
+NOT reply to her yourself and you must NOT call any tool. Your only
+action this turn is to call transfer_to_agent with agent_name="EMERGENCY".
+Do this immediately, every time, for every message, until the app tells
+you the latch is no longer active.
 """
     plan_active = readonly_context.state.get(PLAN_ACTIVE)
     stale_block = (
@@ -508,14 +518,26 @@ return, since it does not return any.
 def _emergency_instruction(readonly_context: ReadonlyContext) -> str:
     case = readonly_context.state.get(CASE) or {}
     case_block = json.dumps(case, ensure_ascii=False) if case else "{}"
+    handoff = readonly_context.state.get(ESCALATION_HANDOFF)
+    handoff_block = (
+        "\nThis Emergency Conversation opened carrying an Escalation Handoff"
+        " (ADR-0009): country, a reason category, and a one-line summary in"
+        " her language of why it opened. It is below. Open by acknowledging"
+        " what it already tells you — do NOT re-ask what her Case or this"
+        f" handoff already records; she disclosed it under duress.\n{json.dumps(handoff, ensure_ascii=False)}\n"
+        if isinstance(handoff, dict)
+        else ""
+    )
     return f"""\
-You are EMERGENCY for Gabay OFW. DISPATCHER has just transferred this
-conversation to you because the Imminent Danger predicate is active: an
-acute safety disclosure or her own tap on the emergency button. You are
-now the only voice she hears until she taps "I'm safe" in the app — you
-never decide when this conversation ends, and you never tell her to say
-a phrase to exit; exit is a UI tap only, never something you infer from
-her words. A textual "I'm okay" does NOT end this conversation.
+You are EMERGENCY for Gabay OFW. This IS the Emergency Conversation
+(ADR-0009): it was opened by her tap on the emergency button or by her
+confirming an Escalation Prompt, and DISPATCHER transfers to you every
+turn while the Imminent Danger latch on this Conversation is active. You
+are now the only voice she hears until she taps "I'm safe" in the app —
+you never decide when this conversation ends, and you never tell her to
+say a phrase to exit; exit is a UI tap only, never something you infer
+from her words. A textual "I'm okay" does NOT end this conversation.
+{handoff_block}
 
 Converse with her. Decide what to ask and when to stop asking, one
 gentle question at a time. Stay warm, calm, and concrete; never lecture,
@@ -620,40 +642,29 @@ def make_absorb_narrative_callback(llm: BaseLlm):
 
     async def absorb_narrative(*, callback_context: CallbackContext) -> None:
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        # Both the record_emergency_turn write below and the extraction
-        # merge write further down can happen in THIS SAME callback, which
-        # shares exactly one Event — accumulate their mutations in local
-        # lists and write each temp: key once at the end (ADR-0008).
-        # Reading it back out of state to append would leak an
-        # already-persisted mutation forward into a LATER event this same
-        # invocation and re-apply it a second time.
+        # The extraction merge below records a temp: Case mutation for the
+        # commit-time replay (ADR-0008). The Emergency long-gap bookkeeping
+        # (``record_turn``) does NOT: it writes EMERGENCY_RESUME, plain
+        # SESSION state, which the per-session revision guard already
+        # protects — and it is a DISJOINT key from EMERGENCY_LATCH, so it
+        # can never re-latch a Conversation mark_safe just cleared
+        # (ADR-0009).
         case_mutations: list[dict] = []
         plan_mutations: list[dict] = []
         case = callback_context.state.get(CASE)
-        if is_imminent_danger(case):
+        if is_emergency_conversation(callback_context.state):
             # Long-gap resume (issue #41): decide, BEFORE narrative
             # reading, whether DISPATCHER should re-ask once rather than
             # silently resuming inside EMERGENCY. Recorded here (not in
             # the instruction) so the once-only latch is set exactly
             # when this turn is actually processed.
-            resume_check = needs_resume_check(case, now=now)
+            latch = callback_context.state.get(EMERGENCY_LATCH)
+            resume = callback_context.state.get(EMERGENCY_RESUME)
+            resume_check = needs_resume_check(latch, resume, now=now)
             callback_context.state["temp:resume_check"] = resume_check
-            callback_context.state[CASE] = record_emergency_turn(
-                case, now=now, resume_check_issued=resume_check
+            callback_context.state[EMERGENCY_RESUME] = record_turn(
+                resume, now=now, resume_check_issued=resume_check
             )
-            case_mutations.append(
-                {
-                    "op": "record_emergency_turn",
-                    "now": now,
-                    "resume_check_issued": resume_check,
-                }
-            )
-            if resume_check:
-                # Still record the narrative for the Case, but the
-                # re-ask itself is DISPATCHER's job this turn — not
-                # EMERGENCY's — so no further absorb_narrative behavior
-                # changes; the instruction reads temp:resume_check.
-                pass
         content = callback_context.user_content
         text = "".join(
             part.text

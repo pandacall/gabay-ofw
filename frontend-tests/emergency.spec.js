@@ -12,26 +12,42 @@ const emergencyCard = {
 };
 
 function emergencyButtonNdjson({ active = true } = {}) {
-  return (
-    [
-      JSON.stringify({ type: "card", card: emergencyCard }),
-      JSON.stringify({
-        type: "case",
-        case: {
-          claims: {},
-          safety_flags: {},
-          language: null,
-          emergency: { active, button_pressed_at: "2026-09-03T00:00:00Z" },
-        },
-        session_id: "emergency-session",
-      }),
-    ].join("\n") + "\n"
+  // ADR-0009: the button opens an Emergency Conversation. The latch is
+  // Conversation state, carried on its own `emergency_latch` line; the
+  // `case` line no longer has an `emergency` key.
+  const lines = [JSON.stringify({ type: "card", card: emergencyCard })];
+  if (active) {
+    lines.push(
+      JSON.stringify({ type: "emergency_latch", active: true, session_id: "emergency-session" }),
+    );
+  }
+  lines.push(
+    JSON.stringify({
+      type: "case",
+      case: { claims: {}, safety_flags: {}, language: null, pending_escalation: null },
+      session_id: "emergency-session",
+    }),
+  );
+  return lines.join("\n") + "\n";
+}
+
+// The button reopens the Emergency Conversation (ADR-0009), so the client
+// also replays its transcript via GET /api/conversations/<id>.
+async function routeEmergencyButton(page, { fulfill } = {}) {
+  await page.route("**/api/emergency/button", (route) =>
+    fulfill
+      ? fulfill(route)
+      : route.fulfill({ contentType: "application/x-ndjson", body: emergencyButtonNdjson() }),
+  );
+  await page.route("**/api/conversations/emergency-session", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body: JSON.stringify({ type: "emergency_latch", active: true }) + "\n",
+    }),
   );
 }
 
-test("the EMERGENCY button is reachable from home and from Profile", async ({
-  page,
-}) => {
+test("the EMERGENCY button is reachable from home and from Profile", async ({ page }) => {
   await openAsSignedInUser(page);
   await expect(page.getByRole("button", { name: "I need help now" })).toBeVisible();
 
@@ -43,12 +59,7 @@ test("the EMERGENCY button is reachable from home and from Profile", async ({
 test("EMERGENCY stays reachable even before the first-run disclaimer is dismissed", async ({
   page,
 }) => {
-  await page.route("**/api/emergency/button", (route) =>
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    }),
-  );
+  await routeEmergencyButton(page);
   await openAsSignedInUser(page, { acceptedDisclaimer: false });
 
   const dialog = page.getByRole("dialog");
@@ -68,12 +79,14 @@ test("pressing EMERGENCY renders the cached action card with zero /api/chat call
     route.continue();
   });
   let emergencyAuth;
-  await page.route("**/api/emergency/button", (route) => {
-    emergencyAuth = route.request().headers()["authorization"];
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    });
+  await routeEmergencyButton(page, {
+    fulfill: (route) => {
+      emergencyAuth = route.request().headers()["authorization"];
+      return route.fulfill({
+        contentType: "application/x-ndjson",
+        body: emergencyButtonNdjson({ active: true }),
+      });
+    },
   });
   await openAsSignedInUser(page);
 
@@ -85,8 +98,6 @@ test("pressing EMERGENCY renders the cached action card with zero /api/chat call
     "href",
     "tel:+966502850944",
   );
-  // The findings render in the conversation, and the composer never
-  // leaves the screen (issue #71) — even for the cached EMERGENCY card.
   await expect(page.locator("#chat-input")).toBeVisible();
   expect(emergencyAuth).toEqual("Bearer valid-alice");
   expect(chatCalls).toEqual([]);
@@ -100,12 +111,14 @@ test("EMERGENCY switches to the home screen synchronously, bypassing the animate
   const emergencyPromise = new Promise((resolve) => {
     resolveEmergency = resolve;
   });
-  await page.route("**/api/emergency/button", async (route) => {
-    await emergencyPromise;
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    });
+  await routeEmergencyButton(page, {
+    fulfill: async (route) => {
+      await emergencyPromise;
+      return route.fulfill({
+        contentType: "application/x-ndjson",
+        body: emergencyButtonNdjson({ active: true }),
+      });
+    },
   });
   await openAsSignedInUser(page);
   await openRailIfDrawer(page);
@@ -114,10 +127,6 @@ test("EMERGENCY switches to the home screen synchronously, bypassing the animate
 
   await page.getByRole("button", { name: "I need help now" }).click();
 
-  // The screen is already the home screen — composer visible — even
-  // though the network call has not resolved yet, and the animated
-  // navigate() loading skeleton is never shown: an emergency exit must
-  // not wait on a decorative delay (issue #71).
   await expect(page.locator("#chat-input")).toBeVisible();
   await expect(page.locator("#screen-loading")).toBeHidden();
 
@@ -125,14 +134,12 @@ test("EMERGENCY switches to the home screen synchronously, bypassing the animate
   await expect(page.locator(".contact-card")).toBeVisible();
 });
 
-test("mark safe stays hidden until the Imminent Danger predicate is active", async ({
-  page,
-}) => {
+test("mark safe stays hidden until this Conversation holds the latch", async ({ page }) => {
   await openAsSignedInUser(page);
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeHidden();
 });
 
-test("the mark-safe affordance reacts to case.emergency.active from the chat stream too", async ({
+test("the mark-safe affordance reacts to the emergency_latch line from the chat stream", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
@@ -142,13 +149,15 @@ test("the mark-safe affordance reacts to case.emergency.active from the chat str
       body:
         [
           JSON.stringify({ type: "ack", text: "I hear you.", session_id: "s1" }),
+          JSON.stringify({ type: "reply", text: "I hear you.", session_id: "s1" }),
+          JSON.stringify({ type: "emergency_latch", active: true, session_id: "s1" }),
           JSON.stringify({
             type: "case",
             case: {
               claims: {},
               safety_flags: { PHYSICAL_ASSAULT_ONGOING: { source: "extraction" } },
               language: "en",
-              emergency: { active: true },
+              pending_escalation: { flag: "PHYSICAL_ASSAULT_ONGOING", at: "x" },
             },
             session_id: "s1",
           }),
@@ -162,23 +171,18 @@ test("the mark-safe affordance reacts to case.emergency.active from the chat str
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
 });
 
-test("a pocket-tap alone cannot clear the predicate — mark safe requires a confirming tap", async ({
+test("a pocket-tap alone cannot clear the latch — mark safe requires a confirming tap", async ({
   page,
 }) => {
   const markSafeCalls = [];
-  await page.route("**/api/emergency/button", (route) =>
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    }),
-  );
+  await routeEmergencyButton(page);
   await page.route("**/api/mark-safe/nonce", (route) => {
     markSafeCalls.push("nonce");
     route.fulfill({ json: { nonce: "one-time-nonce" } });
   });
   await page.route("**/api/mark-safe", (route) => {
     markSafeCalls.push("mark-safe");
-    route.fulfill({ json: { marked_safe: true, case: { emergency: { active: false } } } });
+    route.fulfill({ json: { marked_safe: true, case: {} } });
   });
   await openAsSignedInUser(page);
   await page.getByRole("button", { name: "I need help now" }).click();
@@ -195,16 +199,9 @@ test("a pocket-tap alone cannot clear the predicate — mark safe requires a con
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
 });
 
-test("confirming mark safe clears the predicate through the nonce-gated backend", async ({
-  page,
-}) => {
+test("confirming mark safe clears the latch through the nonce-gated backend", async ({ page }) => {
   const requests = [];
-  await page.route("**/api/emergency/button", (route) =>
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    }),
-  );
+  await routeEmergencyButton(page);
   await page.route("**/api/mark-safe/nonce", (route) => {
     requests.push({ url: "nonce", auth: route.request().headers()["authorization"] });
     route.fulfill({ json: { nonce: "one-time-nonce" } });
@@ -218,7 +215,7 @@ test("confirming mark safe clears the predicate through the nonce-gated backend"
     route.fulfill({
       json: {
         marked_safe: true,
-        case: { claims: {}, safety_flags: { PASSPORT_WITHHELD: { source: "extraction" } }, emergency: { active: false } },
+        case: { claims: {}, safety_flags: { PASSPORT_WITHHELD: { source: "extraction" } } },
       },
     });
   });
@@ -237,9 +234,7 @@ test("confirming mark safe clears the predicate through the nonce-gated backend"
   ]);
 });
 
-test("a failed EMERGENCY call is reported, never silently swallowed", async ({
-  page,
-}) => {
+test("a failed EMERGENCY call is reported, never silently swallowed", async ({ page }) => {
   await page.route("**/api/emergency/button", (route) =>
     route.fulfill({ status: 503, json: { detail: "down" } }),
   );
@@ -252,15 +247,8 @@ test("a failed EMERGENCY call is reported, never silently swallowed", async ({
   );
 });
 
-test("a failed mark-safe confirmation is reported, never silently swallowed", async ({
-  page,
-}) => {
-  await page.route("**/api/emergency/button", (route) =>
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body: emergencyButtonNdjson({ active: true }),
-    }),
-  );
+test("a failed mark-safe confirmation is reported, never silently swallowed", async ({ page }) => {
+  await routeEmergencyButton(page);
   await page.route("**/api/mark-safe/nonce", (route) =>
     route.fulfill({ status: 503, json: { detail: "down" } }),
   );

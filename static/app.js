@@ -316,6 +316,31 @@ Object.assign(copy.ceb, {
   closeLabel: "Isira",
 });
 
+// The Escalation Prompt (ADR-0009, issue #74): shown beside the Safe
+// Floor card when she discloses an acute hazard mid-conversation. "Not
+// now" dismisses this card only — never the disclosure.
+Object.assign(copy.en, {
+  escalationPromptTitle: "Do you want to open emergency help?",
+  escalationPromptBody:
+    "This starts a separate conversation for your safety. It already knows what you've told Gabay, so you won't be asked again. Your other conversations stay the same.",
+  escalationPromptOpen: "Open emergency help",
+  escalationPromptDecline: "Not now",
+});
+Object.assign(copy.tl, {
+  escalationPromptTitle: "Gusto mo bang buksan ang tulong pang-emergency?",
+  escalationPromptBody:
+    "Magsisimula ito ng hiwalay na usapan para sa kaligtasan mo. Alam na nito ang sinabi mo kay Gabay, kaya hindi ka na tatanungin muli. Hindi magbabago ang ibang usapan mo.",
+  escalationPromptOpen: "Buksan ang tulong pang-emergency",
+  escalationPromptDecline: "Huwag muna",
+});
+Object.assign(copy.ceb, {
+  escalationPromptTitle: "Gusto ba nimong ablihan ang tabang pang-emergency?",
+  escalationPromptBody:
+    "Magsugod kini og lahi nga panag-istorya para sa imong kaluwasan. Nahibalo na kini sa imong gisulti kang Gabay, mao nga dili ka na pangutan-on pag-usab. Dili mausab ang imong ubang panag-istorya.",
+  escalationPromptOpen: "Ablihi ang tabang pang-emergency",
+  escalationPromptDecline: "Dili sa karon",
+});
+
 const screen = document.getElementById("screen");
 const screenLoading = document.getElementById("screen-loading");
 const app = document.getElementById("signed-in");
@@ -404,6 +429,12 @@ let chatReplyLang = "en";
 // rather than appended to — e.g. the reply language became known after
 // this turn's messages were already painted.
 let forceMessageRerender = false;
+// Whether THIS open Conversation is the Emergency Conversation (ADR-0009,
+// issue #74): the Imminent Danger latch is Conversation state now, not a
+// user-wide Case flag. Set from the `emergency_latch` stream line (and by
+// pressing the button / confirming an Escalation Prompt); cleared by
+// mark_safe and when switching to another Conversation.
+let emergencyLatchActive = false;
 
 // Map the Case's free-form detected language onto the reply language.
 function replyLangFrom(value) {
@@ -532,6 +563,20 @@ function chatMessageHtml(message) {
     // the one live Plan instead of an expired filing order.
     return `<button type="button" class="chat-message agent stale-plan" data-action="view-current-plan">${escapeHtml(t("viewCurrentPlan"))}</button>`;
   }
+  if (message.kind === "escalation-prompt") {
+    // ADR-0009: a two-tap offer to open an Emergency Conversation, shown
+    // beside the Safe Floor card that streamed with it. Declining removes
+    // this card only — the Safety Flag and its provenance stay.
+    const source = escapeHtml(message.prompt?.source_session_id || "");
+    return `<div class="chat-message agent escalation-prompt">
+      <p class="escalation-prompt-title">${escapeHtml(t("escalationPromptTitle"))}</p>
+      <p class="escalation-prompt-body">${escapeHtml(t("escalationPromptBody"))}</p>
+      <div class="escalation-prompt-actions">
+        <button type="button" class="button urgent-button" data-action="escalation-confirm" data-source-session-id="${source}">${escapeHtml(t("escalationPromptOpen"))}</button>
+        <button type="button" class="button" data-action="escalation-decline">${escapeHtml(t("escalationPromptDecline"))}</button>
+      </div>
+    </div>`;
+  }
   if (message.role === "user") {
     return `<div class="chat-message user">${escapeHtml(message.text)}</div>`;
   }
@@ -624,6 +669,9 @@ async function openConversation(sessionId) {
   chatCase = {};
   chatTrail = [];
   chatReplyLang = "en";
+  // The latch is per-Conversation (ADR-0009): assume not-emergency until
+  // this thread's replay says otherwise (a leading `emergency_latch` line).
+  emergencyLatchActive = false;
   if (currentScreen !== "home") renderScreen("home");
   renderRail();
   refreshChatScreen();
@@ -655,6 +703,7 @@ function newConversation() {
   chatCase = {};
   chatTrail = [];
   chatReplyLang = "en";
+  emergencyLatchActive = false;
   editingCaseField = null;
   if (currentScreen !== "home") renderScreen("home");
   renderRail();
@@ -872,12 +921,12 @@ function refreshChatScreen() {
   if (sendButton) sendButton.disabled = chatBusy;
 }
 
-// The Imminent Danger predicate (case.emergency.active) is global app
-// state, not screen state — the "mark safe" affordance must show or hide
-// no matter which screen she is looking at (issue #64).
+// The Imminent Danger latch is Conversation state now (ADR-0009): the
+// "I'm safe" affordance shows when the Conversation she has open is the
+// Emergency one, on any screen (issue #64).
 function refreshEmergencyControls() {
   if (markSafeButton) {
-    markSafeButton.classList.toggle("hidden", !chatCase?.emergency?.active);
+    markSafeButton.classList.toggle("hidden", !emergencyLatchActive);
   }
 }
 
@@ -963,6 +1012,22 @@ function handleChatLine(line) {
   } else if (line.type === "card") {
     // The card is fixed app data rendered outside the LLM text (ADR-0002).
     if (line.card) chatMessages.push({ role: "agent", kind: "card", card: line.card });
+  } else if (line.type === "emergency_latch") {
+    // ADR-0009: this Conversation is (or is not) the Emergency one. The
+    // "I'm safe" control is keyed off THIS, per Conversation.
+    emergencyLatchActive = !!line.active;
+  } else if (line.type === "escalation_prompt") {
+    // ADR-0009: she disclosed an acute hazard mid-conversation. The Safe
+    // Floor card already streamed as a `card` line just before this; here
+    // is the two-tap offer to open an Emergency Conversation. Declining
+    // dismisses this only — never the Safety Flag.
+    if (line.escalation_prompt) {
+      chatMessages.push({
+        role: "agent",
+        kind: "escalation-prompt",
+        prompt: line.escalation_prompt,
+      });
+    }
   } else if (line.type === "case") {
     chatCase = line.case || {};
     const nextLang = replyLangFrom(chatCase.language);
@@ -1077,17 +1142,29 @@ async function panicWipe() {
   }
 }
 
-// EMERGENCY (issue #41, #64): the hardcoded exit. POST /api/emergency/button
-// renders the cached action card with ZERO model turns, so it is reachable
-// even when the model or chat path is down (PRD #34 user story 28) — a
-// dedicated one-shot renderer, not a /api/chat turn, sharing only the NDJSON
-// card/case line handling with sendChatTurn via handleChatLine. Switches to
-// the home screen synchronously (never navigate()'s animated transition —
-// an emergency exit does not wait on a decorative delay) so the rendered
-// card is visible immediately, before the network call even resolves.
+// EMERGENCY (issue #41, #64, ADR-0009): the hardcoded exit. POST
+// /api/emergency/button renders the cached action card with ZERO model
+// turns (reachable even when the model or chat path is down — PRD #34
+// user story 28) AND opens (or reopens) her Emergency Conversation, which
+// this thread then becomes: the `case`/`emergency_latch` stream lines
+// carry its session id, handled by handleChatLine like any other line.
+// Switches to the home screen synchronously (never navigate()'s animated
+// transition — an emergency exit does not wait on a decorative delay) so
+// the card is visible immediately, before the network call resolves.
 async function pressEmergencyButton() {
   if (!auth?.currentUser) return;
   if (currentScreen !== "home") renderScreen("home");
+  // Danger is its own Conversation: switch to a fresh view immediately so
+  // the cached card is visible without waiting on the network.
+  chatSessionId = null;
+  chatMessages = [];
+  chatCase = {};
+  chatTrail = [];
+  emergencyLatchActive = false;
+  forceMessageRerender = true;
+  refreshChatScreen();
+  let card = null;
+  let emergencySessionId = null;
   try {
     const token = await auth.currentUser.getIdToken();
     const response = await fetch("/api/emergency/button", {
@@ -1095,18 +1172,55 @@ async function pressEmergencyButton() {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok || !response.body) throw new Error(`emergency failed: ${response.status}`);
-    await readNdjsonLines(response, handleChatLine);
+    await readNdjsonLines(response, (line) => {
+      if (line.type === "card" && line.card) card = line.card;
+      if (line.session_id) emergencySessionId = line.session_id;
+    });
+    // Reopen the Emergency Conversation (it may already hold prior turns
+    // — ADR-0009: a second press reopens, never forks), then show the
+    // fresh cached card as the newest message so the number is on screen.
+    if (emergencySessionId) await openConversation(emergencySessionId);
+    if (card) chatMessages.push({ role: "agent", kind: "card", card });
+    emergencyLatchActive = !!emergencySessionId;
+    refreshChatScreen();
+    await loadConversations();
   } catch {
+    if (card) chatMessages.push({ role: "agent", kind: "card", card });
     chatMessages.push({ role: "agent", kind: "error", text: t("emergencyFailed") });
     refreshChatScreen();
   }
 }
 
-// mark_safe (issue #41, #64): clears the Imminent Danger PREDICATE only —
-// never the safety flag itself (PRD #34 user story 33). Nonce-gated
-// backend endpoint, same shape as panic_wipe. The confirmation dialog
-// (#mark-safe-dialog) is the deliberate second tap: a coerced pocket-tap
-// on the visible button alone can't clear the predicate (user story 32).
+// Confirming an Escalation Prompt (ADR-0009, issue #74): opens (or
+// reopens) her Emergency Conversation carrying an Escalation Handoff and
+// switches this view to it. Declining is handled inline in the click
+// handler — it removes the prompt card only, never the disclosure.
+async function confirmEscalation(sourceSessionId) {
+  if (!auth?.currentUser || !sourceSessionId) return;
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/emergency/escalate", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ source_session_id: sourceSessionId }),
+    });
+    if (!response.ok) throw new Error(`escalate failed: ${response.status}`);
+    const data = await response.json();
+    await loadConversations();
+    await openConversation(data.emergency_session_id);
+    emergencyLatchActive = true;
+    refreshChatScreen();
+  } catch {
+    showStatus(t("emergencyFailed"));
+  }
+}
+
+// mark_safe (issue #41, #64, ADR-0009): clears the Imminent Danger latch
+// on the one live Emergency Conversation only — never the safety flag
+// itself (PRD #34 user story 33). Nonce-gated backend endpoint, same
+// shape as panic_wipe. The confirmation dialog (#mark-safe-dialog) is the
+// deliberate second tap: a coerced pocket-tap on the visible button alone
+// can't clear the latch (user story 32).
 async function applyMarkSafe() {
   if (!auth?.currentUser) return;
   try {
@@ -1126,6 +1240,7 @@ async function applyMarkSafe() {
     if (!response.ok) throw new Error("mark-safe");
     const data = await response.json();
     chatCase = data.case || chatCase;
+    emergencyLatchActive = false;
     showStatus(t("markSafeDone"));
   } catch {
     showStatus(t("markSafeFailed"));
@@ -1176,6 +1291,24 @@ document.addEventListener("click", (event) => {
     applyMarkSafe().finally(() => {
       button.disabled = false;
     });
+    return;
+  }
+  if (action === "escalation-confirm") {
+    button.disabled = true;
+    confirmEscalation(button.dataset.sourceSessionId).finally(() => {
+      button.disabled = false;
+    });
+    return;
+  }
+  if (action === "escalation-decline") {
+    // ADR-0009: declining dismisses this card only — never the Safety
+    // Flag, which is already recorded server-side with its provenance.
+    const idx = chatMessages.findIndex((m) => m.kind === "escalation-prompt");
+    if (idx >= 0) {
+      chatMessages.splice(idx, 1);
+      forceMessageRerender = true;
+      refreshChatScreen();
+    }
     return;
   }
   if (action === "delete-profile") {

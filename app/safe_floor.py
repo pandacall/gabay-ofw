@@ -5,7 +5,7 @@ shown, she gets this — never an unverified sequence. Contacts are
 resolved from the immutable directory and dialability-filtered; reason
 lines are a fixed enum of hand-written, individually reviewed strings;
 the "do not leave before speaking to the MWO" line is suppressed under
-the Imminent Danger predicate.
+the Imminent Danger latch (``imminent_danger=True``).
 
 Two render paths:
 
@@ -17,10 +17,13 @@ Two render paths:
   ``safe_floor_card`` tool; the card itself is fixed and streams to the
   UI as structured data outside the LLM text (ADR-0002's principle).
 
-The Imminent Danger predicate itself lives in ``app.case`` (issue #41):
-acute flag OR the EMERGENCY button, cleared only by ``mark_safe``, never
-by the clock. This module re-exports it for callers that only need the
-Safe Floor surface.
+The Imminent Danger latch now lives in ``app.emergency`` (ADR-0009): it is
+Conversation state — "this Conversation is the Emergency one" — set by the
+EMERGENCY button or a confirmed Escalation Prompt, cleared only by
+``mark_safe``, never by the clock. This module re-exports
+``is_emergency_conversation`` for callers that only need the Safe Floor
+surface, and keeps the ``imminent_danger`` card parameter (it only ever
+meant "suppress the stay-put line").
 """
 
 from __future__ import annotations
@@ -28,12 +31,13 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
-from app.case import ACUTE_SAFETY_FLAGS, is_imminent_danger
+from app.case import ACUTE_SAFETY_FLAGS
 from app.directory import Country, resolve_keys
+from app.emergency import is_emergency_conversation
 
 __all__ = [
     "ACUTE_SAFETY_FLAGS",
-    "is_imminent_danger",
+    "is_emergency_conversation",
     "SafeFloorReason",
     "REASON_LINES",
     "HOLD_LINE",
@@ -53,6 +57,11 @@ class SafeFloorReason(str, Enum):
     JURISDICTION_HELD = "JURISDICTION_HELD"
     SERVICE_DOWN = "SERVICE_DOWN"
     FACTS_CHANGED = "FACTS_CHANGED"
+    #: Rendered WITH the Escalation Prompt (ADR-0009): she has just
+    #: disclosed an acute hazard mid-conversation. The card comes with the
+    #: prompt, not after it — so the number she needs is on screen whether
+    #: or not she taps.
+    ACUTE_DISCLOSURE = "ACUTE_DISCLOSURE"
 
 
 #: Hand-written, individually reviewed. Never generated, never templated.
@@ -79,6 +88,13 @@ REASON_LINES: dict[SafeFloorReason, str] = {
         " bago ito masundan. / Something you told me changed, so the plan"
         " needs updating before it can be followed. These offices are safe"
         " to contact meanwhile."
+    ),
+    SafeFloorReason.ACUTE_DISCLOSURE: (
+        "Sinabi mo sa akin na nasa panganib ka ngayon. Nasa iyo pa rin ang"
+        " desisyon — pero narito na ang mga numerong ito, at totoong tao"
+        " ang sasagot. / You've told me you're in danger right now. The"
+        " choice stays yours — but these numbers are here now, and real"
+        " people answer them."
     ),
 }
 

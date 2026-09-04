@@ -10,7 +10,14 @@ fails this test.
 from app.main import create_app
 from tests.conftest import iter_app_modules
 
-FORBIDDEN_TOOL_NAMES = {"panic_wipe", "mark_safe"}
+# ADR-0009 (issue #74): opening/reopening/closing the Emergency
+# Conversation is HTTP-only too — no agent may reach it.
+FORBIDDEN_TOOL_NAMES = {
+    "panic_wipe",
+    "mark_safe",
+    "escalate_from_prompt",
+    "press_emergency_button",
+}
 
 
 def _tool_names(agent) -> set[str]:
@@ -72,6 +79,9 @@ def test_wipe_and_mark_safe_are_exposed_only_as_nonce_gated_http_routes():
     assert "/api/panic-wipe/nonce" in paths
     assert "/api/mark-safe" in paths
     assert "/api/mark-safe/nonce" in paths
+    # The Emergency Conversation lifecycle (ADR-0009) is HTTP-only too.
+    assert "/api/emergency/button" in paths
+    assert "/api/emergency/escalate" in paths
 
 
 def test_deletion_and_retention_modules_never_touch_the_agent_layer():
