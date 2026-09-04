@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#FCF5ED">
+  <meta name="theme-color" content="#FBFBFA">
   <title>Gabay OFW</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -21,7 +21,7 @@
   </div>
 
   <main id="signed-out" class="auth-page hidden">
-    <div class="dawn-glow" aria-hidden="true"></div>
+    <div class="ph-glow" aria-hidden="true"></div>
     <nav class="welcome-nav">
       <a class="brand" href="/" data-copy-aria="homeLabel">
         <span class="brand-dot" aria-hidden="true"></span>
@@ -34,7 +34,6 @@
           <span class="sr-only" data-copy="languageLabel"></span>
           <select class="language-select" data-copy-aria="languageLabel"></select>
         </label>
-        <a class="welcome-hotline" href="tel:1348" data-copy="callOwwa"></a>
       </div>
     </nav>
 
@@ -64,38 +63,40 @@
             <span data-copy="trustNoAds"></span>
           </p>
         </section>
-        <a class="urgent-strip" href="tel:1348">
-          <strong>1348</strong>
-          <span data-copy="dangerTonight"></span>
-        </a>
       </div>
     </section>
   </main>
 
   <div id="signed-in" class="app hidden">
-    <header class="topbar">
-      <button class="brand brand-button" type="button" data-action="dashboard">
+    <!-- The left rail (issue #71): brand, the current Conversation (a
+         later slice, #72, makes this a real multi-conversation list —
+         this slice shows exactly one entry, the Conversation she is in),
+         and account controls. Never "check": CONTEXT.md reserves that
+         word for the verb Gabay performs inside a Conversation. -->
+    <aside class="rail">
+      <button class="brand rail-brand" type="button" data-action="home">
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </button>
-      <nav class="mode-switcher" data-copy-aria="modeNavigation">
-        <button class="urgent-mode" type="button" data-mode-link="crisis" data-action="crisis">
-          <span class="urgent-dot" aria-hidden="true"></span>
-          <span data-copy="helpTab"></span>
+      <nav class="rail-conversations" data-copy-aria="conversationsNavigation">
+        <p class="rail-heading" data-copy="conversationsHeading"></p>
+        <button class="rail-conversation active" type="button" data-action="home">
+          <span class="rail-conversation-dot" aria-hidden="true"></span>
+          <span class="rail-conversation-label" data-copy="thisConversation"></span>
         </button>
       </nav>
-      <nav class="topbar-actions" data-copy-aria="accountControls">
-        <span id="account-name" class="account-name"></span>
-        <label class="language-control compact-control">
+      <div class="rail-footer">
+        <label class="language-control rail-control">
           <span class="sr-only" data-copy="languageLabel"></span>
           <select class="language-select" data-copy-aria="languageLabel"></select>
         </label>
-        <button class="avatar-button" type="button" data-action="profile" data-copy-aria="profile">
+        <button class="rail-control avatar-button" type="button" data-action="profile" data-copy-aria="profile">
           <span id="avatar-initial" aria-hidden="true">M</span>
+          <span id="account-name" class="account-name"></span>
         </button>
-        <button class="text-button" id="signout" type="button" data-copy="signOut"></button>
-      </nav>
-    </header>
+        <button class="rail-control text-button" id="signout" type="button" data-copy="signOut"></button>
+      </div>
+    </aside>
 
     <div id="screen-loading" class="screen-loading hidden" aria-live="polite">
       <div class="content-skeleton" aria-hidden="true">
@@ -105,11 +106,6 @@
     </div>
 
     <main id="screen" tabindex="-1"></main>
-
-    <button id="global-help" class="global-help" type="button" data-action="crisis">
-      <span class="urgent-dot" aria-hidden="true"></span>
-      <span data-copy="needHelp"></span>
-    </button>
 
     <!-- EMERGENCY (issue #41, #64): always reachable regardless of screen,
          because #emergency-controls lives outside #screen's per-route
@@ -139,12 +135,10 @@
       </div>
       <div class="dialog-actions">
         <button class="button ink-button full-width" id="accept-disclaimer" value="default" data-copy="understand"></button>
-        <button class="button urgent-button full-width" id="disclaimer-help" value="help" data-copy="needHelp"></button>
         <!-- EMERGENCY must stay reachable even before the disclaimer is
              dismissed (issue #64: "a visible, always-reachable EMERGENCY
              button") — showModal() makes the rest of the page inert, so
-             the escape hatch has to live inside the dialog itself, same
-             as #disclaimer-help above. -->
+             the escape hatch has to live inside the dialog itself. -->
         <button class="button emergency-button full-width" type="button" data-action="emergency-button" data-copy="emergencyButton"></button>
       </div>
     </form>

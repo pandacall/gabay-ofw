@@ -1,17 +1,18 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser } = require("./test-helpers");
+const { openAsSignedInUser, SAMPLE_CONTACTS } = require("./test-helpers");
 
 const openApp = openAsSignedInUser;
 
-test("signed-in user reaches Crisis Help from the dashboard", async ({
+test("signed-in user lands directly on the home screen: a centred greeting, the rail, and the floating composer", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
 
   await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
-  await expect(page.locator(".crisis-card")).toBeVisible();
-  await expect(page.locator(".crisis-card")).toHaveCSS("background-color", "rgb(168, 67, 31)");
-  await expect(page.getByRole("button", { name: "I cannot go out" })).toBeVisible();
+  await expect(page.locator(".rail")).toBeVisible();
+  await expect(page.locator(".rail-conversation.active")).toBeVisible();
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
 test("signed-out user can choose a language before sign-in", async ({ page }) => {
@@ -42,33 +43,11 @@ test("first-time user sees the service limits before using the app", async ({
   await expect(dialog).not.toBeVisible();
 });
 
-test("user can click through Crisis Help to code-owned contact cards", async ({
-  page,
-}) => {
-  await openAsSignedInUser(page);
-
-  await page.locator(".crisis-card").click();
-  await page.getByRole("button", { name: "Yes, or I cannot leave safely" }).click();
-  await page.getByLabel("Country").selectOption("Qatar");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("One-line description").fill("My employer will not let me leave.");
-  await page.getByRole("button", { name: "Show official help" }).click();
-
-  await expect(page.getByRole("heading", { name: "Call one of these now. All are free." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Call 1343" })).toHaveAttribute("href", "tel:1343");
-  await expect(page.getByRole("link", { name: "Call 1348" })).toHaveAttribute("href", "tel:1348");
-  await expect(page.getByRole("link", { name: "Open the official DMW directory" })).toHaveAttribute(
-    "href",
-    "https://dmw.gov.ph/",
-  );
-});
-
-test("language choice updates every flow and persists", async ({ page }) => {
+test("language choice updates the home screen and persists", async ({ page }) => {
   await openAsSignedInUser(page);
 
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
   await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
-  await expect(page.locator(".crisis-card")).toContainText("Kinahanglan ko og tabang karon");
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
@@ -86,7 +65,7 @@ test("optional profile accepts and retains any destination country", async ({
   await page.getByRole("button", { name: "Save profile" }).click();
   await expect(page.getByRole("status")).toContainText("Profile saved");
 
-  await page.getByRole("button", { name: "Back to dashboard" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByLabel("Destination country (optional)")).toHaveValue("Iceland");
 });
@@ -112,6 +91,14 @@ test("one tap wipes everything through the nonce-gated backend", async ({
   });
   await openAsSignedInUser(page);
 
+  // The device is the threat model (issue #71): a wipe that leaves local
+  // traces behind is not a wipe. Seed both device-local keys so we can
+  // prove the wipe clears them, not just the server-side subtree.
+  await page.evaluate(() => {
+    localStorage.setItem("gabay-profile:alice", JSON.stringify({ country: "Qatar" }));
+    localStorage.setItem("gabay-disclaimer-accepted:alice", "true");
+  });
+
   await page.getByRole("button", { name: "Profile" }).click();
   await page.getByRole("button", { name: "Delete everything now" }).click();
 
@@ -120,6 +107,11 @@ test("one tap wipes everything through the nonce-gated backend", async ({
     { url: "nonce", auth: "Bearer valid-alice" },
     { url: "wipe", auth: "Bearer valid-alice", body: { nonce: "one-time-nonce" } },
   ]);
+  const remainingKeys = await page.evaluate(() => ({
+    profile: localStorage.getItem("gabay-profile:alice"),
+    disclaimer: localStorage.getItem("gabay-disclaimer-accepted:alice"),
+  }));
+  expect(remainingKeys).toEqual({ profile: null, disclaimer: null });
 });
 
 test("a failed wipe is reported, never silently swallowed", async ({ page }) => {
@@ -132,23 +124,6 @@ test("a failed wipe is reported, never silently swallowed", async ({ page }) => 
   await page.getByRole("button", { name: "Delete everything now" }).click();
 
   await expect(page.getByRole("status")).toContainText("Could not delete right now.");
-});
-
-test("non-danger Crisis Help path omits the trafficking hotline", async ({
-  page,
-}) => {
-  await openAsSignedInUser(page);
-
-  await page.locator(".crisis-card").click();
-  await page.getByRole("button", { name: "No, I can safely use my phone" }).click();
-  await page.getByLabel("Country").selectOption("Kuwait");
-  await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByLabel("One-line description").fill("My wages have not been paid.");
-  await page.getByRole("button", { name: "Show official help" }).click();
-
-  await expect(page.getByRole("heading", { name: "Contact your Migrant Workers Office" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Call 1343" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Call 1348" })).toBeVisible();
 });
 
 test("user can open the conversation from a paired bilingual opener", async ({
@@ -175,7 +150,6 @@ test("user can open the conversation from a paired bilingual opener", async ({
     }),
   );
 
-  await page.locator(".chat-card").click();
   const opener = page.getByRole("button", { name: "Hindi ako nababayaran / I'm not being paid" });
   await expect(opener).toBeVisible();
   await opener.click();
@@ -184,11 +158,16 @@ test("user can open the conversation from a paired bilingual opener", async ({
 
   await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");
   await expect(page.locator(".chat-message.agent").last()).toContainText("Nandito ako para tumulong");
-  await expect(page.locator(".chat-case")).toContainText("months unpaid");
-  await expect(page.locator(".chat-case")).toContainText("passport withheld");
+  await expect(page.locator(".case-panel")).toContainText("months unpaid");
+  await expect(page.locator(".case-panel")).toContainText("passport withheld");
+  // The greeting and openers retire once the conversation starts, but the
+  // composer never does (issue #71: "a floating pill composer that never
+  // leaves the screen").
+  await expect(page.locator("#home-greeting")).toBeHidden();
+  await expect(page.locator("#chat-input")).toBeVisible();
 });
 
-test("a Safe Floor card line renders as tappable contacts outside the LLM text", async ({
+test("a Safe Floor card line renders as a message in the conversation, with the composer still visible", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
@@ -206,10 +185,7 @@ test("a Safe Floor card line renders as tappable contacts outside the LLM text",
               title: "Saudi Arabia — Mga totoong opisina na makakatulong / Real offices that can help",
               reason: "NO_VERIFIED_PLAN",
               reason_line: "Wala pa akong verified na plano para sa sitwasyon mo. / I don't have a verified plan yet.",
-              contacts: [
-                { key: "mwo_riyadh", channel: "MWO", label: "MWO Riyadh (Migrant Workers Office)", phone: "+966 50 285 0944", dial_mode: "dialable", note: "" },
-                { key: "owwa_1348", channel: "OWWA_1348", label: "OWWA / DMW Hotline 1348", phone: "1348", dial_mode: "manila_relay", note: "for someone in the Philippines to call for you" },
-              ],
+              contacts: SAMPLE_CONTACTS,
               hold_line: "Huwag kang umalis sa amo mo bago ka makausap ang MWO. / Do not leave before speaking to the MWO.",
             },
             session_id: "s1",
@@ -220,27 +196,33 @@ test("a Safe Floor card line renders as tappable contacts outside the LLM text",
     }),
   );
 
-  await page.locator(".chat-card").click();
   await page.locator("#chat-input").fill("Ano ang unang hakbang ko?");
   await page.getByRole("button", { name: "Send" }).click();
 
+  // The finding arrives as Gabay's reply in the conversation — never a
+  // separate screen (issue #71's structural move) — and the composer
+  // stays put.
   const card = page.locator(".contact-card");
   await expect(card).toBeVisible();
+  await expect(page.locator(".messages")).toContainText("Real offices that can help");
   await expect(card.locator(".card-reason")).toContainText("verified na plano");
   const dialable = card.locator(".card-contact.dialable a.card-contact-phone");
   await expect(dialable).toHaveAttribute("href", "tel:+966502850944");
   await expect(card.locator(".card-contact.relay")).toContainText("1348");
   await expect(card.locator(".card-hold-line")).toContainText("Do not leave before speaking to the MWO");
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
-test("profile and crisis entry remain available on a small screen", async ({
+test("profile stays reachable, and the composer stays visible, on a small screen", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await openAsSignedInUser(page);
 
   await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
-  await expect(page.locator(".crisis-card")).toBeVisible();
+  await expect(page.locator("#chat-input")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
 test("a Case conflict is shown with both values and resolved by one tap", async ({
@@ -278,7 +260,6 @@ test("a Case conflict is shown with both values and resolved by one tap", async 
     }),
   );
 
-  await page.locator(".chat-card").click();
   await page.locator("#chat-input").fill("Hindi ako nababayaran ng 11 months");
   await page.getByRole("button", { name: "Send" }).click();
 
@@ -318,4 +299,58 @@ test("a Case conflict is shown with both values and resolved by one tap", async 
     field: "months_unpaid",
     value: "11",
   });
+});
+
+test("the retired Crisis Help wizard is gone: no danger question, country picker, situation form, or routing screen is reachable", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+
+  await expect(page.locator("[data-action='crisis']")).toHaveCount(0);
+  await expect(page.locator("[data-form='crisis-country']")).toHaveCount(0);
+  await expect(page.locator("[data-form='crisis-situation']")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Are you in physical danger right now?" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Profile" })).toBeVisible();
+});
+
+test("an unrecognised stream line type is ignored without breaking the render (ADR-0010)", async ({
+  page,
+}) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
+  await openAsSignedInUser(page);
+  await page.route("**/api/chat", (route) =>
+    route.fulfill({
+      contentType: "application/x-ndjson",
+      body:
+        [
+          JSON.stringify({ type: "ack", text: "I hear you.", session_id: "s1" }),
+          // A future slice's line type (e.g. the Progress Trail, ADR-0010)
+          // this build does not know about yet.
+          JSON.stringify({ type: "progress", label: "Looking up your agency", session_id: "s1" }),
+          JSON.stringify({ type: "reply", text: "Salamat.", session_id: "s1" }),
+          JSON.stringify({ type: "case", case: {}, session_id: "s1" }),
+        ].join("\n") + "\n",
+    }),
+  );
+
+  await page.locator("#chat-input").fill("Hello");
+  await page.getByRole("button", { name: "Send" }).click();
+
+  await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");
+  await expect(page.locator(".chat-message.agent").last()).toContainText("Salamat");
+  expect(pageErrors).toEqual([]);
+});
+
+test("no hotline or office phone number appears anywhere in client-side code (ADR-0002)", async ({
+  page,
+}) => {
+  const fs = require("fs");
+  const path = require("path");
+  const html = fs.readFileSync(path.join(__dirname, "..", "static", "index.html"), "utf-8");
+  const js = fs.readFileSync(path.join(__dirname, "..", "static", "app.js"), "utf-8");
+  for (const forbidden of ["1343", "1348"]) {
+    expect(html).not.toContain(forbidden);
+    expect(js).not.toContain(forbidden);
+  }
 });

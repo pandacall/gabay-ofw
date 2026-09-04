@@ -38,6 +38,15 @@ async function openApp(
   await page.goto("/");
 }
 
+// Shared Safe-Floor-shaped contact fixture used by multiple spec files
+// (emergency.spec.js and app-shell.spec.js both render a card with this
+// exact contacts shape). The numbers themselves are server-owned data
+// (ADR-0002) — this is just a stable test fixture, not client routing.
+const SAMPLE_CONTACTS = [
+  { key: "mwo_riyadh", channel: "MWO", label: "MWO Riyadh (Migrant Workers Office)", phone: "+966 50 285 0944", dial_mode: "dialable", note: "" },
+  { key: "owwa_1348", channel: "OWWA_1348", label: "OWWA / DMW Hotline 1348", phone: "1348", dial_mode: "manila_relay", note: "for someone in the Philippines to call for you" },
+];
+
 const openAsSignedInUser = (page, options) => openApp(page, options);
 
-module.exports = { openApp, openAsSignedInUser };
+module.exports = { openApp, openAsSignedInUser, SAMPLE_CONTACTS };
