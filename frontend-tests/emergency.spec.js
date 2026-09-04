@@ -33,10 +33,10 @@ test("the EMERGENCY button is reachable from home and from Profile", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
-  await expect(page.getByRole("button", { name: "EMERGENCY" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "I need help now" })).toBeVisible();
 
   await page.getByRole("button", { name: "Profile" }).click();
-  await expect(page.getByRole("button", { name: "EMERGENCY" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "I need help now" })).toBeVisible();
 });
 
 test("EMERGENCY stays reachable even before the first-run disclaimer is dismissed", async ({
@@ -52,7 +52,7 @@ test("EMERGENCY stays reachable even before the first-run disclaimer is dismisse
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "EMERGENCY" }).click();
+  await dialog.getByRole("button", { name: "I need help now" }).click();
 
   await expect(dialog).not.toBeVisible();
   await expect(page.locator(".contact-card")).toBeVisible();
@@ -76,7 +76,7 @@ test("pressing EMERGENCY renders the cached action card with zero /api/chat call
   });
   await openAsSignedInUser(page);
 
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
 
   const card = page.locator(".contact-card");
   await expect(card).toBeVisible();
@@ -110,7 +110,7 @@ test("EMERGENCY switches to the home screen synchronously, bypassing the animate
   await page.getByRole("button", { name: "Profile" }).click();
   await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
 
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
 
   // The screen is already the home screen — composer visible — even
   // though the network call has not resolved yet, and the animated
@@ -179,7 +179,7 @@ test("a pocket-tap alone cannot clear the predicate — mark safe requires a con
     route.fulfill({ json: { marked_safe: true, case: { emergency: { active: false } } } });
   });
   await openAsSignedInUser(page);
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
 
   await page.getByRole("button", { name: "I'm safe now" }).click();
@@ -221,7 +221,7 @@ test("confirming mark safe clears the predicate through the nonce-gated backend"
     });
   });
   await openAsSignedInUser(page);
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
 
   await page.getByRole("button", { name: "I'm safe now" }).click();
@@ -243,7 +243,7 @@ test("a failed EMERGENCY call is reported, never silently swallowed", async ({
   );
   await openAsSignedInUser(page);
 
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
 
   await expect(page.locator(".chat-message.agent.error")).toContainText(
     "Could not reach the emergency card right now",
@@ -263,7 +263,7 @@ test("a failed mark-safe confirmation is reported, never silently swallowed", as
     route.fulfill({ status: 503, json: { detail: "down" } }),
   );
   await openAsSignedInUser(page);
-  await page.getByRole("button", { name: "EMERGENCY" }).click();
+  await page.getByRole("button", { name: "I need help now" }).click();
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
 
   await page.getByRole("button", { name: "I'm safe now" }).click();

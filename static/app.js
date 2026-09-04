@@ -28,7 +28,7 @@ const copy = {
     notEmergencyTitle: "Not an emergency service.",
     notEmergencyBody: "If you are in immediate danger, contact local emergency services or the nearest Philippine Embassy.",
     understand: "I understand",
-    greeting: (name) => `${name}, what do you need?`,
+    greeting: (name) => `Kumusta, ${name}?`,
     conversationsHeading: "Conversations",
     conversationsNavigation: "Conversations",
     thisConversation: "Your conversation",
@@ -52,7 +52,7 @@ const copy = {
     signInFailed: (message) => `Sign-in failed: ${message}`,
     notConfigured: "Firebase sign-in is not configured yet.",
     chatBody: "Any language, any order. Office names like DOLE-SEnA, MWO, and OWWA stay as they are so you can match them against a sign or a website.",
-    chatPlaceholder: "Type in any language...",
+    chatPlaceholder: "Tell Gabay what is happening",
     chatSend: "Send",
     chatOpenersLabel: "You can start with one of these:",
     chatError: "Something went wrong on our side. Nothing you wrote was lost - please send it again.",
@@ -68,7 +68,7 @@ const copy = {
     caseSourceDocument: "a document said",
     caseSourceDebunker: "checked",
     caseUpdateFailed: "Could not save your correction. Try again.",
-    emergencyButton: "EMERGENCY",
+    emergencyButton: "I need help now",
     emergencyFailed: "Could not reach the emergency card right now. Try again.",
     markSafeButton: "I'm safe now",
     markSafeConfirmTitle: "Confirm you are safe",
@@ -98,7 +98,7 @@ const copy = {
     notEmergencyTitle: "Hindi emergency service.",
     notEmergencyBody: "Kung may agarang panganib, tumawag sa local emergency services o pinakamalapit na Philippine Embassy.",
     understand: "Naiintindihan ko",
-    greeting: (name) => `${name}, ano ang kailangan mo?`,
+    greeting: (name) => `Kumusta, ${name}?`,
     conversationsHeading: "Mga Usapan",
     conversationsNavigation: "Mga Usapan",
     thisConversation: "Ang usapan mo",
@@ -122,7 +122,7 @@ const copy = {
     signInFailed: (message) => `Hindi nagtagumpay ang sign-in: ${message}`,
     notConfigured: "Hindi pa naka-configure ang Firebase sign-in.",
     chatBody: "Kahit anong wika, kahit anong ayos. Mananatili ang mga pangalan ng opisina tulad ng DOLE-SEnA, MWO, at OWWA para maitugma mo sa karatula o website.",
-    chatPlaceholder: "Mag-type sa kahit anong wika...",
+    chatPlaceholder: "Sabihin kay Gabay ang nangyayari",
     chatSend: "Ipadala",
     chatOpenersLabel: "Puwede kang magsimula sa isa sa mga ito:",
     chatError: "May nangyaring mali sa amin. Hindi nawala ang isinulat mo - pakisend ulit.",
@@ -138,7 +138,7 @@ const copy = {
     caseSourceDocument: "sinabi ng dokumento",
     caseSourceDebunker: "na-check",
     caseUpdateFailed: "Hindi na-save ang pagtatama mo. Subukan muli.",
-    emergencyButton: "EMERGENCY",
+    emergencyButton: "Kailangan ko ng tulong ngayon",
     emergencyFailed: "Hindi naabot ang emergency card ngayon. Subukan muli.",
     markSafeButton: "Ligtas na ako ngayon",
     markSafeConfirmTitle: "Kumpirmahin na ligtas ka na",
@@ -168,7 +168,7 @@ const copy = {
     notEmergencyTitle: "Dili emergency service.",
     notEmergencyBody: "Kung naa sa diha-diha nga peligro, kontaka ang local emergency services o duol nga Philippine Embassy.",
     understand: "Nasabtan nako",
-    greeting: (name) => `${name}, unsay imong kinahanglan?`,
+    greeting: (name) => `Kumusta, ${name}?`,
     conversationsHeading: "Mga Panag-istorya",
     conversationsNavigation: "Mga Panag-istorya",
     thisConversation: "Imong panag-istorya",
@@ -192,7 +192,7 @@ const copy = {
     signInFailed: (message) => `Wala molampos ang sign-in: ${message}`,
     notConfigured: "Wala pa ma-configure ang Firebase sign-in.",
     chatBody: "Bisan unsang pinulongan, bisan unsang han-ay. Magpabilin ang ngalan sa opisina sama sa DOLE-SEnA, MWO, ug OWWA aron imong ikatandi sa karatula o website.",
-    chatPlaceholder: "Pag-type sa bisan unsang pinulongan...",
+    chatPlaceholder: "Isulti kang Gabay ang nahitabo",
     chatSend: "Ipadala",
     chatOpenersLabel: "Mahimo kang magsugod sa usa niini:",
     chatError: "Adunay sayop sa among bahin. Wala mawala ang imong gisulat - palihug isend pag-usab.",
@@ -208,7 +208,7 @@ const copy = {
     caseSourceDocument: "gisulti sa dokumento",
     caseSourceDebunker: "gi-check",
     caseUpdateFailed: "Wala ma-save ang imong pagtul-id. Sulayi pag-usab.",
-    emergencyButton: "EMERGENCY",
+    emergencyButton: "Kinahanglan nako og tabang karon",
     emergencyFailed: "Wala naabot ang emergency card karon. Sulayi pag-usab.",
     markSafeButton: "Luwas na ko karon",
     markSafeConfirmTitle: "Kumpirmaha nga luwas ka na",
@@ -459,7 +459,9 @@ function chatMessageHtml(message) {
   if (message.role === "user") {
     return `<div class="chat-message user">${escapeHtml(message.text)}</div>`;
   }
-  const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : "";
+  // A plain reply gets the "reply" class so the rotated pine mark renders
+  // before it (styles.css); the transient ack/error lines stay markless.
+  const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : " reply";
   return `<div class="chat-message agent${extra}">${escapeHtml(message.text)}</div>`;
 }
 
@@ -592,7 +594,15 @@ function chatMessagesHtml() {
   const typing = chatBusy && !chatTrail.length
     ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>'
     : "";
-  return bubbles + trail + typing;
+  // "What Gabay knows" (issue #44): the Case has no panel and no screen
+  // of its own any more — it folds into the thread as a quiet block
+  // pinned below the last message, so one-tap correction and conflict
+  // resolution sit right where she is reading and the composer stays put
+  // under it. Rendered only when the Case actually carries something.
+  const caseBlock = caseHasContent()
+    ? `<div class="case-inline" id="chat-case"><p class="case-inline-title">${t("caseTitle")}</p>${chatCaseHtml()}</div>`
+    : "";
+  return bubbles + trail + typing + caseBlock;
 }
 
 function caseFieldLabel(field) {
@@ -682,7 +692,7 @@ function homeTemplate() {
   const openers = CHAT_OPENERS.map(
     (opener) => `<button type="button" class="chat-opener" data-opener="${escapeHtml(opener)}">${escapeHtml(opener)}</button>`,
   ).join("");
-  return `<section class="home-shell">
+  return `<section class="home-shell${isEmpty ? "" : " has-messages"}">
     <div class="ph-glow" aria-hidden="true"></div>
     <div class="home-main">
       <div class="home-greeting${isEmpty ? "" : " hidden"}" id="home-greeting">
@@ -690,25 +700,33 @@ function homeTemplate() {
         <p>${t("chatBody")}</p>
       </div>
       <div class="messages" id="chat-messages" aria-live="polite">${chatMessagesHtml()}</div>
+      <form class="composer-pill" data-form="chat">
+        <span class="composer-plus" aria-hidden="true">+</span>
+        <textarea id="chat-input" rows="1" maxlength="4000" required placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
+        <button class="composer-send" type="submit" aria-label="${escapeHtml(t("chatSend"))}" ${chatBusy ? "disabled" : ""}>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 0 0 3.5-3.5V6a3.5 3.5 0 1 0-7 0v6a3.5 3.5 0 0 0 3.5 3.5Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 11.5V12a6 6 0 0 0 12 0v-.5M12 18v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </button>
+      </form>
       <div class="chat-openers${isEmpty ? "" : " hidden"}" id="chat-openers">
         <p>${t("chatOpenersLabel")}</p>
         <div class="opener-chips">${openers}</div>
       </div>
-      <form class="composer-pill" data-form="chat">
-        <textarea id="chat-input" rows="1" maxlength="4000" required placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
-        <button class="button ink-button composer-send" type="submit" ${chatBusy ? "disabled" : ""}>${t("chatSend")}</button>
-      </form>
     </div>
-    <aside class="case-panel" id="chat-case-panel">
-      <h2>${t("caseTitle")}</h2>
-      <div id="chat-case">${chatCaseHtml()}</div>
-    </aside>
   </section>`;
+}
+
+function caseHasContent() {
+  return (
+    Object.keys(chatCase.claims || {}).length > 0 ||
+    Object.keys(chatCase.safety_flags || {}).length > 0
+  );
 }
 
 function refreshChatScreen() {
   refreshEmergencyControls();
   if (currentScreen !== "home") return;
+  const shell = document.querySelector(".home-shell");
+  if (shell) shell.classList.toggle("has-messages", chatMessages.length > 0);
   const greeting = document.getElementById("home-greeting");
   if (greeting) greeting.classList.toggle("hidden", chatMessages.length > 0);
   const openersBlock = document.getElementById("chat-openers");
@@ -718,8 +736,6 @@ function refreshChatScreen() {
     messagesEl.innerHTML = chatMessagesHtml();
     messagesEl.scrollTop = messagesEl.scrollHeight;
   }
-  const casePanel = document.getElementById("chat-case");
-  if (casePanel) casePanel.innerHTML = chatCaseHtml();
   const sendButton = document.querySelector('.composer-pill button[type="submit"]');
   if (sendButton) sendButton.disabled = chatBusy;
 }
@@ -1055,12 +1071,35 @@ document.addEventListener("click", (event) => {
   }
   if (action === "view-current-plan") {
     // The one live Plan / Case surface is #77's; for now, take her to
-    // the Case panel where the current picture lives.
-    document.getElementById("chat-case-panel")?.scrollIntoView({ behavior: "smooth" });
+    // "What Gabay knows", the Case block folded into the thread.
+    (document.getElementById("chat-case") || document.getElementById("chat-messages"))
+      ?.scrollIntoView({ behavior: "smooth", block: "end" });
     return;
   }
   if (action === "home" && currentScreen === "home") return;
   navigate(action);
+});
+
+// The composer has no Send button — the mic is the submit control and
+// Enter (without Shift) sends, matching the canvas. Shift+Enter still
+// inserts a newline.
+document.addEventListener("keydown", (event) => {
+  if (
+    event.target.id === "chat-input" &&
+    event.key === "Enter" &&
+    !event.shiftKey &&
+    !event.isComposing
+  ) {
+    event.preventDefault();
+    event.target.closest("form")?.requestSubmit();
+  }
+});
+
+// Grow the composer with its content, up to the CSS max-height.
+document.addEventListener("input", (event) => {
+  if (event.target.id !== "chat-input") return;
+  event.target.style.height = "auto";
+  event.target.style.height = `${Math.min(event.target.scrollHeight, 128)}px`;
 });
 
 document.addEventListener("submit", async (event) => {
@@ -1072,6 +1111,7 @@ document.addEventListener("submit", async (event) => {
     const text = input.value.trim();
     if (!text) return;
     input.value = "";
+    input.style.height = "auto";
     sendChatTurn(text);
   } else if (form.dataset.form === "case-edit") {
     const field = form.dataset.field;
@@ -1096,6 +1136,7 @@ languageSelects.forEach((select) => {
     if (!app.classList.contains("hidden")) {
       renderScreen();
       renderRail();
+      refreshChatScreen();
     }
   });
 });

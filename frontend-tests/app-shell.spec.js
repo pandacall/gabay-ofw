@@ -8,7 +8,7 @@ test("signed-in user lands directly on the home screen: a centred greeting, the 
 }) => {
   await openAsSignedInUser(page);
 
-  await expect(page.getByRole("heading", { name: "Alice, what do you need?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kumusta, Alice?" })).toBeVisible();
   await expect(page.locator(".rail")).toBeVisible();
   // Creation is implicit (issue #72): no Conversation row exists until
   // she sends her first message — the rail offers "new conversation".
@@ -49,11 +49,14 @@ test("first-time user sees the service limits before using the app", async ({
 test("language choice updates the home screen and persists", async ({ page }) => {
   await openAsSignedInUser(page);
 
+  // The greeting is "Kumusta, {name}?" in every language, so assert on
+  // body copy that is genuinely localised.
   await page.locator("#signed-in").getByLabel("Language").selectOption("ceb");
-  await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Kumusta, Alice?" })).toBeVisible();
+  await expect(page.locator("#home-greeting")).toContainText("Bisan unsang pinulongan");
 
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Alice, unsay imong kinahanglan?" })).toBeVisible();
+  await expect(page.locator("#home-greeting")).toContainText("Bisan unsang pinulongan");
   await expect(page.locator("html")).toHaveAttribute("lang", "ceb");
 });
 
@@ -161,8 +164,11 @@ test("user can open the conversation from a paired bilingual opener", async ({
 
   await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");
   await expect(page.locator(".chat-message.agent").last()).toContainText("Nandito ako para tumulong");
-  await expect(page.locator(".case-panel")).toContainText("months unpaid");
-  await expect(page.locator(".case-panel")).toContainText("passport withheld");
+  // "What Gabay knows" folds into the thread now — a Case block pinned
+  // below the last message, shown once it carries a claim or a flag.
+  await expect(page.locator(".case-inline")).toBeVisible();
+  await expect(page.locator(".case-inline")).toContainText("months unpaid");
+  await expect(page.locator(".case-inline")).toContainText("passport withheld");
   // The greeting and openers retire once the conversation starts, but the
   // composer never does (issue #71: "a floating pill composer that never
   // leaves the screen").

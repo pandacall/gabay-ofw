@@ -7,7 +7,7 @@
   <title>Gabay OFW</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -20,6 +20,12 @@
     <p data-copy="loading"></p>
   </div>
 
+  <!-- Signed-out / welcome (issue #71, design-fidelity follow-up): one
+       centred column on the near-white ground with the flag glow behind
+       it — the question, the sign-in card, then the three orienting
+       steps kept quiet below. No hotline number appears here: routing
+       numbers are code-owned and resolved server-side (ADR-0002), and a
+       signed-out visitor cannot reach the zero-model emergency card. -->
   <main id="signed-out" class="auth-page hidden">
     <div class="ph-glow" aria-hidden="true"></div>
     <nav class="welcome-nav">
@@ -27,28 +33,19 @@
         <span class="brand-dot" aria-hidden="true"></span>
         <span>Gabay OFW</span>
       </a>
-      <div class="welcome-links">
-        <a href="#how-it-works" data-copy="howItWorks"></a>
-        <a href="#privacy" data-copy="privacyLink"></a>
-        <label class="language-control">
-          <span class="sr-only" data-copy="languageLabel"></span>
-          <select class="language-select" data-copy-aria="languageLabel"></select>
-        </label>
-      </div>
+      <label class="language-control">
+        <span class="sr-only" data-copy="languageLabel"></span>
+        <select class="language-select" data-copy-aria="languageLabel"></select>
+      </label>
     </nav>
 
     <section class="welcome-layout">
       <div class="welcome-copy">
         <h1 data-copy="welcomeTitle"></h1>
         <p class="lead" data-copy="welcomeBody"></p>
-        <ol class="welcome-steps" id="how-it-works">
-          <li><span>1</span><p data-copy="welcomeStepOne"></p></li>
-          <li><span>2</span><p data-copy="welcomeStepTwo"></p></li>
-          <li><span>3</span><p data-copy="welcomeStepThree"></p></li>
-        </ol>
       </div>
       <div class="welcome-actions">
-        <section class="signin-card" id="privacy">
+        <section class="signin-card">
           <h2 data-copy="startNow"></h2>
           <p data-copy="signInBody"></p>
           <button class="google-button" id="signin" type="button">
@@ -63,16 +60,23 @@
             <span data-copy="trustNoAds"></span>
           </p>
         </section>
+        <ol class="welcome-steps">
+          <li><span>1</span><p data-copy="welcomeStepOne"></p></li>
+          <li><span>2</span><p data-copy="welcomeStepTwo"></p></li>
+          <li><span>3</span><p data-copy="welcomeStepThree"></p></li>
+        </ol>
       </div>
     </section>
   </main>
 
   <div id="signed-in" class="app hidden">
-    <!-- The left rail (issue #71): brand, the current Conversation (a
-         later slice, #72, makes this a real multi-conversation list —
-         this slice shows exactly one entry, the Conversation she is in),
-         and account controls. Never "check": CONTEXT.md reserves that
-         word for the verb Gabay performs inside a Conversation. -->
+    <!-- The left rail (issue #71): brand, the Conversation list (#72),
+         and account controls. A flat panel one shade off the page:
+         separation is the ground colour, never a line or shadow. The
+         right-hand Case panel is gone — "what Gabay knows" now folds
+         into the thread (see chatMessagesHtml in app.js). Never "check":
+         CONTEXT.md reserves that word for the verb Gabay performs inside
+         a Conversation. -->
     <aside class="rail">
       <button class="brand rail-brand" type="button" data-action="home">
         <span class="brand-dot" aria-hidden="true"></span>
@@ -88,6 +92,7 @@
         <button class="rail-new-conversation" type="button" data-action="new-conversation" data-copy="newConversation"></button>
         <div id="rail-conversations-list" class="rail-conversations-list"></div>
       </nav>
+
       <div class="rail-footer">
         <label class="language-control rail-control">
           <span class="sr-only" data-copy="languageLabel"></span>
@@ -114,8 +119,11 @@
          because #emergency-controls lives outside #screen's per-route
          templates. Renders POST /api/emergency/button's cached action
          card with zero model calls, so it works even when chat/model is
-         down. "Mark safe" only appears once the Imminent Danger predicate
-         (case.emergency.active) is on. -->
+         down. The design-fidelity follow-up drops its visual weight — a
+         quiet pill with the flag-red dot, not a shouting slab — without
+         changing that it is always visible, always reachable, and on the
+         zero-model path. "Mark safe" only appears once the Imminent
+         Danger predicate (case.emergency.active) is on. -->
     <div id="emergency-controls" class="emergency-controls">
       <button id="emergency-button" class="emergency-button" type="button" data-action="emergency-button">
         <span class="urgent-dot" aria-hidden="true"></span>
