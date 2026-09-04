@@ -72,6 +72,7 @@ from app.case import merge_case
 from app.case import press_emergency_button as case_press_emergency_button
 from app.directory import Country, resolve_case_country, resolve_keys
 from app.history import cards_in, replay_conversation
+from app.reply_text import visible_texts
 from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card, is_imminent_danger
 from app.state_keys import CASE, CASE_MUTATIONS, CASE_RAW, PLAN_ACTIVE
 
@@ -530,9 +531,11 @@ class ChatService:
                 # whose text is her reply, since a transfer hands the
                 # conversation to it, not DISPATCHER.
                 if event.author in ("DISPATCHER", "EMERGENCY"):
-                    reply_parts.extend(
-                        part.text for part in event.content.parts if part.text
-                    )
+                    # issue #76: model thinking arrives as parts marked
+                    # ``thought=True`` INSIDE the same event content as the
+                    # reply; visible_texts drops them so her raw reasoning
+                    # never splices into the reply (in English, mid-crisis).
+                    reply_parts.extend(visible_texts(event.content.parts))
         except Exception:
             logger.exception("DISPATCHER turn failed")
             # The hard fallback: her country's cached Safe Floor card,
