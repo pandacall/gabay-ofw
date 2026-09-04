@@ -294,8 +294,13 @@ class TestTaglishDemo:
         # The reply is still DISPATCHER's voice; the verdicts line is the
         # code-owned payload the UI renders (ADR-0002).
         assert by_type["reply"]["text"] == DISPATCHER_REPLY
+        # Two trail lines (issue #75, ADR-0010): the opening line, then
+        # one for the DEBUNKER specialist call — never one for its own
+        # internal search_corpus tool.
         assert [line["type"] for line in lines] == [
             "ack",
+            "trail",
+            "trail",
             "reply",
             "verdicts",
             "case",
@@ -324,4 +329,6 @@ class TestTaglishDemo:
         app = create_app(verifier=FakeVerifier(), chat_service=service)
         client = TestClient(app)
         _, lines = turn(client, "kumusta")
-        assert [line["type"] for line in lines] == ["ack", "reply", "case"]
+        # Just the trail's opening line (issue #75) — no DEBUNKER call
+        # this turn, so no second trail line.
+        assert [line["type"] for line in lines] == ["ack", "trail", "reply", "case"]

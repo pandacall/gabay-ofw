@@ -284,6 +284,11 @@ let chatMessages = [];
 let chatCase = {};
 let chatBusy = false;
 let editingCaseField = null;
+// The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
+// shown while a turn runs, never part of chatMessages/the transcript —
+// cleared as soon as the "reply" line lands (see handleChatLine) and
+// again defensively in sendChatTurn's finally block.
+let chatTrail = [];
 
 const t = (key, ...args) => {
   const value = copy[language][key] ?? copy.en[key];
@@ -406,8 +411,25 @@ function chatMessageHtml(message) {
 
 function chatMessagesHtml() {
   const bubbles = chatMessages.map(chatMessageHtml).join("");
-  const typing = chatBusy ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>' : "";
-  return bubbles + typing;
+  // The Progress Trail replaces the meaningless typing animation with
+  // fixed, code-owned labels of what the app is actually doing (issue
+  // #75, ADR-0010) — rendered whenever any are queued, never added to
+  // chatMessages so it can never become part of the transcript. Keyed
+  // on chatTrail itself, not chatBusy, so it renders identically no
+  // matter which stream populated it (the EMERGENCY button's response
+  // reuses this same handleChatLine, per ADR-0010: "shown in every
+  // Conversation").
+  const trail = chatTrail.length
+    ? chatTrail
+        .map(
+          (label) => `<div class="chat-message agent trail">${escapeHtml(label)}</div>`,
+        )
+        .join("")
+    : "";
+  const typing = chatBusy && !chatTrail.length
+    ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>'
+    : "";
+  return bubbles + trail + typing;
 }
 
 function caseFieldLabel(field) {
@@ -571,6 +593,7 @@ async function sendChatTurn(text) {
   if (chatBusy || !auth?.currentUser) return;
   chatBusy = true;
   chatMessages.push({ role: "user", text });
+  chatTrail = [];
   refreshChatScreen();
   try {
     const token = await auth.currentUser.getIdToken();
@@ -585,6 +608,9 @@ async function sendChatTurn(text) {
     chatMessages.push({ role: "agent", kind: "error", text: t("chatError") });
   } finally {
     chatBusy = false;
+    // Defensive: the trail is transient and must never outlive the turn
+    // even if the stream broke before a "reply" line ever arrived.
+    chatTrail = [];
     refreshChatScreen();
   }
 }
@@ -599,7 +625,15 @@ function handleChatLine(line) {
   if (line.session_id) chatSessionId = line.session_id;
   if (line.type === "ack") {
     chatMessages.push({ role: "agent", kind: "ack", text: line.text });
+  } else if (line.type === "trail") {
+    // The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
+    // of what the app is doing, transient — never pushed to
+    // chatMessages, so it never becomes part of the transcript.
+    if (line.text) chatTrail.push(line.text);
   } else if (line.type === "reply") {
+    // Cleared the moment the reply lands (ADR-0010): the trail's job is
+    // done once she has something to read.
+    chatTrail = [];
     if (line.text) chatMessages.push({ role: "agent", text: line.text });
   } else if (line.type === "card") {
     // The card is fixed app data rendered outside the LLM text (ADR-0002).

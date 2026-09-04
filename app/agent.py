@@ -128,6 +128,122 @@ def acknowledgement_for(language: str | None) -> str:
     return ACKNOWLEDGEMENTS.get(language or "en", ACKNOWLEDGEMENTS["en"])
 
 
+# ---------------------------------------------------------------------------
+# The Progress Trail (issue #75, ADR-0010): a fixed, code-owned label per
+# specialist tool CALL, plus FILING_SEQUENCER's verification step. Never
+# the model's own thought summaries — see the ADR for why. Translated
+# exactly like ACKNOWLEDGEMENTS above (same closed language set, same
+# "taglish" -> pure Filipino normalization).
+# ---------------------------------------------------------------------------
+
+# The trail's opening line: fires immediately after the acknowledgement,
+# before any tool call, since reasoning and extraction happen before any
+# tool call. Deliberately NOT "reading what you wrote" — the
+# acknowledgement already says that; this is the next beat, what the app
+# is about to do.
+PROGRESS_TRAIL_OPENING = {
+    "en": "Now let's see what would help you here.",
+    "tl": "Ngayon, tingnan natin kung ano ang makakatulong sa iyo.",
+    "ceb": "Karon, tan-awon nato kung unsa ang makatabang nimo.",
+}
+
+#: One fixed label per specialist tool-CALL name DISPATCHER (or a
+#: specialist, for the verification entry) may fire, keyed exactly to the
+#: name google-adk exposes the call under — never a raw tool name, an
+#: agent name, or JSON shown to her. Every key here names the TASK, never
+#: a hypothesis about her situation (ADR-0010): "Checking what the rules
+#: actually say", never a claim about whether she was lied to. The ADR's
+#: own "Looking up your agency" example names COMPLAINT_DRAFTER's
+#: INTERNAL agency-license check (``complaint_check_agency_license``) —
+#: an internal tool, so per the granularity rule below it gets no line of
+#: its own; COMPLAINT_DRAFTER's ONE line names what the specialist as a
+#: whole is doing (drafting/filling the complaint), never the narrower
+#: internal check.
+#:
+#: Granularity (ADR-0010's "one line per specialist, plus one for
+#: verification"): FILING_SEQUENCER's OWN internal tools
+#: (sequencer_jurisdiction_rules, sequencer_sequence_actions,
+#: sequencer_compute_deadlines) are deliberately ABSENT — only the
+#: specialist call itself and its verification step
+#: (sequencer_verify_plan) get a line, so a single filing turn never
+#: stutters four lines through what she asked as one question. The same
+#: reasoning drops DEBUNKER's own search_corpus, COMPLAINT_DRAFTER's four
+#: gate/fill tools (including complaint_check_agency_license), and
+#: RECOURSE_ROUTER's recourse_build_routes — each is covered by its
+#: specialist's one line already. Contact-directory and card-rendering
+#: tools (office_directory, action_card, safe_floor_card,
+#: mark_plan_step_done) are absent too: the card itself appears, which
+#: says more than a label could. Any call whose name is not a key here
+#: renders NOTHING (the quiet-gap failure mode ADR-0010 requires).
+PROGRESS_TRAIL_LABELS: dict[str, dict[str, str]] = {
+    "DEBUNKER": {
+        "en": "Checking what the rules actually say.",
+        "tl": "Tinitingnan kung ano talaga ang sinasabi ng batas.",
+        "ceb": "Gitan-aw kung unsa gyud ang giingon sa balaod.",
+    },
+    "PROOF_BUILDER": {
+        "en": "Working out what proof you already have.",
+        "tl": "Tinitingnan kung anong patunay ang mayroon ka na.",
+        "ceb": "Gitan-aw kung unsa nga pamatuod anaa na nimo.",
+    },
+    "FILING_SEQUENCER": {
+        "en": "Working out your filing steps in order.",
+        "tl": "Inaayos ang pagkakasunud-sunod ng dapat mong gawin.",
+        "ceb": "Gihan-ay ang han-ay sa imong buhaton.",
+    },
+    # The verification exception (ADR-0010): sequencer_verify_plan is
+    # FILING_SEQUENCER's OWN tool call, distinct from the specialist line
+    # above, because "checking these steps against the rules" is a
+    # separate, true claim and the most reassuring thing the system can
+    # say to someone a recruiter has lied to.
+    "sequencer_verify_plan": {
+        "en": "Checking these steps against the rules.",
+        "tl": "Tinitingnan kung tama ang mga hakbang na ito ayon sa batas.",
+        "ceb": "Gisusi kung husto kini nga mga lakang base sa balaod.",
+    },
+    # Names the specialist's whole task (drafting/filling the complaint
+    # form), never the narrower internal agency-license check it also
+    # runs — that check (complaint_check_agency_license) is an internal
+    # tool and stays silent, per the granularity rule above.
+    "COMPLAINT_DRAFTER": {
+        "en": "Putting your complaint into the right form.",
+        "tl": "Inilalagay ang reklamo mo sa tamang porma.",
+        "ceb": "Gibutang ang imong reklamo sa hustong porma.",
+    },
+    "RECOURSE_ROUTER": {
+        "en": "Working out where you can take this next.",
+        "tl": "Tinitingnan kung saan mo pwedeng dalhin ito.",
+        "ceb": "Gitan-aw kung asa nimo kini madala.",
+    },
+}
+
+
+def _closed_language(language: str | None) -> str:
+    """The same normalization ``acknowledgement_for`` applies: "taglish"
+    folds to "tl" (issue #67 — Taglish is detected, never produced), and
+    anything else falls through to the caller's own English default."""
+    return "tl" if language in _FILIPINO_LANGUAGES else (language or "en")
+
+
+def progress_trail_opening_for(language: str | None) -> str:
+    """The trail's fixed opening line for a recorded language — same
+    closed language set and source of truth as ``acknowledgement_for``."""
+    return PROGRESS_TRAIL_OPENING.get(
+        _closed_language(language), PROGRESS_TRAIL_OPENING["en"]
+    )
+
+
+def progress_trail_label_for(call_name: str, language: str | None) -> str | None:
+    """The fixed label for a tool/specialist CALL name, or ``None`` when
+    ``call_name`` has no entry in :data:`PROGRESS_TRAIL_LABELS` — the
+    quiet-gap failure mode ADR-0010 requires (never a raw tool name, an
+    agent name, or JSON on screen)."""
+    labels = PROGRESS_TRAIL_LABELS.get(call_name)
+    if labels is None:
+        return None
+    return labels.get(_closed_language(language), labels["en"])
+
+
 def _dispatcher_instruction(readonly_context: ReadonlyContext) -> str:
     case = readonly_context.state.get(CASE) or {}
     extraction_failed = bool(readonly_context.state.get("temp:extraction_failed"))

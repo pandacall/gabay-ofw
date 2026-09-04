@@ -497,6 +497,10 @@ p { font-weight: 300; color: var(--body); line-height: 1.55; }
 }
 .chat-message.agent.ack { color: var(--muted); font-style: italic; }
 .chat-message.agent.error { color: var(--urgent-dark); }
+/* Progress Trail (issue #75, ADR-0010): transient, never persisted —
+   styled like .ack (muted/italic) so it reads as in-progress status,
+   not a message she needs to keep. */
+.chat-message.agent.trail { color: var(--muted); font-style: italic; }
 .chat-message.typing { display: flex; gap: 0.35rem; align-items: center; }
 
 /* Contact/action cards — findings arrive here, in the conversation,
