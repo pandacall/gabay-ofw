@@ -79,6 +79,24 @@ DISCLOSURE_SUMMARY: dict[str, dict[str, str]] = {
     },
 }
 
+#: The proactive opener (spec 2026-09-06). After the EMERGENCY button
+#: renders its card and opens the Conversation, the frontend calls
+#: ``/api/emergency/opener``, which drives ONE Runner turn with this fixed
+#: stage direction as the user message. The latch is already active, so
+#: DISPATCHER transfers to EMERGENCY immediately — no change to either
+#: agent instruction; the framing rides here. Best-effort: if the model is
+#: down the turn is swallowed and she keeps the card. ADK persists this as
+#: a ``user`` event, so ``app.history.replay_conversation`` drops it by
+#: exact match — it is a direction, never something she said.
+EMERGENCY_OPENER_TRIGGER = (
+    "[She just opened this Emergency Conversation from the help button and"
+    " has not said anything yet. Greet her warmly in her language, reflect"
+    " what her Case already shows without re-asking it, and in the same"
+    " short message ask whether she wants you to help her think through"
+    " what to do next or whether she just needed the phone numbers. Ask"
+    " nothing else.]"
+)
+
 _FILIPINO_LANGUAGES = frozenset({"tl", "taglish"})
 
 

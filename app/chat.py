@@ -70,6 +70,7 @@ from app.agent import (
 from app.case import ACUTE_SAFETY_FLAGS, merge_case
 from app.directory import Country, resolve_case_country, resolve_keys
 from app.emergency import (
+    EMERGENCY_OPENER_TRIGGER,
     REASON_BUTTON,
     build_handoff,
     button_summary,
@@ -421,7 +422,7 @@ class ChatService:
         reason_category: str,
         summary: str,
         case: dict | None,
-    ) -> tuple[str, dict]:
+    ) -> tuple[str, dict, bool]:
         """Opens THE Emergency Conversation, or reopens the live one
         (ADR-0009: at most one at a time).
 
@@ -433,7 +434,9 @@ class ChatService:
         routes the ``user:`` pointer to ``adkUserState`` and the rest to
         the session document). Zero model calls.
 
-        Returns ``(emergency_session_id, case)``.
+        Returns ``(emergency_session_id, case, created)`` — ``created`` is
+        False when an existing live Conversation was reopened, so the
+        caller can skip the proactive opener on a second press.
         """
         now_iso = datetime.now(timezone.utc).isoformat()
         pointer = (await self._user_state(uid=uid)).get(
@@ -444,7 +447,7 @@ class ChatService:
                 app_name=APP_NAME, user_id=uid, session_id=pointer
             )
             if existing is not None and is_emergency_conversation(existing.state):
-                return pointer, (existing.state.get(CASE) or case or {})
+                return pointer, (existing.state.get(CASE) or case or {}), False
 
         sid = uuid4().hex
         handoff = build_handoff(
@@ -453,7 +456,7 @@ class ChatService:
             reason_category=reason_category,
             summary=summary,
         )
-        created = await self._session_service.create_session(
+        new_session = await self._session_service.create_session(
             app_name=APP_NAME,
             user_id=uid,
             session_id=sid,
@@ -469,20 +472,26 @@ class ChatService:
                 EMERGENCY_CONVERSATION: True,
             },
         )
-        return sid, (created.state.get(CASE) or case or {})
+        return sid, (new_session.state.get(CASE) or case or {}), True
 
     async def press_emergency_button(self, *, uid: str) -> AsyncIterator[str]:
         """The hardcoded EMERGENCY button: renders the cached action card
         with ZERO model calls, UNCONDITIONALLY — first, before anything
         else runs, and never gated on the session store succeeding (PRD
         #34 user story 28: "help survives a dead model, a dead session
-        store, or a dead connection").
+        store, or a dead connection"). The card carries the HELP_REQUESTED
+        reason line — a healthy press is not a service outage, so it must
+        not tell her the app is broken.
 
         Then it opens (or reopens) her Emergency Conversation (ADR-0009),
         still with zero model calls — the latch belongs to that
         Conversation now, so DISPATCHER honours it there starting from her
         next message. If the session store is down, that failure is
         surfaced but never retracts the card she already has.
+
+        The ``emergency_latch`` line reports ``created`` — the frontend
+        calls ``/api/emergency/opener`` (spec 2026-09-06) only when it is
+        True, so a second press reopens without re-greeting.
         """
         case: dict | None = None
         try:
@@ -492,14 +501,21 @@ class ChatService:
             logger.exception("press_emergency_button: could not read country")
             country = Country.UNKNOWN
         yield _line(
-            {"type": "card", "card": cached_card(country, imminent_danger=True)}
+            {
+                "type": "card",
+                "card": cached_card(
+                    country,
+                    imminent_danger=True,
+                    reason=SafeFloorReason.HELP_REQUESTED,
+                ),
+            }
         )
 
         try:
             flags = (case or {}).get("safety_flags") or {}
             acute = set(flags) & ACUTE_SAFETY_FLAGS
             reason = reason_category_for(flags) if acute else REASON_BUTTON
-            session_id, updated_case = (
+            session_id, updated_case, created = (
                 await self._open_or_reopen_emergency_conversation(
                     uid=uid,
                     source_session_id=None,
@@ -515,11 +531,94 @@ class ChatService:
             yield _line({"type": "error", "detail": "session store unavailable"})
             return
         yield _line(
-            {"type": "emergency_latch", "active": True, "session_id": session_id}
+            {
+                "type": "emergency_latch",
+                "active": True,
+                "session_id": session_id,
+                # The proactive opener (spec 2026-09-06) fires only on a
+                # fresh Conversation; a second press reopens and must not
+                # re-greet.
+                "created": created,
+            }
         )
         yield _line(
             {"type": "case", "case": updated_case or {}, "session_id": session_id}
         )
+
+    async def _live_emergency_session(self, *, uid: str) -> Session | None:
+        """The user's one live Emergency Conversation (ADR-0009), or None.
+        Same user-scoped pointer ``_open_or_reopen_emergency_conversation``
+        uses; None once ``mark_safe`` has cleared the latch and pointer."""
+        pointer = (await self._user_state(uid=uid)).get(
+            EMERGENCY_CONVERSATION_ID_RAW
+        )
+        if not pointer:
+            return None
+        session = await self._session_service.get_session(
+            app_name=APP_NAME, user_id=uid, session_id=pointer
+        )
+        if session is None or not is_emergency_conversation(session.state):
+            return None
+        return session
+
+    async def has_live_emergency_conversation(self, *, uid: str) -> bool:
+        return (await self._live_emergency_session(uid=uid)) is not None
+
+    async def stream_emergency_opener(
+        self, *, uid: str
+    ) -> AsyncIterator[str]:
+        """The proactive opener (spec 2026-09-06). After the button has
+        rendered its card and opened the Emergency Conversation, this
+        drives ONE Runner turn with the fixed ``EMERGENCY_OPENER_TRIGGER``
+        stage direction: the latch is active, so DISPATCHER transfers to
+        EMERGENCY, which greets her and offers the one triage choice.
+
+        Best-effort. Any failure is logged and swallowed — the stream just
+        ends with no ``reply`` line, and she still has the card and the
+        Conversation. Yields nothing at all when no Emergency Conversation
+        is live (the route has already 404'd in that case).
+        """
+        session = await self._live_emergency_session(uid=uid)
+        if session is None:
+            return
+        language = (session.state.get(CASE) or {}).get("language")
+        reply_parts: list[str] = []
+        trail_calls_seen: set[str] = set()
+        try:
+            async for event in self._runner.run_async(
+                user_id=uid,
+                session_id=session.id,
+                new_message=types.Content(
+                    role="user",
+                    parts=[types.Part(text=EMERGENCY_OPENER_TRIGGER)],
+                ),
+            ):
+                if event.partial or not event.content or not event.content.parts:
+                    continue
+                for call in event.get_function_calls():
+                    if call.name in trail_calls_seen:
+                        continue
+                    label = progress_trail_label_for(call.name, language)
+                    if label is None:
+                        continue
+                    trail_calls_seen.add(call.name)
+                    yield _line(
+                        {
+                            "type": "trail",
+                            "text": label,
+                            "session_id": session.id,
+                        }
+                    )
+                if event.author == "EMERGENCY":
+                    reply_parts.extend(visible_texts(event.content.parts))
+        except Exception:
+            logger.exception("stream_emergency_opener: opener turn failed")
+            return
+        text = "".join(reply_parts).strip()
+        if text:
+            yield _line(
+                {"type": "reply", "text": text, "session_id": session.id}
+            )
 
     async def escalate_from_prompt(
         self, *, uid: str, source_session_id: str
@@ -542,7 +641,7 @@ class ChatService:
             return None
         case = source.state.get(CASE) or {}
         reason = reason_category_for(case.get("safety_flags") or {})
-        session_id, updated_case = (
+        session_id, updated_case, _created = (
             await self._open_or_reopen_emergency_conversation(
                 uid=uid,
                 source_session_id=source_session_id,

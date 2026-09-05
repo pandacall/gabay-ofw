@@ -113,6 +113,19 @@ def press_button(client, uid="maria") -> tuple[str, list]:
     return by_type["case"]["session_id"], lines
 
 
+def open_emergency(client, uid="maria"):
+    """Calls the proactive-opener endpoint; returns (status_code, lines)."""
+    r = client.post("/api/emergency/opener", headers=auth(uid))
+    lines = [json.loads(line) for line in r.text.splitlines() if line]
+    return r.status_code, lines
+
+
+def replay(client, session_id, uid="maria") -> list:
+    r = client.get(f"/api/conversations/{session_id}", headers=auth(uid))
+    assert r.status_code == 200
+    return [json.loads(line) for line in r.text.splitlines() if line]
+
+
 def mark_safe_nonce(client, uid: str) -> str:
     return client.post("/api/mark-safe/nonce", headers=auth(uid)).json()["nonce"]
 
@@ -142,6 +155,14 @@ class TestHardcodedButtonZeroModelCalls:
         by_type = {line["type"]: line for line in lines}
         assert by_type["card"]["card"]["type"] == "safe_floor"
         assert fake_model.calls == []  # ZERO model calls, asserted directly
+
+    def test_button_card_does_not_claim_a_service_outage(self, client):
+        # A healthy press is not SERVICE_DOWN: the card must not tell her
+        # the app is broken when nothing is.
+        _, lines = press_button(client)
+        card = {line["type"]: line for line in lines}["card"]["card"]
+        assert card["reason"] == "HELP_REQUESTED"
+        assert "trouble" not in card["reason_line"].lower()
 
     def test_button_requires_auth(self, client):
         assert client.post("/api/emergency/button").status_code == 401
@@ -185,6 +206,95 @@ class TestHardcodedButtonZeroModelCalls:
         assert fake_model.calls == []
 
 
+class TestProactiveOpener:
+    """(spec 2026-09-06) After the button opens the Conversation, a
+    SEPARATE best-effort request has EMERGENCY post one greeting. The
+    card path is untouched; a model failure here is swallowed."""
+
+    def test_opener_streams_an_emergency_greeting(self, client, fake_model):
+        session_id, _ = press_button(client)
+
+        fake_model.extraction_results.append(RuntimeError("no narrative to read"))
+        fake_model.responses.append(transfer_to_emergency())
+        fake_model.responses.append(
+            "Nandito ako. Gusto mo bang tulungan kitang pag-isipan ang"
+            " susunod, o kailangan mo lang ang mga numero?"
+        )
+        status, lines = open_emergency(client)
+        by_type = {line["type"]: line for line in lines}
+
+        assert status == 200
+        assert by_type["reply"]["text"] == (
+            "Nandito ako. Gusto mo bang tulungan kitang pag-isipan ang"
+            " susunod, o kailangan mo lang ang mga numero?"
+        )
+        assert by_type["reply"]["session_id"] == session_id
+        # extraction (before-agent), DISPATCHER transfer, EMERGENCY speaks.
+        assert fake_model.calls == ["extraction", "agent", "agent"]
+
+    def test_opener_is_persisted_and_its_trigger_is_never_shown(
+        self, client, fake_model
+    ):
+        from app.emergency import EMERGENCY_OPENER_TRIGGER
+
+        session_id, _ = press_button(client)
+        fake_model.extraction_results.append(RuntimeError("nothing"))
+        fake_model.responses.append(transfer_to_emergency())
+        fake_model.responses.append("I'm here with you.")
+        open_emergency(client)
+
+        transcript = replay(client, session_id)
+        replies = [line for line in transcript if line["type"] == "reply"]
+        assert any(line["text"] == "I'm here with you." for line in replies)
+        # The synthetic stage direction ADK persisted is not her message.
+        user_lines = [line for line in transcript if line["type"] == "user"]
+        assert all(
+            line["text"] != EMERGENCY_OPENER_TRIGGER for line in user_lines
+        )
+
+    def test_opener_swallows_a_model_failure(self, client, fake_model):
+        session_id, _ = press_button(client)
+
+        fake_model.extraction_results.append(RuntimeError("nothing"))
+        fake_model.responses.append(RuntimeError("model down"))
+        status, lines = open_emergency(client)
+
+        assert status == 200
+        assert not [line for line in lines if line["type"] == "reply"]
+        # The Conversation the button opened is still there and latched.
+        assert session_id in conversation_ids(client)
+
+    def test_opener_404s_when_no_emergency_conversation_is_live(self, client):
+        status, _ = open_emergency(client)
+        assert status == 404
+
+    def test_opener_404s_after_mark_safe(self, client):
+        press_button(client)
+        do_mark_safe(client)
+        status, _ = open_emergency(client)
+        assert status == 404
+
+    def test_opener_reply_goes_through_the_voice_whitelist(
+        self, client, fake_model, caplog
+    ):
+        import logging
+
+        from app.directory import Country, office_directory_rows
+
+        press_button(client)
+        fake_model.extraction_results.append(RuntimeError("nothing"))
+        fake_model.responses.append(transfer_to_emergency())
+        fake_model.responses.append(function_call("office_directory", {}))
+        fake_model.responses.append("Tumawag ka sa 999 ngayon din.")
+        with caplog.at_level(logging.WARNING, logger="app.guard"):
+            _, lines = open_emergency(client)
+
+        reply = {line["type"]: line for line in lines}["reply"]["text"]
+        assert "999" not in reply
+        tool_phones = [row["phone"] for row in office_directory_rows(Country.UNKNOWN)]
+        assert any(phone in reply for phone in tool_phones)
+
+
 class TestAtMostOneLiveEmergencyConversation:
     """(ADR-0009) A second press reopens the existing one; a new one is
     created only after mark_safe has closed the previous."""
@@ -195,6 +305,17 @@ class TestAtMostOneLiveEmergencyConversation:
         assert first == second
         # A panic double-tap cannot fragment her account across two rows.
         assert conversation_ids(client).count(first) == 1
+
+    def test_latch_line_reports_created_then_reopened(self, client):
+        # The frontend fires the proactive opener only on a fresh
+        # Emergency Conversation; a second press reopens and must not
+        # re-greet.
+        _, first_lines = press_button(client)
+        _, second_lines = press_button(client)
+        first = {line["type"]: line for line in first_lines}
+        second = {line["type"]: line for line in second_lines}
+        assert first["emergency_latch"]["created"] is True
+        assert second["emergency_latch"]["created"] is False
 
     def test_a_press_after_mark_safe_opens_a_new_conversation(self, client):
         first, _ = press_button(client)

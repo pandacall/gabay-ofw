@@ -5,20 +5,26 @@ const emergencyCard = {
   type: "safe_floor",
   country: "SA",
   title: "Saudi Arabia — Mga totoong opisina na makakatulong / Real offices that can help",
-  reason: "SERVICE_DOWN",
-  reason_line: "Nag-render kami mula sa cache. / We are rendering from cache.",
+  reason: "HELP_REQUESTED",
+  reason_line: "You asked for help now. These offices are real, and real people answer them.",
   contacts: SAMPLE_CONTACTS,
   hold_line: null,
 };
 
-function emergencyButtonNdjson({ active = true } = {}) {
+function emergencyButtonNdjson({ active = true, created = true } = {}) {
   // ADR-0009: the button opens an Emergency Conversation. The latch is
   // Conversation state, carried on its own `emergency_latch` line; the
-  // `case` line no longer has an `emergency` key.
+  // `case` line no longer has an `emergency` key. `created` (spec
+  // 2026-09-06) is false when a second press reopened the live one.
   const lines = [JSON.stringify({ type: "card", card: emergencyCard })];
   if (active) {
     lines.push(
-      JSON.stringify({ type: "emergency_latch", active: true, session_id: "emergency-session" }),
+      JSON.stringify({
+        type: "emergency_latch",
+        active: true,
+        session_id: "emergency-session",
+        created,
+      }),
     );
   }
   lines.push(
@@ -32,8 +38,11 @@ function emergencyButtonNdjson({ active = true } = {}) {
 }
 
 // The button reopens the Emergency Conversation (ADR-0009), so the client
-// also replays its transcript via GET /api/conversations/<id>.
-async function routeEmergencyButton(page, { fulfill } = {}) {
+// also replays its transcript via GET /api/conversations/<id>. It then
+// fires the proactive opener (spec 2026-09-06) for a freshly created
+// Conversation; by default that returns an empty stream (no greeting), so
+// tests not about the opener are unaffected.
+async function routeEmergencyButton(page, { fulfill, fulfillOpener } = {}) {
   await page.route("**/api/emergency/button", (route) =>
     fulfill
       ? fulfill(route)
@@ -44,6 +53,11 @@ async function routeEmergencyButton(page, { fulfill } = {}) {
       contentType: "application/x-ndjson",
       body: JSON.stringify({ type: "emergency_latch", active: true }) + "\n",
     }),
+  );
+  await page.route("**/api/emergency/opener", (route) =>
+    fulfillOpener
+      ? fulfillOpener(route)
+      : route.fulfill({ contentType: "application/x-ndjson", body: "" }),
   );
 }
 
@@ -261,4 +275,74 @@ test("a failed mark-safe confirmation is reported, never silently swallowed", as
 
   await expect(page.getByRole("status")).toContainText("Could not confirm right now.");
   await expect(page.getByRole("button", { name: "I'm safe now" })).toBeVisible();
+});
+
+// The proactive opener (spec 2026-09-06): after the card is on screen,
+// EMERGENCY posts one greeting — but only for a freshly created
+// Conversation, and never at the cost of the card.
+
+test("the proactive opener greeting streams in after a first press", async ({ page }) => {
+  const openerCalls = [];
+  await routeEmergencyButton(page, {
+    fulfillOpener: (route) => {
+      openerCalls.push(route.request().headers()["authorization"]);
+      return route.fulfill({
+        contentType: "application/x-ndjson",
+        body:
+          JSON.stringify({
+            type: "reply",
+            text: "I'm here with you. Do you want help thinking this through, or did you just need these numbers?",
+            session_id: "emergency-session",
+          }) + "\n",
+      });
+    },
+  });
+  await openAsSignedInUser(page);
+
+  await page.getByRole("button", { name: "I need help now" }).click();
+
+  await expect(page.locator(".contact-card")).toBeVisible();
+  await expect(page.locator(".chat-message.agent").last()).toContainText(
+    "Do you want help thinking this through",
+  );
+  expect(openerCalls).toEqual(["Bearer valid-alice"]);
+});
+
+test("a failed opener leaves the card and shows no error", async ({ page }) => {
+  await routeEmergencyButton(page, {
+    fulfillOpener: (route) => route.fulfill({ status: 500, json: { detail: "model down" } }),
+  });
+  await openAsSignedInUser(page);
+
+  await page.getByRole("button", { name: "I need help now" }).click();
+
+  await expect(page.locator(".contact-card")).toBeVisible();
+  await expect(page.locator(".chat-message.agent.error")).toHaveCount(0);
+});
+
+test("a second press reopens and does not fire the opener", async ({ page }) => {
+  let presses = 0;
+  const openerCalls = [];
+  await routeEmergencyButton(page, {
+    fulfill: (route) => {
+      presses += 1;
+      return route.fulfill({
+        contentType: "application/x-ndjson",
+        body: emergencyButtonNdjson({ created: presses === 1 }),
+      });
+    },
+    fulfillOpener: (route) => {
+      openerCalls.push(1);
+      return route.fulfill({ contentType: "application/x-ndjson", body: "" });
+    },
+  });
+  await openAsSignedInUser(page);
+
+  await page.getByRole("button", { name: "I need help now" }).click();
+  await expect(page.locator(".contact-card")).toBeVisible();
+  await page.getByRole("button", { name: "I need help now" }).click();
+  await expect(page.locator(".contact-card")).toBeVisible();
+
+  // Fired once, for the first (creating) press only.
+  expect(openerCalls).toEqual([1]);
 });

@@ -43,6 +43,7 @@ __all__ = [
     "HOLD_LINE",
     "build_card",
     "CACHED_CARDS",
+    "CACHED_REASONS",
     "cached_card",
 ]
 
@@ -57,6 +58,10 @@ class SafeFloorReason(str, Enum):
     JURISDICTION_HELD = "JURISDICTION_HELD"
     SERVICE_DOWN = "SERVICE_DOWN"
     FACTS_CHANGED = "FACTS_CHANGED"
+    #: A healthy press of the "I need help now" button. The button always
+    #: serves a zero-model cached card; before this reason existed it
+    #: reused SERVICE_DOWN and told every caller the app was broken.
+    HELP_REQUESTED = "HELP_REQUESTED"
     #: Rendered WITH the Escalation Prompt (ADR-0009): she has just
     #: disclosed an acute hazard mid-conversation. The card comes with the
     #: prompt, not after it — so the number she needs is on screen whether
@@ -95,6 +100,10 @@ REASON_LINES: dict[SafeFloorReason, str] = {
         " ang sasagot. / You've told me you're in danger right now. The"
         " choice stays yours — but these numbers are here now, and real"
         " people answer them."
+    ),
+    SafeFloorReason.HELP_REQUESTED: (
+        "You asked for help now. These offices are real, and real people"
+        " answer them."
     ),
 }
 
@@ -172,28 +181,43 @@ def build_card(
     }
 
 
-def _build_cache() -> dict[tuple[Country, bool], dict[str, Any]]:
-    cache: dict[tuple[Country, bool], dict[str, Any]] = {}
+#: Reasons that can be served straight from the zero-model cache: the
+#: genuine service-down fallback, and a healthy press of the "I need help
+#: now" button.
+CACHED_REASONS: tuple[SafeFloorReason, ...] = (
+    SafeFloorReason.SERVICE_DOWN,
+    SafeFloorReason.HELP_REQUESTED,
+)
+
+
+def _build_cache() -> dict[tuple[Country, bool, SafeFloorReason], dict[str, Any]]:
+    cache: dict[tuple[Country, bool, SafeFloorReason], dict[str, Any]] = {}
     for country in CARD_KEYS:
         for danger in (False, True):
-            cache[(country, danger)] = build_card(
-                country,
-                reason=SafeFloorReason.SERVICE_DOWN,
-                imminent_danger=danger,
-            )
+            for reason in CACHED_REASONS:
+                cache[(country, danger, reason)] = build_card(
+                    country,
+                    reason=reason,
+                    imminent_danger=danger,
+                )
     return cache
 
 
 #: The zero-model hard fallback: precomputed at import, keyed by
-#: (country, imminent_danger). Rendering from here touches neither the
-#: model nor the session store.
-CACHED_CARDS: dict[tuple[Country, bool], dict[str, Any]] = _build_cache()
+#: (country, imminent_danger, reason). Rendering from here touches neither
+#: the model nor the session store.
+CACHED_CARDS: dict[tuple[Country, bool, SafeFloorReason], dict[str, Any]] = _build_cache()
 
 
 def cached_card(
-    country: Country = Country.UNKNOWN, *, imminent_danger: bool = False
+    country: Country = Country.UNKNOWN,
+    *,
+    imminent_danger: bool = False,
+    reason: SafeFloorReason = SafeFloorReason.SERVICE_DOWN,
 ) -> dict[str, Any]:
-    """The cached SERVICE_DOWN card; UNKNOWN when the country is unreadable."""
+    """The cached card for ``reason`` (SERVICE_DOWN by default); UNKNOWN
+    when the country is unreadable. Never touches the model or the store."""
     return CACHED_CARDS.get(
-        (country, imminent_danger), CACHED_CARDS[(Country.UNKNOWN, imminent_danger)]
+        (country, imminent_danger, reason),
+        CACHED_CARDS[(Country.UNKNOWN, imminent_danger, reason)],
     )
