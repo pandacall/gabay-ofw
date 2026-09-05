@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer } = require("./test-helpers");
+const {
+  openAsSignedInUser,
+  SAMPLE_CONTACTS,
+  openRailIfDrawer,
+  expandCasePanel,
+} = require("./test-helpers");
 
 const openApp = openAsSignedInUser;
 
@@ -176,11 +181,13 @@ test("user can open the conversation from a paired bilingual opener", async ({
 
   await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");
   await expect(page.locator(".chat-message.agent").last()).toContainText("Nandito ako para tumulong");
-  // "What Gabay knows" folds into the thread now — a Case block pinned
-  // below the last message, shown once it carries a claim or a flag.
-  await expect(page.locator(".case-inline")).toBeVisible();
-  await expect(page.locator(".case-inline")).toContainText("months unpaid");
-  await expect(page.locator(".case-inline")).toContainText("passport withheld");
+  // "What Gabay has understood" is its own panel now (issue #44) — a card
+  // top-right on a wide screen, a pill that expands on a phone — shown
+  // once the Case carries a claim or a flag.
+  await expect(page.locator(".case-panel")).toBeVisible();
+  await expandCasePanel(page);
+  await expect(page.locator(".case-panel-body")).toContainText("months unpaid");
+  await expect(page.locator(".case-panel-body")).toContainText("passport withheld");
   // The greeting and openers retire once the conversation starts, but the
   // composer never does (issue #71: "a floating pill composer that never
   // leaves the screen").
@@ -287,6 +294,7 @@ test("a Case conflict is shown with both values and resolved by one tap", async 
   await page.locator("#chat-input").fill("Hindi ako nababayaran ng 11 months");
   await page.getByRole("button", { name: "Send" }).click();
 
+  await expandCasePanel(page);
   const conflict = page.locator(".case-claim.has-conflict");
   await expect(conflict).toBeVisible();
   await expect(conflict).toContainText("11");
@@ -367,67 +375,59 @@ test("an unrecognised stream line type is ignored without breaking the render (A
   expect(pageErrors).toEqual([]);
 });
 
-test("the Progress Trail's own line type renders while the turn is running (issue #75, ADR-0010)", async ({
+test("the loading animation runs while a turn is in flight and stops when the reply lands", async ({
   page,
 }) => {
-  // A MutationObserver records every DOM mutation as it happens,
-  // independent of whether the browser ever gets a chance to PAINT an
-  // intermediate frame — the trail is transient by design (cleared the
-  // moment the reply lands, see the next test), so this is how its
-  // render is asserted without depending on real network chunking.
-  // Registered BEFORE navigation so it actually runs on the loaded page.
-  await page.addInitScript(() => {
-    window.__trailBubbleSeen = false;
-    const check = () => {
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          for (const node of mutation.addedNodes) {
-            if (
-              node.nodeType === 1 &&
-              node.classList &&
-              node.classList.contains("trail")
-            ) {
-              window.__trailBubbleSeen = true;
-            }
-          }
-        }
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
-    };
-    if (document.body) check();
-    else document.addEventListener("DOMContentLoaded", check);
-  });
   await openAsSignedInUser(page);
-  await page.route("**/api/chat", (route) =>
-    route.fulfill({
-      contentType: "application/x-ndjson",
-      body:
-        [
-          JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
-          JSON.stringify({ type: "trail", text: "Now let's see what would help you here.", session_id: "s1" }),
-          JSON.stringify({ type: "reply", text: "Narito ang sagot ko.", session_id: "s1" }),
-          JSON.stringify({ type: "case", case: {}, session_id: "s1" }),
-        ].join("\n") + "\n",
-    }),
-  );
+  let fulfil;
+  await page.route("**/api/chat", (route) => {
+    // Hold the stream open so the in-flight state is observable, then
+    // release the whole response at once.
+    fulfil = () =>
+      route.fulfill({
+        contentType: "application/x-ndjson",
+        body:
+          [
+            JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
+            JSON.stringify({ type: "trail", text: "Now let's see what would help you here.", session_id: "s1" }),
+            JSON.stringify({ type: "reply", text: "Narito ang sagot ko.", session_id: "s1" }),
+            JSON.stringify({ type: "case", case: {}, session_id: "s1" }),
+          ].join("\n") + "\n",
+      });
+  });
 
   await page.locator("#chat-input").fill("Hello");
   await page.getByRole("button", { name: "Send" }).click();
 
+  // The three-dot loader is on screen for the whole wait, and the
+  // Progress Trail text is not (ADR-0010: the backend still emits `trail`
+  // lines, the client no longer surfaces them).
+  await expect(page.locator(".chat-message.typing")).toBeVisible();
+  await expect(page.locator(".chat-message.agent.trail")).toHaveCount(0);
+  await expect(
+    page.getByText("Now let's see what would help you here."),
+  ).toHaveCount(0);
+
+  await expect.poll(() => typeof fulfil).toBe("function");
+  await fulfil();
+
   await expect(page.locator(".chat-message.agent").last()).toContainText("Narito ang sagot ko.");
-  expect(await page.evaluate(() => window.__trailBubbleSeen)).toBe(true);
+  // The loader clears the instant there is something to read.
+  await expect(page.locator(".chat-message.typing")).toHaveCount(0);
 });
 
-test("the Progress Trail clears the moment the reply lands and never survives into the transcript", async ({
+test("the backend's Progress Trail line type is accepted but shown as nothing (ADR-0010)", async ({
   page,
 }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error));
   await openAsSignedInUser(page);
   await page.route("**/api/chat", (route) =>
     route.fulfill({
       contentType: "application/x-ndjson",
       body:
         [
-          JSON.stringify({ type: "ack", text: "I hear you. I'm reading what you wrote — one moment.", session_id: "s1" }),
+          JSON.stringify({ type: "ack", text: "I hear you.", session_id: "s1" }),
           JSON.stringify({ type: "trail", text: "Now let's see what would help you here.", session_id: "s1" }),
           JSON.stringify({ type: "trail", text: "Checking what the rules actually say.", session_id: "s1" }),
           JSON.stringify({ type: "reply", text: "Narito ang sagot ko.", session_id: "s1" }),
@@ -440,8 +440,11 @@ test("the Progress Trail clears the moment the reply lands and never survives in
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page.locator(".chat-message.agent").last()).toContainText("Narito ang sagot ko.");
-  // Cleared once the reply lands (ADR-0010): no trail bubble remains.
-  await expect(page.locator(".chat-message.agent.trail")).toHaveCount(0);
+  await expect(
+    page.getByText("Checking what the rules actually say."),
+  ).toHaveCount(0);
+  await expect(page.locator(".chat-message.typing")).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
 });
 
 test("no hotline or office phone number appears anywhere in client-side code (ADR-0002)", async ({

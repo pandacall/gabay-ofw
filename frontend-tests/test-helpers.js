@@ -54,6 +54,17 @@ const SAMPLE_CONTACTS = [
 
 const openAsSignedInUser = (page, options) => openApp(page, options);
 
+// "What Gabay has understood" is its own panel now (issue #44): open by
+// default on a wide screen, collapsed to a pill on a phone. Expand it if
+// it is collapsed so the claim rows are on screen.
+async function expandCasePanel(page) {
+  const toggle = page.locator(".case-panel-toggle");
+  await toggle.waitFor();
+  if ((await toggle.getAttribute("aria-expanded")) === "false") {
+    await toggle.click();
+  }
+}
+
 // On a phone (<=900px) the rail is an off-canvas drawer opened from the
 // burger bar; on wider screens it is always visible and this is a no-op.
 async function openRailIfDrawer(page) {
@@ -64,4 +75,10 @@ async function openRailIfDrawer(page) {
   }
 }
 
-module.exports = { openApp, openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer };
+module.exports = {
+  openApp,
+  openAsSignedInUser,
+  SAMPLE_CONTACTS,
+  openRailIfDrawer,
+  expandCasePanel,
+};
