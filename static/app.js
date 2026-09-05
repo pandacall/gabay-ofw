@@ -590,6 +590,40 @@ function contactCardHtml(card) {
   </div>`;
 }
 
+// DISPATCHER's replies are markdown-flavoured prose — Gemini's own choice
+// of bold leads, one-line italic citations, and warning lists — which
+// used to render as a single collapsed line of literal asterisks
+// (`white-space: normal` swallows her paragraph and list newlines, and
+// nothing turned `**`/`*` into emphasis). Every raw line is escaped
+// before any tag is inserted, so nothing in her words or the model's
+// reply can reach the DOM as real markup; only paragraphs, `*`/`-` and
+// `1.` lists, and `**bold**`/`*italic*` spans are restructured.
+function inlineReplyMarkup(raw) {
+  return escapeHtml(raw)
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
+function replyMarkupHtml(text) {
+  const paragraphs = String(text).replace(/\r\n/g, "\n").trim().split(/\n{2,}/);
+  return paragraphs
+    .map((paragraph) => {
+      const lines = paragraph.split("\n").map((line) => line.trim()).filter(Boolean);
+      const isBulleted = lines.length > 0 && lines.every((line) => /^[*-]\s+/.test(line));
+      const isNumbered = lines.length > 0 && lines.every((line) => /^\d+[.)]\s+/.test(line));
+      if (isBulleted || isNumbered) {
+        const tag = isNumbered ? "ol" : "ul";
+        const items = lines
+          .map((line) => line.replace(/^(?:[*-]|\d+[.)])\s+/, ""))
+          .map((item) => `<li>${inlineReplyMarkup(item)}</li>`)
+          .join("");
+        return `<${tag} class="reply-list">${items}</${tag}>`;
+      }
+      return `<p>${inlineReplyMarkup(lines.join(" "))}</p>`;
+    })
+    .join("");
+}
+
 function chatMessageHtml(message) {
   if (message.kind === "card") {
     return contactCardHtml(message.card || {});
@@ -619,9 +653,13 @@ function chatMessageHtml(message) {
   }
   // A plain reply gets the "reply" class so the rotated pine mark renders
   // before it (styles.css); the transient ack/error lines stay markless.
-  // `lang` is stamped when Gabay's reply is not English.
+  // `lang` is stamped when Gabay's reply is not English. Ack/error text is
+  // a fixed, code-owned string (never the model's own markdown-flavoured
+  // prose), so only a real reply goes through replyMarkupHtml.
+  const isPlainReply = message.kind !== "ack" && message.kind !== "error";
   const extra = message.kind === "ack" ? " ack" : message.kind === "error" ? " error" : " reply";
-  return `<div class="chat-message agent${extra}"${langAttr(message.lang)}>${escapeHtml(message.text)}</div>`;
+  const body = isPlainReply ? replyMarkupHtml(message.text) : escapeHtml(message.text);
+  return `<div class="chat-message agent${extra}"${langAttr(message.lang)}>${body}</div>`;
 }
 
 // The rail's Conversation list (issue #72). Rows are rendered from
