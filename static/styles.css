@@ -809,6 +809,20 @@ p { color: var(--body); line-height: 1.55; }
   background: var(--pine);
   transform: rotate(45deg);
 }
+/* replyMarkupHtml (app.js) restructures a reply's markdown-flavoured
+   prose into these — paragraphs and lists sit as ordinary flex children
+   of .chat-message.agent.reply, so its own 0.7rem gap carries the
+   rhythm; a browser's default p/ul margins would only double it. */
+.chat-message.agent.reply p,
+.chat-message.agent.reply .reply-list { margin: 0; }
+.chat-message.agent.reply strong { font-weight: 500; }
+.chat-message.agent.reply em { font-style: italic; color: var(--muted); }
+.chat-message.agent.reply .reply-list {
+  padding-left: 1.3rem;
+  display: grid;
+  gap: 0.5rem;
+}
+.chat-message.agent.reply .reply-list li::marker { color: var(--pine); }
 .chat-message.agent.ack,
 .chat-message.agent.trail {
   align-self: flex-start;
