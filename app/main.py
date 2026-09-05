@@ -6,13 +6,13 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from app.auth import FirebaseTokenVerifier, TokenVerifier, get_current_uid
-from app.chat import ChatService, stream_stateless_fallback
+from app.chat import ChatService, reply_text_from_line, stream_stateless_fallback
 from app.config import (
     get_firebase_web_config,
     get_gemini_api_key,
@@ -88,13 +88,16 @@ def _production_chat_service() -> ChatService:
 
     from app.agent import GEMINI_MODEL
     from app.firestore_session_service import FirestoreSessionService
+    from app.title import build_gemini_model_call
 
     api_key = get_gemini_api_key()
     if api_key is None:
         raise HTTPException(status_code=503, detail="Gemini API key not available")
+    client = genai.Client(api_key=api_key)
     return ChatService(
         session_service=FirestoreSessionService(firestore.Client()),
-        llm=Gemini(model=GEMINI_MODEL, client=genai.Client(api_key=api_key)),
+        llm=Gemini(model=GEMINI_MODEL, client=client),
+        title_model=build_gemini_model_call(client, GEMINI_MODEL),
     )
 
 
@@ -152,6 +155,7 @@ def create_app(
     @app.post("/api/chat")
     async def chat_turn(
         turn: ChatTurnIn,
+        background_tasks: BackgroundTasks,
         uid: str = Depends(get_current_uid),
         service: ChatService = Depends(get_chat_service),
     ):
@@ -169,9 +173,45 @@ def create_app(
             )
         if session is None:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # spec 2026-09-05-llm-conversation-titles: the one-time LLM
+        # Conversation-title attempt only ever fires on a Conversation's
+        # very first turn — decided here, before the turn runs, from
+        # whether any event already exists on the session. Her reply
+        # text is only known once the stream below has actually produced
+        # it, so it's captured into this holder as the response streams
+        # and read back by the background task, which Starlette runs
+        # only after the full response has been sent — never delaying
+        # her reply.
+        is_first_turn = not session.events
+        title_ctx: dict[str, str] = {}
+
+        async def _stream():
+            async for line in service.stream_turn(
+                uid=uid, session=session, text=turn.text
+            ):
+                if is_first_turn:
+                    reply_text = reply_text_from_line(line)
+                    if reply_text is not None:
+                        title_ctx["reply_text"] = reply_text
+                yield line
+
+        if is_first_turn:
+
+            async def _generate_title():
+                await service.maybe_generate_title(
+                    uid=uid,
+                    session_id=session.id,
+                    user_text=turn.text,
+                    reply_text=title_ctx.get("reply_text", ""),
+                )
+
+            background_tasks.add_task(_generate_title)
+
         return StreamingResponse(
-            service.stream_turn(uid=uid, session=session, text=turn.text),
+            _stream(),
             media_type="application/x-ndjson",
+            background=background_tasks,
         )
 
     @app.post("/api/case/correct")

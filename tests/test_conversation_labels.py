@@ -9,9 +9,11 @@ from __future__ import annotations
 from app.labels import (
     CONVERSATION_LABEL,
     CONVERSATION_LABEL_SOURCE,
+    CONVERSATION_TITLE_LLM_ATTEMPTED,
     EMERGENCY_CONVERSATION,
     derive_label,
     label_state_delta,
+    llm_title_state_delta,
     rename_state_delta,
 )
 
@@ -99,4 +101,46 @@ class TestRename:
         assert rename_state_delta("my word for it") == {
             CONVERSATION_LABEL: "my word for it",
             CONVERSATION_LABEL_SOURCE: "user",
+        }
+
+
+class TestLlmTitleStateDelta:
+    """spec 2026-09-05-llm-conversation-titles: the one-time background
+    LLM title attempt's write. Always marks attempted; only ever WRITES
+    the label when one produced a safe title and none already exists —
+    it never overwrites a claims-derived label or her rename, and (per
+    that spec's explicit, accepted departure from the old invariant) it
+    is NOT excluded for the Emergency Conversation.
+    """
+
+    def test_writes_label_and_marks_attempted_on_success(self):
+        assert llm_title_state_delta({}, "Unpaid wages, several months") == {
+            CONVERSATION_TITLE_LLM_ATTEMPTED: True,
+            CONVERSATION_LABEL: "Unpaid wages, several months",
+            CONVERSATION_LABEL_SOURCE: "llm",
+        }
+
+    def test_marks_attempted_only_when_title_is_none(self):
+        assert llm_title_state_delta({}, None) == {
+            CONVERSATION_TITLE_LLM_ATTEMPTED: True,
+        }
+
+    def test_never_overwrites_an_existing_derived_label(self):
+        state = {CONVERSATION_LABEL: "wages", CONVERSATION_LABEL_SOURCE: "derived"}
+        delta = llm_title_state_delta(state, "Passport concerns")
+        assert delta == {CONVERSATION_TITLE_LLM_ATTEMPTED: True}
+
+    def test_never_overwrites_her_rename(self):
+        state = {CONVERSATION_LABEL: "the passport one", CONVERSATION_LABEL_SOURCE: "user"}
+        delta = llm_title_state_delta(state, "Passport concerns")
+        assert delta == {CONVERSATION_TITLE_LLM_ATTEMPTED: True}
+
+    def test_not_excluded_for_the_emergency_conversation(self):
+        # Deliberate departure from label_state_delta's EMERGENCY_CONVERSATION
+        # exclusion — see the spec for the accepted risk.
+        state = {EMERGENCY_CONVERSATION: True}
+        assert llm_title_state_delta(state, "General inquiry") == {
+            CONVERSATION_TITLE_LLM_ATTEMPTED: True,
+            CONVERSATION_LABEL: "General inquiry",
+            CONVERSATION_LABEL_SOURCE: "llm",
         }

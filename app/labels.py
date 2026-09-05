@@ -55,6 +55,13 @@ LISTING_STATE_KEYS: tuple[str, ...] = (
 #: while present, no topic label is ever derived for this Conversation.
 EMERGENCY_CONVERSATION = "emergency_conversation"
 
+#: Session-scoped marker (spec 2026-09-05-llm-conversation-titles): set
+#: once the one-time background LLM title attempt has run, regardless of
+#: outcome, so it is never retried on a later turn. Unlike
+#: ``EMERGENCY_CONVERSATION``, this one does NOT gate the LLM attempt —
+#: see ``llm_title_state_delta``.
+CONVERSATION_TITLE_LLM_ATTEMPTED = "conversation_title_llm_attempted"
+
 #: Fixed precedence — first match wins, so a turn touching several claims
 #: is deterministic. Each entry is ``(label key, claim fields that fire
 #: it)``. ``country`` and ``location_now`` appear nowhere: excluded by
@@ -114,6 +121,34 @@ def label_state_delta(
         CONVERSATION_LABEL: label,
         CONVERSATION_LABEL_SOURCE: "derived",
     }
+
+
+def llm_title_state_delta(
+    session_state: dict[str, Any] | None, title: str | None
+) -> dict[str, Any]:
+    """The session-state delta for the one-time background LLM title
+    attempt's outcome (spec 2026-09-05-llm-conversation-titles).
+
+    Always marks the attempt done, so it is never retried. Writes the
+    label itself only when ``title`` is not ``None`` (the caller's
+    ``app.title.generate_title`` already ran it through the
+    deterministic safety filter and retried internally) AND no label
+    already exists — the write-once latch here is identical to
+    ``label_state_delta``'s, so whichever of the two writes first for a
+    given Conversation wins and the other becomes a no-op.
+
+    Deliberately NOT excluded for the Emergency Conversation: this is an
+    explicit, accepted departure from ``label_state_delta``'s
+    ``EMERGENCY_CONVERSATION`` exclusion (see the spec) — the riskiest
+    Conversations rely on ``app.title.is_title_safe`` like every other
+    Conversation, rather than being hard-excluded from generation.
+    """
+    delta: dict[str, Any] = {CONVERSATION_TITLE_LLM_ATTEMPTED: True}
+    state = session_state or {}
+    if title and not state.get(CONVERSATION_LABEL):
+        delta[CONVERSATION_LABEL] = title
+        delta[CONVERSATION_LABEL_SOURCE] = "llm"
+    return delta
 
 
 def rename_state_delta(label: str) -> dict[str, str]:
