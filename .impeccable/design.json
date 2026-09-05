@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-04T09:25:25.439Z",
+  "generatedAt": "2026-09-06T00:00:00.000Z",
   "title": "Design System: Gabay OFW",
   "extensions": {
     "themeStrategy": "Light default in the frontmatter is normative. Dark is a :root token swap under @media (prefers-color-scheme: dark) — no per-component overrides, no in-app toggle. `dark` below is the dark-mode value of each token.",
@@ -136,6 +136,12 @@
         "canonical": "#6e7370",
         "dark": "#93989b"
       },
+      "dim": {
+        "role": "neutral",
+        "displayName": "Dim",
+        "canonical": "#8c918d",
+        "dark": "#6d7174"
+      },
       "flag-blue": {
         "role": "tertiary",
         "displayName": "Flag Blue (light only)",
@@ -192,7 +198,7 @@
       },
       "caption": {
         "displayName": "Caption",
-        "purpose": "Dense sub-body tier (0.78-0.95rem, centered on 0.88): card reason lines, contact labels, trust line, timestamps, ack/trail status."
+        "purpose": "Dense sub-body tier (0.78-0.95rem, centered on 0.88): card reason lines, contact labels, trust line, timestamps, the ack status line, the Case panel title."
       },
       "label": {
         "displayName": "Label",
@@ -208,12 +214,12 @@
       {
         "name": "sm",
         "value": "0 1px 3px rgba(31,31,31,.08), 0 6px 18px rgba(31,31,31,.06)",
-        "purpose": "Default floating surface: cards, calm emergency pill, quiet buttons, in-thread Case block."
+        "purpose": "Default floating surface: cards, calm emergency pill, quiet buttons, the Case panel (side card)."
       },
       {
         "name": "md",
         "value": "0 1px 3px rgba(31,31,31,.08), 0 12px 34px rgba(31,31,31,.08)",
-        "purpose": "The composer, and the hover state of an sm surface."
+        "purpose": "The composer, the hover state of an sm surface, and the Case panel when it drops as a sheet on a narrow screen."
       },
       {
         "name": "lg",
@@ -240,13 +246,22 @@
       {
         "name": "pulse",
         "value": "1.1s ease-in-out infinite",
-        "purpose": "Loader dots (auth, screen, typing indicator)."
+        "purpose": "The three loader dots — auth screen, screen transitions, and the loading animation under the transcript while a reply streams."
+      },
+      {
+        "name": "case-panel-reveal",
+        "value": "opacity 0.16s ease, transform 0.16s ease",
+        "purpose": "The Case panel body fading and rising in on expand; chevron rotates 0.18s. Height snaps, no layout property is animated. Instant under prefers-reduced-motion."
       }
     ],
     "breakpoints": [
       {
         "name": "rail-collapse",
         "value": "900px"
+      },
+      {
+        "name": "case-panel",
+        "value": "1200px"
       }
     ]
   },
@@ -292,12 +307,28 @@
       "css": ".ds-agent-reply { align-self:flex-start; max-width:40rem; display:flex; flex-direction:column; gap:.7rem; color:#1f1f1f; font:400 1.08rem/1.62 'Figtree',system-ui,sans-serif; } .ds-agent-reply::before { content:''; width:.95rem; height:.95rem; border-radius:4px; background:#1f5e4a; transform:rotate(45deg); }"
     },
     {
+      "name": "Loading Animation",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The whole of the in-flight feedback while a reply streams: three pulsing pine dots where the reply will land, left-aligned in the thread. Replaces the old visible Progress Trail text (the backend still emits code-owned trail labels; the client no longer renders them). Clears the instant the reply arrives. Freezes to a static dimmed row under prefers-reduced-motion.",
+      "html": "<div class=\"ds-typing\" aria-hidden=\"true\"><span></span><span></span><span></span></div>",
+      "css": ".ds-typing { align-self:flex-start; display:flex; flex-direction:row; gap:.35rem; align-items:center; } .ds-typing span { width:.5rem; height:.5rem; border-radius:50%; background:#1f5e4a; animation:ds-pulse 1.1s ease-in-out infinite; } .ds-typing span:nth-child(2) { animation-delay:.15s; } .ds-typing span:nth-child(3) { animation-delay:.3s; } @keyframes ds-pulse { 0%,80%,100% { opacity:.25; transform:scale(.85); } 40% { opacity:1; transform:scale(1); } } @media (prefers-reduced-motion:reduce) { .ds-typing span { animation:none; opacity:.55; transform:none; } }"
+    },
+    {
       "name": "Contact Card",
       "kind": "card",
       "refersTo": "card",
       "description": "A findings / routing card that renders inside the thread. Title, optional reason line, phone rows on the recessed faint fill, optional urgent hold-line in red.",
       "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Saudi Arabia — Real offices that can help</h3><p class=\"ds-card-reason\">We are rendering from cache.</p><ul class=\"ds-card-list\"><li class=\"ds-card-row\"><span class=\"ds-card-label\">MWO Riyadh (Migrant Workers Office)</span><a class=\"ds-card-phone\" href=\"#\">+966 50 285 0944</a></li></ul><p class=\"ds-card-hold\">Do not leave before speaking to the MWO.</p></div>",
       "css": ".ds-card { align-self:flex-start; max-width:30rem; background:#fff; border-radius:24px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 6px 18px rgba(31,31,31,.06); padding:1.15rem 1.3rem; font:400 1rem/1.55 'Figtree',system-ui,sans-serif; } .ds-card-title { margin:0 0 .3rem; font-weight:500; font-size:1.05rem; color:#1f1f1f; } .ds-card-reason { margin:0 0 .85rem; font-size:.9rem; color:#6e7370; } .ds-card-list { list-style:none; margin:0; padding:0; display:grid; gap:.5rem; } .ds-card-row { display:flex; flex-direction:column; gap:.15rem; padding:.7rem .9rem; border-radius:13px; background:#f1f1ee; } .ds-card-label { font-size:.82rem; color:#6e7370; } .ds-card-phone { font-weight:500; color:#1f5e4a; text-decoration:none; } .ds-card-hold { margin:.85rem 0 0; font-size:.88rem; color:#a30e1f; }"
+    },
+    {
+      "name": "Case Panel",
+      "kind": "custom",
+      "refersTo": "case-panel",
+      "description": "\"What Gabay has understood\" — the one panel of chrome the conversation adds. A dim title-bar button (chevron) over correctable claim rows and Safety-Flag pills (same rows as the old in-thread block; one-tap Conflict resolution lives here). Fixed top-right below the emergency pill above 1200px, with the thread reserving a matching right gutter; a centred pill that drops a floating sheet on tap at or below 1200px. Collapsed it is a pill, expanded a card. No flag red: Safety-Flag rows keep the tint-urgent wash. Shown only on the home screen, only with Case content, never during the Imminent Danger latch.",
+      "html": "<div class=\"ds-case is-expanded\"><button class=\"ds-case-toggle\" aria-expanded=\"true\"><span>What Gabay has understood</span><span class=\"ds-case-chevron\" aria-hidden=\"true\"><svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M6 9l6 6 6-6\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span></button><div class=\"ds-case-body\"><div class=\"ds-case-claim\"><span class=\"ds-case-field\">months unpaid</span><span class=\"ds-case-value\">3</span></div><h3 class=\"ds-case-h3\">Safety notes</h3><span class=\"ds-case-flag\">passport withheld</span></div></div>",
+      "css": ".ds-case { width:20rem; background:#fff; border-radius:24px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 6px 18px rgba(31,31,31,.06); font:400 1rem/1.55 'Figtree',system-ui,sans-serif; } .ds-case:not(.is-expanded) { border-radius:999px; } .ds-case-toggle { display:flex; align-items:center; justify-content:space-between; gap:.5rem; width:100%; padding:.85rem 1rem .85rem 1.15rem; border:none; background:none; font:500 .8rem 'Figtree',system-ui,sans-serif; color:#6e7370; text-align:left; cursor:pointer; transition:color .14s ease; } .ds-case-toggle:hover { color:#1f1f1f; } .ds-case-toggle:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; } .ds-case-chevron { flex-shrink:0; display:grid; place-items:center; color:#8c918d; transition:transform .18s ease; } .ds-case-chevron svg { width:.9rem; height:.9rem; display:block; } .ds-case.is-expanded .ds-case-chevron { transform:rotate(180deg); } .ds-case-body { max-height:min(58vh,30rem); overflow-y:auto; padding:0 1.15rem 1.2rem; display:flex; flex-direction:column; gap:.6rem; transition:opacity .16s ease,transform .16s ease; } .ds-case:not(.is-expanded) .ds-case-body { max-height:0; padding-top:0; padding-bottom:0; opacity:0; transform:translateY(-.4rem); overflow:hidden; visibility:hidden; } .ds-case-claim { padding:.6rem .8rem; border-radius:13px; background:#f1f1ee; } .ds-case-field { display:block; font-size:.72rem; text-transform:capitalize; color:#6e7370; margin-bottom:.2rem; } .ds-case-value { font-size:.9rem; color:#1f1f1f; } .ds-case-h3 { margin:.3rem 0 0; font-size:.8rem; font-weight:500; color:#6e7370; } .ds-case-flag { padding:.5rem .75rem; border-radius:13px; background:rgba(206,17,38,.07); color:#a30e1f; font-size:.84rem; text-transform:capitalize; }"
     },
     {
       "name": "Emergency Pill",
@@ -326,7 +357,7 @@
   ],
   "narrative": {
     "northStar": "One Surface, One Glow, One Bar",
-    "overview": "Gabay OFW is one calm surface an Overseas Filipino Worker talks to — often on a watched phone, in the middle of a bad situation, with a narrow window to act. The design borrows the shape of an assistant she already trusts how to use: a near-white ground, white lifted on soft shadow, a floating input at the foot of the screen. Everything that could be a border has been taken away; the only things that separate one region from another are a shadow and a stretch of empty space. Underneath that borrowed calm, the warmth is unmistakably hers — one diffuse glow drawn from the Philippine flag's blue, red and gold pools behind the greeting, the mark is a plain rotated square in pine green, and the first word is \"Kumusta\". The aesthetic is borrowed; the brand is not.\n\nThe system is built by radical subtraction. There is one ground color, not a palette of surfaces. There is one glow, and it fades the moment a conversation starts so it never competes with what Gabay is saying. There is one input, and it never leaves the screen — findings, contact cards, and the record of what Gabay understood all arrive inside the thread rather than on a screen she has to navigate to. Stillness is the feature. Type is large and light, weight 400 for even the biggest headings, so nothing on the page raises its voice.\n\nExactly one thing is allowed to break the calm: flag red. It marks the EMERGENCY exit, the delete-everything action, and an urgent finding — and nothing else, ever. Its rarity is what makes it legible under stress. The explicit anti-reference is a generic assistant blue: the glow is the flag's #0038a8, never a borrowed brand color, and the design never leans on another product's identity to feel trustworthy.",
+    "overview": "Gabay OFW is one calm surface an Overseas Filipino Worker talks to — often on a watched phone, in the middle of a bad situation, with a narrow window to act. The design borrows the shape of an assistant she already trusts how to use: a near-white ground, white lifted on soft shadow, a floating input at the foot of the screen. Everything that could be a border has been taken away; the only things that separate one region from another are a shadow and a stretch of empty space. Underneath that borrowed calm, the warmth is unmistakably hers — one diffuse glow drawn from the Philippine flag's blue, red and gold pools behind the greeting, the mark is a plain rotated square in pine green, and the first word is \"Kumusta\". The aesthetic is borrowed; the brand is not.\n\nThe system is built by radical subtraction. There is one ground color, not a palette of surfaces. There is one glow, and it fades the moment a conversation starts so it never competes with what Gabay is saying. There is one input, and it never leaves the screen — findings and contact cards arrive inside the thread rather than on a screen she has to navigate to. The one panel of chrome the conversation adds is \"What Gabay has understood\": a quiet card top-right (a pill that drops a sheet on a narrow screen), collapsible and out of the way, so the record of her Case is one glance away without sitting in the reading column. Stillness is the feature. Type is large and light, weight 400 for even the biggest headings, so nothing on the page raises its voice.\n\nExactly one thing is allowed to break the calm: flag red. It marks the EMERGENCY exit, the delete-everything action, and an urgent finding — and nothing else, ever. Its rarity is what makes it legible under stress. The explicit anti-reference is a generic assistant blue: the glow is the flag's #0038a8, never a borrowed brand color, and the design never leans on another product's identity to feel trustworthy.",
     "keyCharacteristics": [
       "Single near-white ground (#fbfbfa); white (#ffffff) only for surfaces that float",
       "Zero borders in the current implementation — shadow and space do all separation",
@@ -371,6 +402,11 @@
         "name": "The Glow-Recedes Rule",
         "body": "The .ph-glow layer is decoration that must never compete with content. It is present and saturated on the empty home screen and animates to opacity: 0 (0.5s ease) the instant the thread has a message.",
         "section": "elevation"
+      },
+      {
+        "name": "The Quiet-Motion Rule",
+        "body": "Motion is state feedback, never spectacle — shadow and color shifts under 150ms, one glow fade, three pulsing loader dots. Under prefers-reduced-motion the loader dots freeze to a static dimmed row, the glow fade and control transitions cut to instant, and smooth-scroll is dropped — the state change survives, the animation does not.",
+        "section": "elevation"
       }
     ],
     "dos": [
@@ -378,7 +414,7 @@
       "Do separate regions with space, then a one-shade ground shift, then a two-layer shadow — in that order.",
       "Do set headings at weight 400 and create hierarchy with size and negative tracking (-0.01em to -0.015em).",
       "Do keep the reading column near 47rem and agent replies near 40rem, even on a wide screen.",
-      "Do render findings, contact cards, and the Case as messages inside the thread; the composer must stay visible while she reads them.",
+      "Do render findings and contact cards as messages inside the thread; the composer must stay visible while she reads them. The Case is the one exception — it has its own quiet panel.",
       "Do use the rotated pine square as the only geometric motif — brand mark and agent speaker mark, always pine.",
       "Do keep the emergency affordance always on screen and on the zero-model path, however quiet it looks."
     ],

@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
-const { openAsSignedInUser, SAMPLE_CONTACTS, openRailIfDrawer } = require("./test-helpers");
+const {
+  openAsSignedInUser,
+  SAMPLE_CONTACTS,
+  openRailIfDrawer,
+  expandCasePanel,
+} = require("./test-helpers");
 
 // issue #72 (ADR-0008): many Conversations she can leave and return to,
 // sharing one Case. These drive the rail + transcript UI with every
@@ -117,7 +122,8 @@ test("opening a conversation from the rail restores its transcript and cards", a
   await expect(page.locator(".chat-message.user")).toContainText("not been paid");
   await expect(page.locator(".contact-card")).toContainText("Real offices that can help");
   await expect(page.locator(".chat-message.agent").last()).toContainText("These offices can help");
-  await expect(page.locator(".case-inline")).toContainText("months unpaid");
+  await expandCasePanel(page);
+  await expect(page.locator(".case-panel-body")).toContainText("months unpaid");
 });
 
 test("a re-opened turn with a past plan card shows one 'view current plan' line, not an actionable card", async ({

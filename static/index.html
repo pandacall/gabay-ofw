@@ -91,6 +91,26 @@
       </button>
     </div>
 
+    <!-- "What Gabay has understood" (issue #44): the Case in its own
+         panel, not folded into the thread. It sits OUTSIDE #screen so the
+         thread's own scroll never clips it and it survives every
+         re-render — a quiet card fixed top-right on a wide screen, a
+         centred pill that expands on tap on a phone. refreshCasePanel()
+         in app.js owns its visibility (home screen only, once the Case
+         carries a claim or a Safety Flag, and never while the Imminent
+         Danger latch is live) and fills #case-panel-body from the same
+         chatCaseHtml() the in-thread block used, so every one-tap
+         correction and Conflict control keeps working unchanged. -->
+    <div id="case-panel" class="case-panel hidden">
+      <button class="case-panel-toggle" type="button" data-action="toggle-case-panel" aria-expanded="true" aria-controls="case-panel-body">
+        <span class="case-panel-label" data-copy="caseTitle"></span>
+        <span class="case-panel-chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+      </button>
+      <div class="case-panel-body" id="case-panel-body"></div>
+    </div>
+
     <!-- Mobile only (<=900px): the rail is an off-canvas drawer, opened
          from this bar — a burger + wordmark, Gemini-style. On wider
          screens the rail is always visible and this bar is display:none. -->
@@ -109,10 +129,10 @@
          list (#72), and account controls. Always visible on wide
          screens; an off-canvas drawer on a phone (opened from the burger
          above). A flat panel one shade off the page — separation is the
-         ground colour, never a line or shadow. The right-hand Case panel
-         is gone — "what Gabay knows" folds into the thread. Never
-         "check": CONTEXT.md reserves that word for the verb Gabay
-         performs inside a Conversation. -->
+         ground colour, never a line or shadow. "What Gabay has
+         understood" is #case-panel above, top-right; the rail carries
+         navigation only. Never "check": CONTEXT.md reserves that word for
+         the verb Gabay performs inside a Conversation. -->
     <aside class="rail" id="rail" aria-label="Gabay OFW navigation">
       <button class="rail-close" type="button" data-action="close-rail" data-copy-aria="closeLabel">
         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>

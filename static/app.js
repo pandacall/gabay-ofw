@@ -451,11 +451,6 @@ const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let conversations = [];
 let pendingDeleteSessionId = null;
 let pendingRenameSessionId = null;
-// The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
-// shown while a turn runs, never part of chatMessages/the transcript —
-// cleared as soon as the "reply" line lands (see handleChatLine) and
-// again defensively in sendChatTurn's finally block.
-let chatTrail = [];
 // The language Gabay replies in for this Conversation (issue #67 closed
 // set), derived from the Case's detected input language. Used only to
 // stamp `lang` on non-English message text so a screen reader voices
@@ -472,6 +467,21 @@ let forceMessageRerender = false;
 // pressing the button / confirming an Escalation Prompt); cleared by
 // mark_safe and when switching to another Conversation.
 let emergencyLatchActive = false;
+
+// "What Gabay has understood" (issue #44) is its own panel now, not a
+// block folded into the thread. Above 1200px it is a fixed side card;
+// at or below that it is a centred pill that drops a sheet on tap. This
+// holds the expanded/collapsed choice, persisted per browser — default
+// open where it is the side card, collapsed where it is the pill.
+const CASE_PANEL_KEY = "gabay-case-panel";
+const casePanelIsSheet = () =>
+  window.matchMedia("(max-width: 1199px)").matches;
+let casePanelExpanded = (() => {
+  const stored = localStorage.getItem(CASE_PANEL_KEY);
+  if (stored === "open") return true;
+  if (stored === "closed") return false;
+  return !casePanelIsSheet();
+})();
 
 // Map the Case's free-form detected language onto the reply language.
 function replyLangFrom(value) {
@@ -770,7 +780,6 @@ async function openConversation(sessionId) {
   chatSessionId = sessionId;
   chatMessages = [];
   chatCase = {};
-  chatTrail = [];
   chatReplyLang = "en";
   // The latch is per-Conversation (ADR-0009): assume not-emergency until
   // this thread's replay says otherwise (a leading `emergency_latch` line).
@@ -791,7 +800,6 @@ async function openConversation(sessionId) {
   } catch {
     chatMessages.push({ role: "agent", kind: "error", text: t("chatError") });
   } finally {
-    chatTrail = [];
     refreshChatScreen();
     document.getElementById("chat-messages")?.setAttribute("aria-busy", "false");
   }
@@ -804,7 +812,6 @@ function newConversation() {
   chatSessionId = null;
   chatMessages = [];
   chatCase = {};
-  chatTrail = [];
   chatReplyLang = "en";
   emergencyLatchActive = false;
   editingCaseField = null;
@@ -865,27 +872,18 @@ function chatBubblesHtml(messages) {
   return messages.map(chatMessageHtml).join("");
 }
 
-// The transient tail under the transcript: the Progress Trail / typing
-// indicator (issue #75, ADR-0010 — code-owned, never part of the
-// transcript) and the "What Gabay knows" Case block (issue #44 — folded
-// into the thread, pinned below the last message). This is rebuilt on
-// every refresh; the bubbles above it are appended, not re-rendered, so
-// a long transcript does not re-parse on every stream line.
+// The transient tail under the transcript: just the loading animation
+// now — three pulsing dots where Gabay's reply will land, shown for the
+// whole time a turn is in flight. The backend still emits code-owned
+// Progress Trail labels (ADR-0010), but they are no longer surfaced as
+// text; the animation is the whole of the in-flight feedback. "What
+// Gabay has understood" (issue #44) has moved out of the thread into its
+// own panel — see #case-panel / refreshCasePanel. Rebuilt on every
+// refresh; the bubbles above it are appended, not re-rendered.
 function chatTailHtml() {
-  const trail = chatTrail.length
-    ? chatTrail
-        .map(
-          (label) => `<div class="chat-message agent trail"${langAttr(chatReplyLang)}>${escapeHtml(label)}</div>`,
-        )
-        .join("")
-    : "";
-  const typing = chatBusy && !chatTrail.length
+  return chatBusy
     ? '<div class="chat-message agent typing" aria-hidden="true"><span></span><span></span><span></span></div>'
     : "";
-  const caseBlock = caseHasContent()
-    ? `<div class="case-inline" id="chat-case"><p class="case-inline-title">${t("caseTitle")}</p>${chatCaseHtml()}</div>`
-    : "";
-  return trail + typing + caseBlock;
 }
 
 function messagesInnerHtml() {
@@ -1020,6 +1018,7 @@ function caseHasContent() {
 
 function refreshChatScreen() {
   refreshEmergencyControls();
+  refreshCasePanel();
   if (currentScreen !== "home") return;
   const shell = document.querySelector(".home-shell");
   if (shell) shell.classList.toggle("has-messages", chatMessages.length > 0);
@@ -1051,6 +1050,41 @@ function refreshChatScreen() {
   }
   const sendButton = document.querySelector('.composer-pill button[type="submit"]');
   if (sendButton) sendButton.disabled = chatBusy;
+}
+
+// "What Gabay has understood" (issue #44): its own panel, outside #screen
+// so it survives every re-render and is never clipped by the thread's
+// scroll. Shown only on the home screen, only once the Case carries a
+// claim or a flag, and never while the Imminent Danger latch is live —
+// during a crisis the screen stays about the exit, not a data panel
+// (and that also keeps it clear of the stacked "I'm safe" pill). All the
+// correction / conflict controls inside it are the same markup as before
+// (chatCaseHtml) and reached by the same global data-action delegation.
+function refreshCasePanel() {
+  const panel = document.getElementById("case-panel");
+  if (!panel) return;
+  const show =
+    currentScreen === "home" && caseHasContent() && !emergencyLatchActive;
+  panel.classList.toggle("hidden", !show);
+  app.classList.toggle("case-visible", show);
+  app.classList.toggle("case-open", show && casePanelExpanded);
+  if (!show) return;
+  panel.classList.toggle("is-expanded", casePanelExpanded);
+  panel
+    .querySelector(".case-panel-toggle")
+    ?.setAttribute("aria-expanded", String(casePanelExpanded));
+  const body = document.getElementById("case-panel-body");
+  if (body) body.innerHTML = chatCaseHtml();
+}
+
+// Toggling remembers the choice per browser: someone who wants the panel
+// always open (or always out of the way) gets that on every visit.
+function setCasePanelExpanded(next) {
+  casePanelExpanded = next;
+  try {
+    localStorage.setItem(CASE_PANEL_KEY, next ? "open" : "closed");
+  } catch {}
+  refreshCasePanel();
 }
 
 // The Imminent Danger latch is Conversation state now (ADR-0009): the
@@ -1085,7 +1119,6 @@ async function sendChatTurn(text) {
   if (chatBusy || !auth?.currentUser) return;
   chatBusy = true;
   chatMessages.push({ role: "user", text });
-  chatTrail = [];
   refreshChatScreen();
   try {
     const token = await auth.currentUser.getIdToken();
@@ -1100,9 +1133,6 @@ async function sendChatTurn(text) {
     chatMessages.push({ role: "agent", kind: "error", text: t("chatError") });
   } finally {
     chatBusy = false;
-    // Defensive: the trail is transient and must never outlive the turn
-    // even if the stream broke before a "reply" line ever arrived.
-    chatTrail = [];
     refreshChatScreen();
     // Refresh the rail (issue #72): her first message in a fresh thread
     // just created a Conversation, and any turn moves its row to the top
@@ -1132,14 +1162,13 @@ function handleChatLine(line) {
     // A past deadline-bearing Plan card, collapsed (issue #72, ADR-0006).
     chatMessages.push({ role: "agent", kind: "stale-plan" });
   } else if (line.type === "trail") {
-    // The Progress Trail (issue #75, ADR-0010): fixed, code-owned labels
-    // of what the app is doing, transient — never pushed to
-    // chatMessages, so it never becomes part of the transcript.
-    if (line.text) chatTrail.push(line.text);
+    // ADR-0010: the backend still emits fixed, code-owned Progress Trail
+    // labels of what the app is doing, but they are no longer shown as
+    // text — the loading animation under the transcript is the whole of
+    // the in-flight feedback. Kept as an explicit branch so the line type
+    // stays recognised (and so the seam that lets the two halves ship
+    // independently is documented, not silently dropped).
   } else if (line.type === "reply") {
-    // Cleared the moment the reply lands (ADR-0010): the trail's job is
-    // done once she has something to read.
-    chatTrail = [];
     if (line.text) chatMessages.push({ role: "agent", text: line.text, lang: lineLang });
   } else if (line.type === "card") {
     // The card is fixed app data rendered outside the LLM text (ADR-0002).
@@ -1218,6 +1247,9 @@ function renderScreen(name = currentScreen) {
     renderedMessageCount = chatMessages.length;
     forceMessageRerender = false;
   }
+  // The Case panel lives outside #screen; keep it in step with the route
+  // (hidden on profile, back on home).
+  refreshCasePanel();
   // Focus is moved to #screen only on an explicit route change (see
   // navigate), never on the first render or a re-render — otherwise a
   // keyboard user who just signed in can never tab *back* to the skip
@@ -1291,7 +1323,6 @@ async function pressEmergencyButton() {
   chatSessionId = null;
   chatMessages = [];
   chatCase = {};
-  chatTrail = [];
   emergencyLatchActive = false;
   forceMessageRerender = true;
   refreshChatScreen();
@@ -1466,6 +1497,10 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
+  if (action === "toggle-case-panel") {
+    setCasePanelExpanded(!casePanelExpanded);
+    return;
+  }
   if (action === "toggle-rail") {
     setRailOpen(!app.classList.contains("rail-open"));
     return;
@@ -1532,10 +1567,19 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (action === "view-current-plan") {
-    // The one live Plan / Case surface is #77's; for now, take her to
-    // "What Gabay knows", the Case block folded into the thread.
-    (document.getElementById("chat-case") || document.getElementById("chat-messages"))
-      ?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "end" });
+    // The one live Plan / Case surface is #77's; for now, open "What Gabay
+    // has understood" so she can see the claims on file.
+    if (caseHasContent()) {
+      setCasePanelExpanded(true);
+      document
+        .getElementById("case-panel")
+        ?.querySelector(".case-panel-toggle")
+        ?.focus();
+    } else {
+      document
+        .getElementById("chat-messages")
+        ?.scrollIntoView({ behavior: reduceMotion.matches ? "auto" : "smooth", block: "end" });
+    }
     return;
   }
   if (action === "home" && currentScreen === "home") {
@@ -1551,6 +1595,25 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && app.classList.contains("rail-open")) {
     setRailOpen(false);
   }
+});
+
+// The Case panel collapses on Escape while focus is inside it, and —
+// wherever it opens as a floating sheet over the thread (<=1199px) — on a
+// tap anywhere outside it. Focus returns to the toggle so a keyboard
+// user is never stranded.
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !casePanelExpanded) return;
+  const panel = document.getElementById("case-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  if (!panel.contains(document.activeElement)) return;
+  setCasePanelExpanded(false);
+  panel.querySelector(".case-panel-toggle")?.focus();
+});
+document.addEventListener("click", (event) => {
+  if (!casePanelExpanded || !casePanelIsSheet()) return;
+  const panel = document.getElementById("case-panel");
+  if (!panel || panel.classList.contains("hidden")) return;
+  if (!panel.contains(event.target)) setCasePanelExpanded(false);
 });
 
 // The composer has no Send button — the mic is the submit control and
@@ -1678,6 +1741,7 @@ if (auth) {
       if (renameConversationDialog.open) renameConversationDialog.close();
       app.classList.remove("rail-open");
       refreshEmergencyControls();
+      refreshCasePanel();
       return;
     }
     userName = user.displayName || user.email || "";

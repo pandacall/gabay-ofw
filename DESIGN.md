@@ -122,6 +122,11 @@ components:
     textColor: "{colors.urgent}"
     rounded: "{rounded.pill}"
     padding: "0.6rem 1rem"
+  case-panel:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.muted}"
+    rounded: "{rounded.lg}"
+    padding: "0.85rem 1.15rem"
   input-field:
     backgroundColor: "{colors.faint}"
     textColor: "{colors.ink}"
@@ -149,9 +154,12 @@ first word is "Kumusta". The aesthetic is borrowed; the brand is not.
 The system is built by radical subtraction. There is one ground color, not a
 palette of surfaces. There is one glow, and it fades the moment a conversation
 starts so it never competes with what Gabay is saying. There is one input, and
-it never leaves the screen — findings, contact cards, and the record of what
-Gabay understood all arrive inside the thread rather than on a screen she has to
-navigate to. Stillness is the feature. Type is large and light, weight 400 for
+it never leaves the screen — findings and contact cards arrive inside the
+thread rather than on a screen she has to navigate to. The one panel of chrome
+the conversation adds is "What Gabay has understood": a quiet card top-right (a
+pill that drops a sheet on a narrow screen), collapsible and out of the way, so
+the record of her Case is one glance away without sitting in the reading column.
+Stillness is the feature. Type is large and light, weight 400 for
 even the biggest headings, so nothing on the page raises its voice.
 
 Exactly one thing is allowed to break the calm: flag red. It marks the
@@ -284,7 +292,8 @@ be justified — the "G" in the Sign-in-with-Google button — still uses Figtre
   answer reads like prose, not a notification.
 - **Body** (400, `1rem`, 1.55): paragraph copy, supporting lines, form values.
 - **Caption** (400, `~0.88rem`, 1.5): the dense sub-body tier — a card's reason
-  line, contact-row labels, the trust line, timestamps, ack/trail status text.
+  line, contact-row labels, the trust line, timestamps, the ack status line,
+  the Case panel title.
   In practice this floats between `0.78rem` and `0.95rem` depending on density;
   treat `0.88rem` as its center, not a hard step.
 - **Label** (500, `0.8rem`): rail headings, the profile eyebrow (uppercase,
@@ -336,9 +345,11 @@ with `rem` values and `clamp()` for page padding. Message-to-message gap is
 `clamp(1.1rem, 4vw, 3rem)` horizontal, with `3.25rem` of top padding on mobile to
 clear the fixed emergency pill.
 
-**Single breakpoint:** `900px`. Below it the rail becomes the drawer, the burger
-bar appears, cards go full-width, the emergency pill shrinks, and touch targets
-stay large.
+**Breakpoints:** `900px` is the shell breakpoint — below it the rail becomes the
+drawer, the burger bar appears, cards go full-width, the emergency pill shrinks,
+and touch targets stay large. The Case panel adds one of its own at `1200px`
+(side card above it, centred pill / drop-down sheet below), because a persistent
+right column needs the rail's width *and* a readable thread beside it.
 
 ## Elevation & Depth
 
@@ -361,7 +372,7 @@ dramatic.
   hover.
 - **sm** (`0 1px 3px rgba(31,31,31,.08), 0 6px 18px rgba(31,31,31,.06)`): the
   default floating surface — cards, the calm emergency pill, quiet buttons, the
-  rail's in-thread Case block.
+  Case panel (`md` when it drops as a sheet on a narrow screen).
 - **md** (`0 1px 3px rgba(31,31,31,.08), 0 12px 34px rgba(31,31,31,.08)`): the
   composer, and the hover state of an `sm` surface. The most lift a routine
   element gets.
@@ -435,11 +446,28 @@ never motion that demands attention.
 - **Shadow:** `sm`, flat at rest (see Elevation).
 - **Border:** none.
 - **Padding:** `~1.15rem 1.3rem`.
-- Two kinds: the **contact card** (a title, an optional reason line, phone rows
-  on `faint`, an optional urgent hold-line in red) and the **in-thread Case
-  block** ("What Gabay has understood" — a dim title over correctable claim rows
-  and Safety-Flag pills). Both render inside the message list, pinned below the
-  last message; neither is ever a separate screen.
+- The **contact card** (a title, an optional reason line, phone rows on `faint`,
+  an optional urgent hold-line in red) renders inside the message list, pinned
+  below the last message; it is never a separate screen.
+
+### The Case panel (signature component)
+"What Gabay has understood" — a dim title over correctable claim rows and
+Safety-Flag pills (the same rows as before; her one-tap Conflict resolution
+lives here). It is the one panel of chrome the conversation adds, kept quiet
+and out of the reading column:
+- **≥1200px:** a fixed card top-right, below the emergency pill, `20rem` wide,
+  `sm` shadow, capped height with internal scroll. The thread reserves a
+  matching right gutter (like the rail on the left) so a message never runs
+  under it. Collapsible to a title pill; open by default.
+- **≤1199px:** a centred pill just under the top chrome that drops the Case
+  down as a floating sheet (`md` shadow) on tap, dismissed by tapping outside
+  or `Escape`. Collapsed by default. This is the "hovering pill" on a phone.
+- Shown only on the home screen, only once the Case carries a claim or a flag,
+  and **never while the Imminent Danger latch is live** — the crisis screen
+  stays about the exit. The collapsed/expanded choice persists per browser.
+- No flag red: the Safety-Flag rows keep their existing `tint-urgent` wash.
+  Motion is transform + opacity only (chevron rotate, content fade-in); the
+  height snaps. Instant under `prefers-reduced-motion`.
 
 ### Inputs / Fields
 - **Text fields:** `faint` fill, no border, `13px` radius, `~0.7rem 0.95rem`
@@ -519,8 +547,9 @@ access to the fixed pill.
   tracking (`-0.01em` to `-0.015em`).
 - **Do** keep the reading column near `47rem` and agent replies near `40rem`,
   even on a wide screen.
-- **Do** render findings, contact cards, and the Case as messages inside the
-  thread; the composer must stay visible while she reads them.
+- **Do** render findings and contact cards as messages inside the thread; the
+  composer must stay visible while she reads them. The Case is the one
+  exception — it has its own quiet panel (see The Case panel).
 - **Do** use the rotated pine square as the only geometric motif — brand mark and
   agent speaker mark, always pine.
 - **Do** keep the emergency affordance always on screen and on the zero-model

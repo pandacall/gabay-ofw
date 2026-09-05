@@ -123,7 +123,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
    that was built rather than assembled. */
 ::selection { background: rgba(31, 94, 74, 0.16); }
 @media (prefers-color-scheme: dark) { ::selection { background: rgba(108, 192, 165, 0.28); } }
-.messages, .rail-conversations-list, textarea {
+.messages, .rail-conversations-list, .case-panel-body, textarea {
   scrollbar-width: thin;
   scrollbar-color: var(--dim) transparent;
 }
@@ -823,8 +823,7 @@ p { color: var(--body); line-height: 1.55; }
   gap: 0.5rem;
 }
 .chat-message.agent.reply .reply-list li::marker { color: var(--pine); }
-.chat-message.agent.ack,
-.chat-message.agent.trail {
+.chat-message.agent.ack {
   align-self: flex-start;
   font-size: 0.9rem;
   font-style: italic;
@@ -895,23 +894,116 @@ p { color: var(--body); line-height: 1.55; }
 .card-contact-note { font-size: 0.78rem; color: var(--muted); }
 .card-hold-line { margin: 0.85rem 0 0; font-size: 0.88rem; color: var(--urgent-dark); }
 
-/* ---------- "What Gabay knows" — the Case, folded into the thread ----------
-   No panel, no screen of its own: a quiet card pinned below the last
-   message. One-tap correction (#44) and conflict resolution live here. */
-.case-inline {
-  align-self: flex-start;
-  width: 100%;
-  max-width: 40rem;
+/* ---------- "What Gabay has understood" — the Case panel ----------
+   Issue #44: the Case in its own panel rather than folded into the
+   thread. It sits OUTSIDE #screen, so the thread's own scroll never
+   clips it. Two treatments, one breakpoint (1200px):
+
+   - >=1200px: a quiet card fixed to the top-right, below the emergency
+     pill. `.app.case-open` reserves a matching gutter on the thread so
+     the two never overlap — it is a column of chrome, like the rail.
+   - <=1199px (narrow desktop, tablet, phone): a centred pill just below
+     the top chrome that drops the Case down as a floating sheet on tap,
+     dismissed by tapping outside it or pressing Escape. No room for a
+     persistent side column here, so it is a layer instead.
+
+   Everything inside it (`.case-claim`, `.case-option`, the conflict and
+   edit rows) is unchanged from the old in-thread block. One flat panel,
+   separated by shadow and space — no border (No-Line Rule); the only
+   warm note is the Safety-Flag rows' existing `tint-urgent` wash. */
+.case-panel {
+  position: fixed;
+  top: 4.75rem;
+  right: clamp(0.85rem, 2.5vw, 1.5rem);
+  z-index: 9;
+  width: 20rem;
+  max-width: calc(100vw - 1.7rem);
   background: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  padding: 1rem 1.15rem 1.15rem;
+}
+/* Collapsed it is a pill, matching the emergency affordance's shape
+   vocabulary; expanded it becomes a card. */
+.case-panel:not(.is-expanded) { border-radius: var(--radius-pill); }
+.case-panel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.85rem 1rem 0.85rem 1.15rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: left;
+  transition: color 0.14s ease;
+}
+.case-panel-toggle:hover { color: var(--ink); }
+.case-panel-chevron {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--dim);
+  transition: transform 0.18s ease;
+}
+.case-panel-chevron svg { width: 0.9rem; height: 0.9rem; display: block; }
+.case-panel.is-expanded .case-panel-chevron { transform: rotate(180deg); }
+.case-panel-body {
+  max-height: min(58vh, 30rem);
+  overflow-y: auto;
+  padding: 0 1.15rem 1.2rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /* Transform + opacity only — the height snaps, the content fades and
+     rises in. No layout property is animated. */
+  transition: opacity 0.16s ease, transform 0.16s ease;
 }
-.case-inline-title { margin: 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+.case-panel:not(.is-expanded) .case-panel-body {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  transform: translateY(-0.4rem);
+  overflow: hidden;
+  visibility: hidden;
+}
 .case-empty { font-size: 0.88rem; color: var(--muted); margin: 0; }
+
+/* >=1200px: the panel is a column of chrome — reserve its width on the
+   thread whenever it is on screen (collapsed pill or open card), so a
+   message never runs underneath it. */
+@media (min-width: 1200px) {
+  .app.case-visible .home-main {
+    padding-right: calc(20rem + clamp(1.1rem, 4vw, 3rem) + 0.75rem);
+  }
+}
+
+/* <=1199px: the centred pill / drop-down sheet. */
+@media (max-width: 1199px) {
+  .case-panel {
+    top: 3.5rem;
+    right: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(22rem, calc(100vw - 1.4rem));
+    box-shadow: var(--shadow-md);
+  }
+  .case-panel-toggle { justify-content: center; gap: 0.4rem; padding: 0.72rem 1rem; }
+  .case-panel-body { max-height: min(62vh, 26rem); }
+  /* Push the thread down so the collapsed pill never covers the first
+     message; the expanded sheet is a deliberate overlay and does not.
+     (The panel only ever shows on the home screen.) */
+  .app.case-visible .home-main { padding-top: 6.6rem; }
+}
+
+/* In the band where the rail is still a fixed 16.5rem strip but the
+   panel is already the centred pill, centre it over the main column
+   rather than the whole viewport. */
+@media (min-width: 901px) and (max-width: 1199px) {
+  .case-panel { left: calc(50% + 8.25rem); }
+}
+
 .case-claims, .case-flags { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
 .case-claim { padding: 0.6rem 0.8rem; border-radius: var(--radius-sm); background: var(--faint); }
 .case-field { display: block; font-size: 0.72rem; text-transform: capitalize; color: var(--muted); margin-bottom: 0.2rem; }
@@ -952,7 +1044,7 @@ p { color: var(--body); line-height: 1.55; }
   font-size: 0.84rem;
   text-transform: capitalize;
 }
-.case-inline h3 { margin: 0.3rem 0 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+.case-panel-body h3 { margin: 0.3rem 0 0; font-size: 0.8rem; font-weight: 500; color: var(--muted); }
 
 /* ---------- Profile / flow screens ---------- */
 .flow-shell { position: relative; z-index: 1; padding: clamp(1.5rem, 4vw, 3rem); max-width: 40rem; }
@@ -1122,7 +1214,6 @@ p { color: var(--body); line-height: 1.55; }
   .rail-conversation-rename { opacity: 1; }
   .rail-conversation-open, .rail-control, .rail-new-conversation { min-height: 2.75rem; }
 
-  .case-inline { max-width: 100%; }
   .welcome-nav { padding: 1rem; }
   .emergency-controls { top: 0.62rem; right: 0.7rem; }
   .emergency-button { padding: 0.7rem 1rem; font-size: 0.84rem; min-height: 2.75rem; }
@@ -1153,6 +1244,9 @@ p { color: var(--body); line-height: 1.55; }
   .home-greeting p { display: none; }
   .chat-openers { display: none; }
   .home-main { padding-top: 3rem; }
+  /* No room to reserve a strip for the pill on a landscape phone — the
+     collapsed pill floats over the very top of the thread instead. */
+  .app.case-visible .home-main { padding-top: 3.25rem; }
 }
 
 /* The narrowest phones: drop the prototype photo button so the one-line
@@ -1178,10 +1272,14 @@ p { color: var(--body); line-height: 1.55; }
     transform: none;
   }
   .ph-glow { transition: none; }
+  /* The Case panel still opens and closes — the state change survives —
+     but instantly, with no height slide or chevron sweep. */
+  .case-panel-body, .case-panel-chevron { transition: none; }
   .button, .ink-button, .urgent-button, .text-button,
   .composer-send, .composer-plus, .chat-opener, .google-button,
   .emergency-button, .mark-safe-button, .rail-control, .rail-conversation,
-  .rail-new-conversation, .case-option, .case-edit-trigger, .skip-link {
+  .rail-new-conversation, .case-option, .case-edit-trigger, .case-panel-toggle,
+  .skip-link {
     transition: none;
   }
 }
