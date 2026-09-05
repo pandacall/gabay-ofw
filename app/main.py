@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 
 from app.auth import FirebaseTokenVerifier, TokenVerifier, get_current_uid
-from app.chat import ChatService, stream_stateless_fallback
+from app.chat import ChatService, reply_text_from_line, stream_stateless_fallback
 from app.config import (
     get_firebase_web_config,
     get_gemini_api_key,
@@ -191,12 +191,9 @@ def create_app(
                 uid=uid, session=session, text=turn.text
             ):
                 if is_first_turn:
-                    try:
-                        payload = json.loads(line)
-                    except ValueError:
-                        payload = None
-                    if isinstance(payload, dict) and payload.get("type") == "reply":
-                        title_ctx["reply_text"] = payload.get("text", "")
+                    reply_text = reply_text_from_line(line)
+                    if reply_text is not None:
+                        title_ctx["reply_text"] = reply_text
                 yield line
 
         if is_first_turn:

@@ -14,7 +14,7 @@ import asyncio
 
 import pytest
 
-from app.title import MAX_ATTEMPTS, generate_title, is_title_safe
+from app.title import MAX_ATTEMPTS, _build_prompt, generate_title, is_title_safe
 
 
 class TestSafetyFilter:
@@ -64,6 +64,31 @@ class TestSafetyFilter:
     def test_empty_or_blank_titles_are_rejected(self):
         assert not is_title_safe("")
         assert not is_title_safe("   ")
+
+    @pytest.mark.parametrize(
+        "title",
+        [
+            "Sinaktan ako ng amo",
+            "Hindi ako nababayaran",
+            "Wala akong pasaporte",
+            "Gikuha sa amo ang pasaporte",
+        ],
+    )
+    def test_non_english_titles_are_rejected(self, title):
+        # Decision 5 (spec 2026-09-05): titles are always English because
+        # the blocklist above is English-only vocabulary — a Tagalog or
+        # Cebuano title would sail past every check unscathed otherwise,
+        # even though her own message (the model's input) is frequently
+        # non-English by design (issue #67).
+        assert not is_title_safe(title)
+
+
+class TestPromptRequestsEnglish:
+    def test_the_generation_prompt_explicitly_requests_english_output(self):
+        # Decision 5 depends on the model actually producing English —
+        # nothing enforces that if the prompt never asks for it.
+        prompt = _build_prompt("hindi ako nababayaran", "ilang buwan na?", retry=False)
+        assert "english" in prompt.lower()
 
 
 class TestGenerateTitleRetryLoop:

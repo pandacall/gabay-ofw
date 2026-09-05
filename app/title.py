@@ -50,15 +50,15 @@ MAX_TITLE_LENGTH = 40
 #: names the PASSPORT_WITHHELD flag and is blocked. Kept in lockstep
 #: with the flag enum by the assertion below: a new flag added there
 #: must get an entry here before this module can claim to cover it.
+_PHYSICAL_ASSAULT_TERMS = (
+    "assault", "assaulted", "hit me", "hitting", "beat", "beaten",
+    "beating", "punch", "punched", "slap", "slapped", "attacked",
+)
 _SAFETY_FLAG_TERMS: dict[str, tuple[str, ...]] = {
-    "PHYSICAL_ASSAULT_ONGOING": (
-        "assault", "assaulted", "hit me", "hitting", "beat", "beaten",
-        "beating", "punch", "punched", "slap", "slapped", "attacked",
-    ),
-    "PHYSICAL_ASSAULT_PAST": (
-        "assault", "assaulted", "hit me", "hitting", "beat", "beaten",
-        "beating", "punch", "punched", "slap", "slapped", "attacked",
-    ),
+    # Ongoing and past assault share the same term list: the words
+    # naming the allegation don't depend on tense.
+    "PHYSICAL_ASSAULT_ONGOING": _PHYSICAL_ASSAULT_TERMS,
+    "PHYSICAL_ASSAULT_PAST": _PHYSICAL_ASSAULT_TERMS,
     "THREAT_OF_HARM": ("threat", "threatened", "threatening"),
     "CONFINED": (
         "confine", "confined", "confinement", "locked in", "locked up",
@@ -90,19 +90,46 @@ _BLOCKLIST = frozenset(
 
 _DIGIT_RE = re.compile(r"\d")
 
+#: Common Tagalog/Cebuano function words that essentially never appear in
+#: a natural English 3-6 word title (spec Decision 5: titles are always
+#: English, which is what makes the English-only ``_BLOCKLIST`` above a
+#: valid safety net at all). Her own message and DISPATCHER's reply — the
+#: two inputs to the generation prompt — are frequently non-English by
+#: design (issue #67), so this is a real path, not a hypothetical one:
+#: a prompt instruction alone is never trusted for a safety-critical
+#: property in this codebase (see ROUTING_GUARD), so this is the
+#: deterministic backstop if the model doesn't comply. Matched on word
+#: boundaries, unlike ``_BLOCKLIST``'s substring match, so short markers
+#: like "mo" or "ba" don't false-positive inside English words.
+_NON_ENGLISH_MARKERS = frozenset(
+    {
+        "ako", "ko", "mo", "niya", "namin", "natin", "kami", "tayo",
+        "sila", "siya", "hindi", "wala", "akin", "amo", "ba", "po",
+        "opo", "kasi", "yung", "nang", "nila", "gikuha", "gikan",
+    }
+)
+_NON_ENGLISH_RE = re.compile(
+    r"\b(" + "|".join(_NON_ENGLISH_MARKERS) + r")\b", re.IGNORECASE
+)
+
 
 def is_title_safe(title: str) -> bool:
     """Whether a candidate title is safe to show verbatim in the rail.
 
     Deterministic, no I/O, never a model call. Rejects: empty/blank,
     any digit character (current claims-based labels never show numbers
-    either), over-length, or a case-insensitive blocklist hit.
+    either), over-length, a case-insensitive blocklist hit, or a
+    Tagalog/Cebuano function-word marker (the blocklist above is
+    English-only vocabulary, so a non-English title would otherwise
+    bypass it entirely).
     """
     if not title or not title.strip():
         return False
     if len(title) > MAX_TITLE_LENGTH:
         return False
     if _DIGIT_RE.search(title):
+        return False
+    if _NON_ENGLISH_RE.search(title):
         return False
     lowered = title.lower()
     return not any(term in lowered for term in _BLOCKLIST)
@@ -120,6 +147,9 @@ if nothing more specific fits.
 Never include: specific incident details, numbers, dates, names, \
 locations, or any wording that implies violence, confinement, threats, \
 or an emergency. Describe the subject, not the allegation.
+
+Always respond in English, even though her message and the reply below \
+may be in Tagalog, Taglish, or Cebuano.
 
 Her message: {user_text}
 The assistant's reply: {reply_text}

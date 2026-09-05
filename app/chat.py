@@ -112,6 +112,24 @@ def _line(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False) + "\n"
 
 
+def reply_text_from_line(line: str) -> str | None:
+    """The ``reply`` line's text out of one raw NDJSON line this module
+    yielded, or ``None`` for any other line type (including malformed
+    JSON). The NDJSON line shape is this module's own vocabulary
+    (module docstring); ``app.main``'s title-generation trigger needs
+    her turn's reply text without re-deriving that shape itself.
+    """
+    try:
+        payload = json.loads(line)
+    except ValueError:
+        return None
+    if isinstance(payload, dict) and payload.get("type") == "reply":
+        text = payload.get("text")
+        if isinstance(text, str):
+            return text
+    return None
+
+
 #: Card types that already tell her the state of her Plan (or its
 #: replacement, per ADR-0006) — the auto-rendered inactive-plan Safe
 #: Floor (below) is skipped when one of these already streamed this turn,

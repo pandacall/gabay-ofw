@@ -258,3 +258,26 @@ class TestEmergencyConversationIsNotExcluded:
         row = _row(client, session_id)
         assert row["label"] == "General inquiry"
         assert row["label_source"] == "llm"
+
+
+class TestReplyTextFromLine:
+    """The small seam app.main's background-task trigger uses to read
+    her turn's reply text out of one raw NDJSON line, without
+    re-deriving app.chat's own line-shape knowledge."""
+
+    def test_extracts_text_from_a_reply_line(self):
+        from app.chat import reply_text_from_line
+
+        line = json.dumps({"type": "reply", "text": "hello", "session_id": "s"}) + "\n"
+        assert reply_text_from_line(line) == "hello"
+
+    def test_ignores_any_other_line_type(self):
+        from app.chat import reply_text_from_line
+
+        line = json.dumps({"type": "trail", "text": "hello"}) + "\n"
+        assert reply_text_from_line(line) is None
+
+    def test_ignores_malformed_json(self):
+        from app.chat import reply_text_from_line
+
+        assert reply_text_from_line("not json\n") is None
