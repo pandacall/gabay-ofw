@@ -336,12 +336,37 @@ def create_app(
         service: ChatService = Depends(get_chat_service),
     ):
         """The hardcoded EMERGENCY button (issue #41): renders the cached
-        action card OFFLINE, with ZERO model turns. Not a conversation —
-        a fixed, code-owned render plus a timestamped predicate trip; the
-        conversational EMERGENCY sub-agent takes over from her next chat
-        message once the predicate is active."""
+        action card OFFLINE, with ZERO model turns — a fixed, code-owned
+        render plus a timestamped predicate trip. For a freshly created
+        Conversation the frontend then calls ``/api/emergency/opener``
+        (spec 2026-09-06) so EMERGENCY posts one greeting; that call is
+        best-effort and separate, and her next chat message drives the
+        conversation from there as before."""
         return StreamingResponse(
             service.press_emergency_button(uid=uid),
+            media_type="application/x-ndjson",
+        )
+
+    @app.post("/api/emergency/opener")
+    async def emergency_opener(
+        uid: str = Depends(get_current_uid),
+        service: ChatService = Depends(get_chat_service),
+    ):
+        """The proactive opener (spec 2026-09-06): after
+        ``/api/emergency/button`` has rendered its card and opened the
+        Emergency Conversation, the frontend calls this once — only for a
+        freshly created Conversation — and EMERGENCY posts one greeting
+        that offers the single triage choice.
+
+        Best-effort: a model failure ends the stream with no reply and the
+        card already stands. 404 when no Emergency Conversation is live
+        (mirrors ``/api/chat``'s session lookup)."""
+        if not await service.has_live_emergency_conversation(uid=uid):
+            raise HTTPException(
+                status_code=404, detail="No Emergency Conversation"
+            )
+        return StreamingResponse(
+            service.stream_emergency_opener(uid=uid),
             media_type="application/x-ndjson",
         )
 

@@ -1328,6 +1328,7 @@ async function pressEmergencyButton() {
   refreshChatScreen();
   let card = null;
   let emergencySessionId = null;
+  let emergencyCreated = false;
   try {
     const token = await auth.currentUser.getIdToken();
     const response = await fetch("/api/emergency/button", {
@@ -1338,6 +1339,9 @@ async function pressEmergencyButton() {
     await readNdjsonLines(response, (line) => {
       if (line.type === "card" && line.card) card = line.card;
       if (line.session_id) emergencySessionId = line.session_id;
+      // ADR-0009 / spec 2026-09-06: `created` is false when a second
+      // press reopened the live Conversation — no re-greeting then.
+      if (line.type === "emergency_latch") emergencyCreated = !!line.created;
     });
     // Reopen the Emergency Conversation (it may already hold prior turns
     // — ADR-0009: a second press reopens, never forks), then show the
@@ -1347,10 +1351,32 @@ async function pressEmergencyButton() {
     emergencyLatchActive = !!emergencySessionId;
     refreshChatScreen();
     await loadConversations();
+    // The proactive opener streams in after the card is already on
+    // screen (spec 2026-09-06): a fresh Conversation only, best-effort.
+    if (emergencyCreated) await streamEmergencyOpener();
   } catch {
     if (card) chatMessages.push({ role: "agent", kind: "card", card });
     chatMessages.push({ role: "agent", kind: "error", text: t("emergencyFailed") });
     refreshChatScreen();
+  }
+}
+
+// The proactive opener (spec 2026-09-06): after the button's card is on
+// screen, EMERGENCY posts one greeting that offers the single triage
+// choice. Best-effort and decorative relative to the card — a failure
+// (model down, endpoint 404/500) leaves the card and Conversation exactly
+// as they are, with nothing surfaced.
+async function streamEmergencyOpener() {
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const response = await fetch("/api/emergency/opener", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok || !response.body) return;
+    await readNdjsonLines(response, handleChatLine);
+  } catch {
+    /* the card already stands; the opener adds to it or it doesn't */
   }
 }
 

@@ -20,6 +20,7 @@ from app.emergency import open_latch
 from app.safe_floor import (
     ACUTE_SAFETY_FLAGS,
     CACHED_CARDS,
+    CACHED_REASONS,
     CARD_KEYS,
     HOLD_LINE,
     REASON_LINES,
@@ -177,13 +178,25 @@ class TestCardFixtures:
         assert channels <= {Channel.EMBASSY_ATN.value, Channel.OWWA_1348.value}
         assert channels
 
-    def test_cache_is_precomputed_for_every_country_and_danger_state(self):
+    def test_cache_is_precomputed_for_every_country_danger_and_reason(self):
         for country in ALL_CARD_COUNTRIES:
             for danger in (False, True):
-                assert (country, danger) in CACHED_CARDS
+                for reason in CACHED_REASONS:
+                    assert (country, danger, reason) in CACHED_CARDS
         assert cached_card(Country("SA"))["country"] == "SA"
         # Unreadable country falls back to UNKNOWN, never KeyErrors.
         assert cached_card(Country.PH)["country"] == "UNKNOWN"
+
+    def test_cached_card_default_reason_is_service_down(self):
+        assert cached_card(Country.SA)["reason"] == "SERVICE_DOWN"
+
+    def test_cached_card_serves_the_requested_reason(self):
+        card = cached_card(
+            Country.SA, reason=SafeFloorReason.HELP_REQUESTED
+        )
+        assert card["reason"] == "HELP_REQUESTED"
+        assert card["reason_line"] == REASON_LINES[SafeFloorReason.HELP_REQUESTED]
+        assert card["contacts"]
 
 
 class TestImminentDangerPredicate:

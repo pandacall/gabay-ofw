@@ -21,6 +21,7 @@ from __future__ import annotations
 from google.adk.events import Event
 from google.genai import types
 
+from app.emergency import EMERGENCY_OPENER_TRIGGER
 from app.history import replay_conversation
 
 
@@ -62,6 +63,28 @@ def test_a_bare_exchange_replays_as_user_then_reply_lines():
     assert lines == [
         {"type": "user", "text": "they took my passport"},
         {"type": "reply", "text": "I hear you. Which country are you in?"},
+    ]
+
+
+def test_the_emergency_opener_trigger_never_replays_as_her_message():
+    # The proactive opener (spec 2026-09-06) is driven by a synthetic
+    # user message; ADK persists it, but it is a stage direction, not
+    # something she said, so it must not render as her bubble on re-open.
+    lines = replay_conversation(
+        [
+            _user(EMERGENCY_OPENER_TRIGGER),
+            _reply("I'm here with you. Do you want help thinking this "
+                   "through, or did you just need the numbers?",
+                   author="EMERGENCY"),
+        ]
+    )
+
+    assert lines == [
+        {
+            "type": "reply",
+            "text": "I'm here with you. Do you want help thinking this "
+            "through, or did you just need the numbers?",
+        },
     ]
 
 

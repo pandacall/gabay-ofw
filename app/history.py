@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from google.adk.events import Event
 
+from app.emergency import EMERGENCY_OPENER_TRIGGER
 from app.reply_text import visible_texts
 
 #: Every key under a tool result whose dict value is fixed, non-model
@@ -124,6 +125,10 @@ def replay_conversation(events: list[Event]) -> list[dict]:
         if not texts:
             continue
         if event.author == "user":
+            # The proactive opener's synthetic trigger (spec 2026-09-06)
+            # is a stage direction ADK persisted, not something she said.
+            if "".join(texts) == EMERGENCY_OPENER_TRIGGER:
+                continue
             lines.append({"type": "user", "text": "".join(texts)})
         elif event.author in ("DISPATCHER", "EMERGENCY"):
             lines.append({"type": "reply", "text": "".join(texts)})
