@@ -662,7 +662,12 @@ function conversationDateLabel(lastUpdateTime) {
 // or custom label leads, the date still shows as a subline so two
 // same-labelled threads stay distinguishable.
 function conversationRowLabel(row) {
-  if (row.label && row.label_source === "user") return row.label;
+  // "user" is her own rename; "llm" is the generated title (spec
+  // 2026-09-05-llm-conversation-titles) — both render verbatim, unlike
+  // a claims-derived label, which is a key the UI localises below.
+  if (row.label && (row.label_source === "user" || row.label_source === "llm")) {
+    return row.label;
+  }
   if (row.label && copy[language]?.[`convLabel_${row.label}`]) {
     return t(`convLabel_${row.label}`);
   }

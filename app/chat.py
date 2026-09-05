@@ -84,12 +84,15 @@ from app.history import cards_in, replay_conversation
 from app.labels import (
     CONVERSATION_LABEL,
     CONVERSATION_LABEL_SOURCE,
+    CONVERSATION_TITLE_LLM_ATTEMPTED,
     EMERGENCY_CONVERSATION,
     label_state_delta,
+    llm_title_state_delta,
     rename_state_delta,
 )
 from app.reply_text import visible_texts
 from app.safe_floor import CARD_KEYS, SafeFloorReason, build_card, cached_card
+from app.title import ModelCall, generate_title
 from app.state_keys import (
     CASE,
     CASE_MUTATIONS,
@@ -144,11 +147,24 @@ async def stream_stateless_fallback() -> AsyncIterator[str]:
 class ChatService:
     """Owns the ADK App and Runner; one instance per FastAPI app."""
 
-    def __init__(self, *, session_service: BaseSessionService, llm: BaseLlm):
+    def __init__(
+        self,
+        *,
+        session_service: BaseSessionService,
+        llm: BaseLlm,
+        title_model: ModelCall | None = None,
+    ):
         self._session_service = session_service
         self._runner = Runner(
             app=build_adk_app(llm), session_service=session_service
         )
+        # The one-time background Conversation-title call (spec
+        # 2026-09-05-llm-conversation-titles): a plain out-of-band model
+        # call, never the ADK Runner/DISPATCHER — None disables the
+        # feature entirely (tests, or a deployment with no title model
+        # configured), in which case the existing claims-based label is
+        # the only source a Conversation's title ever gets.
+        self._title_model = title_model
 
     async def get_or_create_session(
         self, *, uid: str, session_id: str | None
@@ -288,6 +304,50 @@ class ChatService:
             ),
         )
         return True
+
+    async def maybe_generate_title(
+        self, *, uid: str, session_id: str, user_text: str, reply_text: str
+    ) -> None:
+        """The one-time, best-effort LLM Conversation title (spec
+        2026-09-05-llm-conversation-titles): fired by ``/api/chat`` as a
+        background task after her first reply has already streamed to
+        the client, so it can never add latency to her turn.
+
+        A cosmetic feature that fails invisibly: no title configured, an
+        already-attempted Conversation, a session that vanished
+        underneath it, or any error along the way all just return with
+        no write — the existing claims-based label (``app.labels``)
+        remains the fallback exactly as it does today.
+        """
+        if self._title_model is None:
+            return
+        try:
+            session = await self._session_service.get_session(
+                app_name=APP_NAME, user_id=uid, session_id=session_id
+            )
+            if session is None or session.state.get(
+                CONVERSATION_TITLE_LLM_ATTEMPTED
+            ):
+                return
+            title = await generate_title(
+                user_text=user_text,
+                reply_text=reply_text,
+                call_model=self._title_model,
+            )
+            await self._session_service.append_event(
+                session,
+                Event(
+                    id=Event.new_id(),
+                    invocation_id=f"title-{uuid4().hex}",
+                    author="system",
+                    timestamp=time.time(),
+                    actions=EventActions(
+                        state_delta=llm_title_state_delta(session.state, title)
+                    ),
+                ),
+            )
+        except Exception:
+            logger.exception("maybe_generate_title failed")
 
     async def _most_recent_session(self, *, uid: str) -> Session | None:
         """The uid's most-recently-updated session, or None with no

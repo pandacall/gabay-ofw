@@ -192,6 +192,29 @@ test("the rail shows the derived topic label, with the date kept as a subline", 
   await expect(rows.nth(1).locator(".rail-conversation-label")).toHaveText("Wages");
 });
 
+// spec 2026-09-05-llm-conversation-titles: an "llm" label renders
+// verbatim, exactly like her own rename, never localised as a key.
+test("the rail shows a generated LLM title verbatim, not localised", async ({
+  page,
+}) => {
+  await openAsSignedInUser(page);
+  await useConversations(page, {
+    list: [
+      {
+        session_id: "s-a",
+        last_update_time: NOW,
+        label: "Unpaid wages, several months",
+        label_source: "llm",
+      },
+    ],
+  });
+
+  const rows = page.locator(".rail-conversation");
+  await expect(rows.nth(0).locator(".rail-conversation-label")).toHaveText(
+    "Unpaid wages, several months",
+  );
+});
+
 test("she can rename a conversation and her name is shown verbatim", async ({ page }) => {
   await openAsSignedInUser(page);
   await useConversations(page, {
