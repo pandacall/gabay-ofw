@@ -339,7 +339,12 @@ re-renders across the transition.
 
 **Reading width:** the message thread, the composer, and the opener row share a
 `max-width` of ~`47rem`, centered. Agent replies cap at `~40rem`, user bubbles at
-`~32rem`. Line length stays constrained even as the workspace grows.
+`~32rem`. Line length stays constrained even as the workspace grows. The reading
+column is drawn by the thread's *padding*, never by capping the scroll box: the
+scroll box spans the full main column so its scrollbar rides the pane's right
+edge, and a `scrollbar-gutter` reserved on both edges keeps the column from
+shifting sideways when the conversation grows past one screen. Capping
+`.messages` at `47rem` strands the scrollbar in the middle of the workspace.
 
 **Rhythm:** there is no formal spacing token scale; spacing is set per context
 with `rem` values and `clamp()` for page padding. Message-to-message gap is
