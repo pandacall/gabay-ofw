@@ -149,7 +149,7 @@ test("a failed wipe is reported, never silently swallowed", async ({ page }) => 
   await expect(page.getByRole("status")).toContainText("Could not delete right now.");
 });
 
-test("user can open the conversation from a paired bilingual opener", async ({
+test("user can open the conversation from a single-language opener chip", async ({
   page,
 }) => {
   await openAsSignedInUser(page);
@@ -173,10 +173,17 @@ test("user can open the conversation from a paired bilingual opener", async ({
     }),
   );
 
-  const opener = page.getByRole("button", { name: "Hindi ako nababayaran / I'm not being paid" });
+  // Openers are single-language chips — a couple in Filipino, the rest in
+  // English — never a "Tagalog / English" pair.
+  const opener = page.getByRole("button", { name: "Hindi ako nababayaran", exact: true });
   await expect(opener).toBeVisible();
+  await expect(opener).toHaveAttribute("lang", "tl");
+  await expect(page.getByRole("button", { name: "I want to go home", exact: true })).toHaveAttribute(
+    "lang",
+    "en",
+  );
   await opener.click();
-  await expect(page.locator("#chat-input")).toHaveValue("Hindi ako nababayaran / I'm not being paid");
+  await expect(page.locator("#chat-input")).toHaveValue("Hindi ako nababayaran");
   await page.getByRole("button", { name: "Send" }).click();
 
   await expect(page.locator(".chat-message.agent.ack")).toContainText("I hear you");

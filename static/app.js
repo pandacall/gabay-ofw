@@ -424,13 +424,16 @@ let currentScreen = "home";
 let userName = "";
 let userId = "";
 
-// Paired bilingual openers: showing both languages work is the point
-// ("Hindi ako nababayaran / I'm not being paid").
+// Openers, each in ONE language — never a "Tagalog / English" pair. She
+// reads the language she thinks in; seeing a Filipino chip next to an
+// English one is what says both work, without asking her to read a slash.
+// A couple in Filipino, the rest in English (issue #67 keeps the reply
+// language a closed set; these are only what she can tap to say first).
 const CHAT_OPENERS = [
-  "Hindi ako nababayaran / I'm not being paid",
-  "Kinuha nila ang passport ko / They took my passport",
-  "Gusto ko nang umuwi / I want to go home",
-  "Natatakot ako sa amo ko / I'm afraid of my employer",
+  { text: "Hindi ako nababayaran", lang: "tl" },
+  { text: "Kinuha nila ang passport ko", lang: "tl" },
+  { text: "I want to go home", lang: "en" },
+  { text: "I'm afraid of my employer", lang: "en" },
 ];
 let chatSessionId = null;
 let chatMessages = [];
@@ -974,15 +977,11 @@ function chatCaseHtml() {
 function homeTemplate() {
   const isEmpty = chatMessages.length === 0;
   const firstName = userName.split(" ")[0] || "friend";
-  // Each opener is "<Filipino> / <English>". The full string still goes
-  // into the composer, but the two halves render with their own `lang`
-  // so a screen reader voices each in the right language (WCAG 3.1.2).
-  const openers = CHAT_OPENERS.map((opener) => {
-    const [tl, en] = opener.split(" / ");
-    const label = en
-      ? `<span lang="tl">${escapeHtml(tl)}</span> / <span lang="en">${escapeHtml(en)}</span>`
-      : escapeHtml(opener);
-    return `<button type="button" class="chat-opener" data-opener="${escapeHtml(opener)}">${label}</button>`;
+  // Each opener is a single-language phrase; it carries its own `lang` so
+  // a screen reader voices the Filipino ones in Filipino (WCAG 3.1.2).
+  const openers = CHAT_OPENERS.map(({ text, lang }) => {
+    const safe = escapeHtml(text);
+    return `<button type="button" class="chat-opener" lang="${lang}" data-opener="${safe}">${safe}</button>`;
   }).join("");
   return `<section class="home-shell${isEmpty ? "" : " has-messages"}">
     <div class="ph-glow" aria-hidden="true"></div>

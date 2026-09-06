@@ -449,8 +449,9 @@ never motion that demands attention.
 
 ### Chips
 - **Opener chips:** white pill, ink text, `xs` shadow → `sm` on hover. Used once,
-  on the empty home screen, to suggest first messages. They carry the app's one
-  bilingual flourish ("Hindi ako nababayaran / I'm not being paid").
+  on the empty home screen, to suggest first messages. Each chip is in **one**
+  language, never a "Tagalog / English" pair — a couple in Filipino, the rest in
+  English, so the set itself shows both work.
 - No selected/filter chip state exists.
 
 ### Cards / Containers
@@ -581,8 +582,8 @@ access to the fixed pill.
   values under `@media (prefers-color-scheme: dark)`, never a per-component
   override.
 - **Do** mark non-English text (`lang="tl"` / `lang="ceb"`) so a screen reader
-  voices Filipino and Cebuano correctly — Gabay's reply, and each half of a
-  bilingual opener chip.
+  voices Filipino and Cebuano correctly — Gabay's reply, and every Filipino
+  opener chip.
 
 ### Don't:
 - **Don't** add a `1px` border to separate anything. The system has none.
