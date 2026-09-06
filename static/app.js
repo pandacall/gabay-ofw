@@ -329,24 +329,18 @@ Object.assign(copy.ceb, {
 Object.assign(copy.en, {
   skipToEmergency: "Skip to emergency help",
   emergencyRegion: "Emergency help",
-  attachLabel: "Add a photo",
-  attachUnavailable: "Adding a photo isn't available yet — tell Gabay what it shows instead.",
   menuLabel: "Menu",
   closeLabel: "Close",
 });
 Object.assign(copy.tl, {
   skipToEmergency: "Dumiretso sa tulong pang-emergency",
   emergencyRegion: "Tulong pang-emergency",
-  attachLabel: "Magdagdag ng larawan",
-  attachUnavailable: "Hindi pa puwedeng magdagdag ng larawan — sabihin na lang kay Gabay ang nakikita rito.",
   menuLabel: "Menu",
   closeLabel: "Isara",
 });
 Object.assign(copy.ceb, {
   skipToEmergency: "Diretso sa tabang pang-emergency",
   emergencyRegion: "Tabang pang-emergency",
-  attachLabel: "Pagdugang og litrato",
-  attachUnavailable: "Dili pa mahimo ang pagdugang og litrato — isulti na lang kang Gabay ang makita niini.",
   menuLabel: "Menu",
   closeLabel: "Isira",
 });
@@ -992,9 +986,6 @@ function homeTemplate() {
       </div>
       <div class="messages" id="chat-messages" aria-live="polite" aria-relevant="additions" aria-busy="false">${messagesInnerHtml()}</div>
       <form class="composer-pill" data-form="chat">
-        <button type="button" class="composer-plus" data-action="composer-attach" aria-label="${escapeHtml(t("attachLabel"))}">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.6" stroke="currentColor" stroke-width="1.7"/><circle cx="8.8" cy="10" r="1.7" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 16.5l4.2-3.7a1.5 1.5 0 0 1 2 0l2.6 2.3m2-1.6a1.5 1.5 0 0 1 2 0l0.6 0.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
         <textarea id="chat-input" rows="1" maxlength="4000" required aria-label="${escapeHtml(t("chatPlaceholder"))}" placeholder="${escapeHtml(t("chatPlaceholder"))}"></textarea>
         <button class="composer-send" type="submit" aria-label="${escapeHtml(t("chatSend"))}" ${chatBusy ? "disabled" : ""}>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1585,12 +1576,6 @@ document.addEventListener("click", (event) => {
     });
     return;
   }
-  if (action === "composer-attach") {
-    // Prototype affordance: photo capture isn't built. Acknowledge the
-    // tap without claiming a capability (PRD safety constraint).
-    showStatus(t("attachUnavailable"));
-    return;
-  }
   if (action === "view-current-plan") {
     // The one live Plan / Case surface is #77's; for now, open "What Gabay
     // has understood" so she can see the claims on file.
@@ -1641,9 +1626,10 @@ document.addEventListener("click", (event) => {
   if (!panel.contains(event.target)) setCasePanelExpanded(false);
 });
 
-// The composer has no Send button — the mic is the submit control and
-// Enter (without Shift) sends, matching the canvas. Shift+Enter still
-// inserts a newline.
+// The composer's send control carries no visible "Send" label, so Enter
+// (without Shift) is the primary way to send. Shift+Enter still inserts
+// a newline. (This comment used to describe a mic submit control; there
+// has never been one in this implementation.)
 document.addEventListener("keydown", (event) => {
   if (
     event.target.id === "chat-input" &&
