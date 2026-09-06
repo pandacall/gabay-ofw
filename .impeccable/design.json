@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-06T00:00:00.000Z",
+  "generatedAt": "2026-09-06T09:30:00.000Z",
   "title": "Design System: Gabay OFW",
   "extensions": {
     "themeStrategy": "Light default in the frontmatter is normative. Dark is a :root token swap under @media (prefers-color-scheme: dark) — no per-component overrides, no in-app toggle. `dark` below is the dark-mode value of each token.",
@@ -267,6 +267,14 @@
   },
   "components": [
     {
+      "name": "Brand Lockup",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The hand-and-path mark beside the wordmark — the rail, the mobile topbar, the welcome nav, the loading screen. Sized by height (the artwork is 1.22:1), never width; pine on either ground.",
+      "html": "<span class=\"ds-brand\"><svg class=\"ds-brand-mark\" viewBox=\"0 0 39.09 32\" aria-hidden=\"true\" focusable=\"false\"><path fill-rule=\"evenodd\" fill=\"currentColor\" d=\"M23.41 0.9C23.54 0.88 24.02 0.82 24.12 0.85C24.22 0.87 24.45 0.94 24.01 1.06C23.58 1.19 22.47 1.3 21.51 1.61C20.54 1.92 19.01 2.45 18.24 2.92C17.46 3.38 17.1 3.98 16.87 4.39C16.65 4.8 16.8 5.08 16.87 5.37C16.94 5.66 16.75 5.62 17.31 6.13C17.87 6.64 19.71 7.93 20.25 8.42C20.8 8.91 20.52 8.8 20.58 9.08C20.63 9.35 20.63 9.77 20.58 10.06C20.52 10.35 20.79 10.34 20.25 10.82C19.72 11.3 18.26 12.67 17.36 12.95C16.46 13.23 15.9 12.56 14.86 12.51C13.81 12.47 11.2 12.87 11.09 12.67C10.98 12.47 13.44 11.77 14.2 11.31C14.96 10.86 15.43 10.36 15.67 9.95C15.92 9.54 15.91 9.33 15.67 8.86C15.44 8.39 14.56 7.57 14.26 7.11C13.95 6.66 13.87 6.55 13.82 6.13C13.76 5.72 13.76 5.07 13.93 4.61C14.1 4.14 14.46 3.71 14.86 3.35C15.25 3 15.56 2.79 16.27 2.48C16.98 2.17 17.93 1.75 19.11 1.5C20.29 1.25 22.64 1.05 23.36 0.95C24.08 0.85 23.29 0.92 23.41 0.9ZM27.34 1.01C27.52 0.99 28.24 0.93 28.37 0.95C28.51 0.98 28.63 1.01 28.16 1.17C27.68 1.34 26.36 1.63 25.54 1.94C24.72 2.24 23.71 2.74 23.25 3.03C22.79 3.31 22.84 3.42 22.76 3.63C22.68 3.83 22.64 4.05 22.76 4.28C22.88 4.51 22.57 4.54 23.47 4.99C24.37 5.43 27.1 6.46 28.16 6.95C29.21 7.44 29.33 7.58 29.79 7.93C30.26 8.29 30.65 8.7 30.94 9.08C31.22 9.45 31.39 9.69 31.48 10.17C31.57 10.64 32.05 11.07 31.48 11.91C30.91 12.76 28.93 14.83 28.05 15.24C27.17 15.65 26.79 14.55 26.19 14.36C25.59 14.18 24.46 14.52 24.45 14.15C24.44 13.77 25.79 12.63 26.14 12.13C26.49 11.63 26.5 11.51 26.58 11.15C26.65 10.78 26.68 10.33 26.58 9.95C26.47 9.57 26.15 9.14 25.92 8.86C25.69 8.58 26.02 8.72 25.21 8.26C24.4 7.8 21.95 6.67 21.07 6.08C20.19 5.49 20.1 5.12 19.92 4.72C19.75 4.31 19.9 3.93 20.03 3.63C20.17 3.33 20.42 3.14 20.74 2.92C21.06 2.69 21.27 2.52 21.94 2.26C22.61 2.01 23.89 1.59 24.78 1.39C25.67 1.19 26.86 1.13 27.28 1.06C27.71 1 27.16 1.03 27.34 1.01ZM34.53 12.46C34.83 12.47 35.72 12.42 36.22 12.62C36.73 12.82 37.27 13.28 37.59 13.66C37.9 14.03 38.04 14.46 38.13 14.86C38.22 15.25 38.2 15.67 38.13 16.05C38.06 16.44 38.55 16 37.7 17.14C36.84 18.29 34.11 21.64 33.01 22.92C31.91 24.2 32.05 24.1 31.1 24.83C30.15 25.57 28.5 26.7 27.28 27.34C26.07 27.97 24.99 28.39 23.8 28.65C22.6 28.9 21.96 28.94 20.09 28.86C18.22 28.79 14.06 28.19 12.57 28.21C11.08 28.23 11.75 28.5 11.15 28.97C10.55 29.45 9.46 30.7 8.97 31.05C8.48 31.39 8.45 31.15 8.2 31.05C7.96 30.95 7.63 30.65 7.5 30.45C7.36 30.24 7.37 29.99 7.39 29.79C7.41 29.59 7.16 29.73 7.61 29.25C8.05 28.77 9.27 27.46 10.06 26.9C10.85 26.35 10.28 25.98 12.35 25.92C14.42 25.87 20.4 26.58 22.49 26.58C24.58 26.58 24.18 26.18 24.89 25.92C25.59 25.67 25.85 25.61 26.74 25.05C27.63 24.49 29.27 23.39 30.23 22.54C31.18 21.7 31.55 21.08 32.46 19.98C33.38 18.88 35.17 16.73 35.73 15.95C36.3 15.16 35.92 15.5 35.84 15.29C35.76 15.08 35.45 14.79 35.24 14.69C35.03 14.59 34.86 14.6 34.59 14.69C34.32 14.78 34.35 14.56 33.61 15.24C32.86 15.91 31.01 17.91 30.12 18.73C29.23 19.54 28.83 19.58 28.27 20.14C27.7 20.71 27.3 21.67 26.74 22.11C26.18 22.54 26.43 22.65 24.89 22.76C23.34 22.87 18.86 22.88 17.47 22.76C16.08 22.64 16.7 22.31 16.55 22.05C16.39 21.79 16.41 21.44 16.55 21.18C16.68 20.92 15.99 20.59 17.36 20.47C18.73 20.35 23.45 20.51 24.78 20.47C26.1 20.43 25.15 20.39 25.32 20.25C25.49 20.12 25.73 19.88 25.81 19.65C25.89 19.43 25.89 19.12 25.81 18.89C25.73 18.66 25.51 18.43 25.32 18.29C25.13 18.15 25.65 18.13 24.67 18.07C23.69 18.02 21 18.22 19.43 17.96C17.87 17.71 16.4 16.8 15.29 16.55C14.18 16.29 13.49 16.38 12.78 16.44C12.08 16.49 11.66 16.62 11.04 16.87C10.42 17.13 10.48 16.69 9.08 17.96C7.68 19.23 3.88 23.4 2.64 24.5C1.41 25.61 1.94 24.71 1.66 24.61C1.38 24.51 1.07 24.17 0.95 23.9C0.84 23.64 0.43 23.74 0.95 23.03C1.48 22.32 2.96 20.82 4.12 19.65C5.27 18.48 7.01 16.75 7.88 16C8.74 15.25 8.71 15.4 9.29 15.13C9.88 14.86 10.48 14.53 11.37 14.36C12.26 14.2 13.71 14.11 14.64 14.15C15.56 14.18 15.96 14.31 16.93 14.58C17.89 14.86 19.07 15.58 20.42 15.78C21.76 15.98 23.98 15.69 24.99 15.78C26.01 15.87 26.05 16.02 26.52 16.33C26.99 16.64 26.9 18.11 27.83 17.64C28.76 17.16 31.17 14.31 32.08 13.49C32.99 12.67 32.88 12.89 33.28 12.73C33.68 12.57 34.27 12.56 34.48 12.51C34.69 12.47 34.24 12.44 34.53 12.46Z\"/></svg><span>Gabay OFW</span></span>",
+      "css": ".ds-brand { display: inline-flex; align-items: center; gap: 0.55rem; color: var(--ink, #1f1f1f); font-family: Figtree, system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1rem; font-weight: 500; } .ds-brand-mark { height: 1.85rem; width: calc(1.85rem * 39.09 / 32); color: var(--pine, #1f5e4a); flex-shrink: 0; }"
+    },
+    {
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
@@ -284,11 +292,11 @@
     },
     {
       "name": "Composer",
-      "kind": "custom",
+      "kind": "input",
       "refersTo": "composer",
-      "description": "The floating input that never leaves the screen. An add-a-photo button at the head (prototype affordance — acknowledges the tap), an auto-growing textarea, and a circular send button at the tail that takes Gabay's pine once there is text. No visible Send label; Enter sends.",
-      "html": "<form class=\"ds-composer\"><button type=\"button\" class=\"ds-composer-plus\" aria-label=\"Add a photo\">+</button><textarea class=\"ds-composer-input\" rows=\"1\" aria-label=\"Tell Gabay what is happening\" placeholder=\"Tell Gabay what is happening\"></textarea><button class=\"ds-composer-send\" type=\"submit\" aria-label=\"Send\"><svg viewBox=\"0 0 24 24\" fill=\"none\"><path d=\"M12 19V6M6 12l6-6 6 6\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button></form>",
-      "css": ".ds-composer { display:flex; align-items:flex-end; gap:.4rem; background:#fff; border-radius:32px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 12px 34px rgba(31,31,31,.08); padding:.4rem .5rem .4rem .65rem; max-width:47rem; } .ds-composer-plus { flex-shrink:0; display:grid; place-items:center; width:2.4rem; height:2.4rem; border:none; background:none; border-radius:50%; font:300 1.5rem/1 'Figtree',system-ui,sans-serif; color:#6e7370; cursor:pointer; margin-bottom:.15rem; transition:background .14s ease,color .14s ease; } .ds-composer-plus:hover { background:#f1f1ee; color:#1f1f1f; } .ds-composer-input { flex:1; min-width:0; border:none; resize:none; background:none; padding:.85rem 0; font:400 1rem/1.45 'Figtree',system-ui,sans-serif; color:#1f1f1f; caret-color:#1f5e4a; } .ds-composer-input::placeholder { color:#6e7370; } .ds-composer-input:focus { outline:none; } .ds-composer-send { flex-shrink:0; width:2.9rem; height:2.9rem; border:none; background:none; border-radius:50%; display:grid; place-items:center; color:#6e7370; cursor:pointer; transition:background .14s ease,color .14s ease; } .ds-composer-send svg { width:1.15rem; height:1.15rem; } .ds-composer-input:not(:placeholder-shown) + .ds-composer-send { color:#1f5e4a; } .ds-composer-send:hover { background:#f1f1ee; color:#1f1f1f; } .ds-composer-send:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
+      "description": "The floating white pill that never leaves the screen. Two matched circular buttons — an add-a-photo control at the head, send at the tail — flank a borderless auto-growing textarea, optically centred against a single line of text. The send glyph takes pine once the field has text. Enter sends; Shift+Enter is a newline.",
+      "html": "<form class=\"ds-composer\"><button type=\"button\" class=\"ds-composer-plus\" aria-label=\"Add a photo\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><rect x=\"3.5\" y=\"5\" width=\"17\" height=\"14\" rx=\"2.6\" stroke=\"currentColor\" stroke-width=\"1.7\"/><circle cx=\"8.8\" cy=\"10\" r=\"1.7\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M4.5 16.5l4.2-3.7a1.5 1.5 0 0 1 2 0l2.6 2.3m2-1.6a1.5 1.5 0 0 1 2 0l0.6 0.5\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button><textarea class=\"ds-composer-input\" rows=\"1\" aria-label=\"Tell Gabay what is happening\" placeholder=\"Tell Gabay what is happening\"></textarea><button class=\"ds-composer-send\" type=\"submit\" aria-label=\"Send\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M12 19V6M6 12l6-6 6 6\" stroke=\"currentColor\" stroke-width=\"1.9\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button></form>",
+      "css": ".ds-composer { display:flex; align-items:center; gap:.3rem; background:var(--surface,#fff); border-radius:32px; box-shadow:0 1px 3px rgba(31,31,31,.08),0 12px 34px rgba(31,31,31,.08); padding:.4rem .5rem; max-width:47rem; width:100%; } .ds-composer-plus, .ds-composer-send { flex-shrink:0; width:2.5rem; height:2.5rem; border:none; background:none; border-radius:50%; display:grid; place-items:center; color:var(--muted,#6e7370); cursor:pointer; transition:background .14s ease, color .14s ease; } .ds-composer-plus svg, .ds-composer-send svg { width:1.2rem; height:1.2rem; display:block; } .ds-composer-plus:hover, .ds-composer-send:hover { background:var(--faint,#f1f1ee); color:var(--ink,#1f1f1f); } .ds-composer-input { flex:1; min-width:0; border:none; resize:none; background:none; padding:.6rem .2rem; max-height:8rem; font:400 1rem/1.5 Figtree,system-ui,-apple-system,'Segoe UI',sans-serif; color:var(--ink,#1f1f1f); caret-color:var(--pine,#1f5e4a); } .ds-composer-input::placeholder { color:var(--muted,#6e7370); } .ds-composer-input:focus { outline:none; } .ds-composer-input:not(:placeholder-shown) + .ds-composer-send { color:var(--pine,#1f5e4a); } .ds-composer-send:disabled { opacity:.4; cursor:default; } .ds-composer-plus:focus-visible, .ds-composer-send:focus-visible { outline:3px solid rgba(31,94,74,.35); outline-offset:3px; }"
     },
     {
       "name": "User Chat Bubble",
@@ -357,7 +365,7 @@
   ],
   "narrative": {
     "northStar": "One Surface, One Glow, One Bar",
-    "overview": "Gabay OFW is one calm surface an Overseas Filipino Worker talks to — often on a watched phone, in the middle of a bad situation, with a narrow window to act. The design borrows the shape of an assistant she already trusts how to use: a near-white ground, white lifted on soft shadow, a floating input at the foot of the screen. Everything that could be a border has been taken away; the only things that separate one region from another are a shadow and a stretch of empty space. Underneath that borrowed calm, the warmth is unmistakably hers — one diffuse glow drawn from the Philippine flag's blue, red and gold pools behind the greeting, the mark is a plain rotated square in pine green, and the first word is \"Kumusta\". The aesthetic is borrowed; the brand is not.\n\nThe system is built by radical subtraction. There is one ground color, not a palette of surfaces. There is one glow, and it fades the moment a conversation starts so it never competes with what Gabay is saying. There is one input, and it never leaves the screen — findings and contact cards arrive inside the thread rather than on a screen she has to navigate to. The one panel of chrome the conversation adds is \"What Gabay has understood\": a quiet card top-right (a pill that drops a sheet on a narrow screen), collapsible and out of the way, so the record of her Case is one glance away without sitting in the reading column. Stillness is the feature. Type is large and light, weight 400 for even the biggest headings, so nothing on the page raises its voice.\n\nExactly one thing is allowed to break the calm: flag red. It marks the EMERGENCY exit, the delete-everything action, and an urgent finding — and nothing else, ever. Its rarity is what makes it legible under stress. The explicit anti-reference is a generic assistant blue: the glow is the flag's #0038a8, never a borrowed brand color, and the design never leans on another product's identity to feel trustworthy.",
+    "overview": "Gabay OFW is one calm surface an Overseas Filipino Worker talks to — often on a watched phone, in the middle of a bad situation, with a narrow window to act. The design borrows the shape of an assistant she already trusts how to use: a near-white ground, white lifted on soft shadow, a floating input at the foot of the screen. Everything that could be a border has been taken away; the only things that separate one region from another are a shadow and a stretch of empty space. Underneath that borrowed calm, the warmth is unmistakably hers — one diffuse glow drawn from the Philippine flag's blue, red and gold pools behind the greeting, the mark is an open hand holding a winding path drawn in one pine line, and the first word is \"Kumusta\". The aesthetic is borrowed; the brand is not.\n\nThe system is built by radical subtraction. There is one ground color, not a palette of surfaces. There is one glow, and it fades the moment a conversation starts so it never competes with what Gabay is saying. There is one input, and it never leaves the screen — findings and contact cards arrive inside the thread rather than on a screen she has to navigate to. The one panel of chrome the conversation adds is \"What Gabay has understood\": a quiet card top-right (a pill that drops a sheet on a narrow screen), collapsible and out of the way, so the record of her Case is one glance away without sitting in the reading column. Stillness is the feature. Type is large and light, weight 400 for even the biggest headings, so nothing on the page raises its voice.\n\nExactly one thing is allowed to break the calm: flag red. It marks the EMERGENCY exit, the delete-everything action, and an urgent finding — and nothing else, ever. Its rarity is what makes it legible under stress. The explicit anti-reference is a generic assistant blue: the glow is the flag's #0038a8, never a borrowed brand color, and the design never leans on another product's identity to feel trustworthy.",
     "keyCharacteristics": [
       "Single near-white ground (#fbfbfa); white (#ffffff) only for surfaces that float",
       "Zero borders in the current implementation — shadow and space do all separation",
@@ -365,7 +373,7 @@
       "One flag-colored glow on the home screen, faded out once messaging begins",
       "Flag red (#ce1126) reserved for urgent affordances, never decoration",
       "One conversation, one composer that never leaves; no modes, no dashboard",
-      "Rotated pine square as both the brand mark and the agent's speaker mark"
+      "Hand-and-path brand mark beside the wordmark; rotated pine square kept as the agent's speaker mark"
     ],
     "rules": [
       {
@@ -395,7 +403,7 @@
       },
       {
         "name": "The No-Line Rule",
-        "body": "Don't add a border to create separation. If two regions blur together, the fix is more space or a ground-shift, then a shadow — a 1px solid line is the wrong tool in this system.",
+        "body": "Don't add a border to create separation. If two regions blur together, the fix is more space or a ground-shift, then a shadow — a 1px solid line is the wrong tool in this system. In dark this is load-bearing: shadow barely registers on black, so the ground-shift is the separation.",
         "section": "elevation"
       },
       {
@@ -405,18 +413,25 @@
       },
       {
         "name": "The Quiet-Motion Rule",
-        "body": "Motion is state feedback, never spectacle — shadow and color shifts under 150ms, one glow fade, three pulsing loader dots. Under prefers-reduced-motion the loader dots freeze to a static dimmed row, the glow fade and control transitions cut to instant, and smooth-scroll is dropped — the state change survives, the animation does not.",
+        "body": "Motion is state feedback, never spectacle — shadow and color shifts under 150ms, one glow fade, three pulsing loader dots. Under prefers-reduced-motion: reduce the loader dots freeze to a static dimmed row, the glow fade and control transitions cut to instant, and smooth-scroll is dropped — the state change survives, the animation does not.",
         "section": "elevation"
       }
     ],
     "dos": [
       "Do put every new surface on the #fbfbfa ground and reserve white for things that genuinely float (cards, inputs, messages, dialogs, chips).",
       "Do separate regions with space, then a one-shade ground shift, then a two-layer shadow — in that order.",
+      "Do keep the shell one screen tall and clipping — the page never scrolls; the rail is fixed and the message thread is the only scroll region (its own list is the rail's).",
+      "Do draw every glyph as an authored single-path SVG at one stroke weight — the compose, globe, chevron, sign-out, trash, photo, and send icons. Never a +, ×, or other typographic character standing in for an icon.",
       "Do set headings at weight 400 and create hierarchy with size and negative tracking (-0.01em to -0.015em).",
       "Do keep the reading column near 47rem and agent replies near 40rem, even on a wide screen.",
-      "Do render findings and contact cards as messages inside the thread; the composer must stay visible while she reads them. The Case is the one exception — it has its own quiet panel.",
-      "Do use the rotated pine square as the only geometric motif — brand mark and agent speaker mark, always pine.",
-      "Do keep the emergency affordance always on screen and on the zero-model path, however quiet it looks."
+      "Do render findings and contact cards as messages inside the thread; the composer must stay visible while she reads them. The Case is the one exception — it has its own quiet panel (see The Case panel).",
+      "Do keep the two marks in their lanes: the hand-and-path drawing beside the wordmark, the rotated pine square before Gabay's replies. Both always pine.",
+      "Do keep the emergency affordance always on screen and on the zero-model path, however quiet it looks — and first in the DOM, reachable by the skip link, so assistive-tech users reach it as fast as mouse users do.",
+      "Do give every interactive target ≥44px on a phone (the emergency pill first) and honor prefers-reduced-motion with a static alternative, not a blanket 0.01ms kill.",
+      "Do label every input with aria-label or <label> — a placeholder is not a name.",
+      "Do theme the browser surfaces from the palette: selection, caret, scrollbars, focus ring, and the theme-color meta pair.",
+      "Do keep every color a token — light and dark differ only in the :root values under @media (prefers-color-scheme: dark), never a per-component override.",
+      "Do mark non-English text (lang=\"tl\" / lang=\"ceb\") so a screen reader voices Filipino and Cebuano correctly — Gabay's reply, and each half of a bilingual opener chip."
     ],
     "donts": [
       "Don't add a 1px border to separate anything. The system has none.",
@@ -425,6 +440,7 @@
       "Don't let the glow sit under an active conversation — it fades to zero once the thread has a message.",
       "Don't introduce a second font family or a bold heading weight.",
       "Don't give Gabay's replies a bubble or a card; they are markless text after the pine square.",
+      "Don't shrink the brand mark below ~20px or drop it onto a transparent ground at tab size — use static/icon.svg instead.",
       "Don't build a settings screen, a mode picker, or a separate findings page — one conversation, one composer, one Case.",
       "Don't show a phone number, office name, distance, or citation that the server didn't send (ADR-0002)."
     ]

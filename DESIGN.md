@@ -570,8 +570,6 @@ access to the fixed pill.
   exception — it has its own quiet panel (see The Case panel).
 - **Do** keep the two marks in their lanes: the hand-and-path drawing beside the
   wordmark, the rotated pine square before Gabay's replies. Both always pine.
-- **Don't** shrink the brand mark below `~20px` or drop it onto a transparent
-  ground at tab size — use `static/icon.svg` instead.
 - **Do** keep the emergency affordance always on screen and on the zero-model
   path, however quiet it looks — and first in the DOM, reachable by the skip
   link, so assistive-tech users reach it as fast as mouse users do.
@@ -600,6 +598,8 @@ access to the fixed pill.
 - **Don't** introduce a second font family or a bold heading weight.
 - **Don't** give Gabay's replies a bubble or a card; they are markless text after
   the pine square.
+- **Don't** shrink the brand mark below `~20px` or drop it onto a transparent
+  ground at tab size — use `static/icon.svg` instead.
 - **Don't** build a settings screen, a mode picker, or a separate findings page —
   one conversation, one composer, one Case.
 - **Don't** show a phone number, office name, distance, or citation that the
