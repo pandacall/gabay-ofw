@@ -431,7 +431,7 @@
       "Do label every input with aria-label or <label> — a placeholder is not a name.",
       "Do theme the browser surfaces from the palette: selection, caret, scrollbars, focus ring, and the theme-color meta pair.",
       "Do keep every color a token — light and dark differ only in the :root values under @media (prefers-color-scheme: dark), never a per-component override.",
-      "Do mark non-English text (lang=\"tl\" / lang=\"ceb\") so a screen reader voices Filipino and Cebuano correctly — Gabay's reply, and each half of a bilingual opener chip."
+      "Do mark non-English text (lang=\"tl\" / lang=\"ceb\") so a screen reader voices Filipino and Cebuano correctly — Gabay's reply, and every Filipino opener chip."
     ],
     "donts": [
       "Don't add a 1px border to separate anything. The system has none.",
