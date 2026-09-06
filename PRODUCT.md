@@ -158,8 +158,10 @@ items, not commitments. No formal accessibility conformance target has been set.
 
 ## Brand Commitments
 
-- **Name:** Gabay OFW; short form **Gabay** (Filipino for "guide"). The mark is a
-  plain rotated square in pine green — deliberately generic.
+- **Name:** Gabay OFW; short form **Gabay** (Filipino for "guide"). The mark is
+  an open hand holding a winding path, drawn in one pine line — the guide and
+  the road she is being guided along. The rotated pine square it replaced is
+  kept as the agent's speaker mark.
 - **"The aesthetic is borrowed, the brand is not."** The design may echo a
   familiar calm-assistant surface, but Gabay never wears another product's
   identity: the home-screen glow is drawn from the Philippine flag's own blue,

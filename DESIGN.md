@@ -148,8 +148,9 @@ the screen. Everything that could be a border has been taken away; the only
 things that separate one region from another are a shadow and a stretch of
 empty space. Underneath that borrowed calm, the warmth is unmistakably hers —
 one diffuse glow drawn from the Philippine flag's blue, red and gold pools
-behind the greeting, the mark is a plain rotated square in pine green, and the
-first word is "Kumusta". The aesthetic is borrowed; the brand is not.
+behind the greeting, the mark is an open hand holding a winding path drawn in
+one pine line, and the first word is "Kumusta". The aesthetic is borrowed; the
+brand is not.
 
 The system is built by radical subtraction. There is one ground color, not a
 palette of surfaces. There is one glow, and it fades the moment a conversation
@@ -176,7 +177,8 @@ product's identity to feel trustworthy.
 - One flag-colored glow on the home screen, faded out once messaging begins
 - Flag red (`#ce1126`) reserved for urgent affordances, never decoration
 - One conversation, one composer that never leaves; no modes, no dashboard
-- Rotated pine square as both the brand mark and the agent's speaker mark
+- Hand-and-path brand mark beside the wordmark; rotated pine square kept as the
+  agent's speaker mark
 
 ## Colors
 
@@ -185,7 +187,7 @@ identity accent and one red alarm accent, plus the three flag hues that exist
 only as light.
 
 ### Primary
-- **Pine** (`#1f5e4a`): Gabay itself. The rotated-square brand mark, the speaker
+- **Pine** (`#1f5e4a`): Gabay itself. The brand mark, the speaker
   mark before every agent reply, the primary/confirm button fill, the active
   conversation dot, the account avatar, the focus ring (at 35% alpha). It is the
   color of the guide, used with restraint.
@@ -403,11 +405,22 @@ dialogs, `32px` for the composer, and a full `999px` pill for every button,
 chip, rail row, and the emergency and language controls. Chat bubbles use a flat
 `20px`. There are no sharp corners and no cut/beveled edges anywhere.
 
-The one hard-edged shape in the entire system is the **rotated pine square** —
-a `~0.75rem` square, `3–5px` radius, turned 45°. It is the brand mark in the
-rail and on the loading screen, and it reappears at `~0.95rem` as the speaker
-mark before every one of Gabay's replies. It is the system's only geometric
-motif and it is always pine, never outlined, never filled with anything else.
+The **brand mark** is an open hand holding a winding path, drawn as one filled
+pine silhouette on a `39.09 × 32` viewBox. It is defined once as an inline
+`<symbol>` and referenced by `<use>` everywhere it appears — the rail, the
+mobile topbar, the welcome nav, the loading screen, and knocked out of the pine
+disc on the first-run dialog. It is sized by height (`1.4rem` in a lockup),
+never width; the artwork is `1.22:1` and a square box would crop or shrink it.
+
+It does not go below about `20px`. Where it must — the browser tab — it ships
+as a separate asset (`static/icon.svg`): the same mark knocked out of a solid
+pine tile, because line art on a transparent ground disappears at `16px`.
+
+The **rotated pine square** survives as the agent's speaker mark only — a
+`~0.95rem` square, `4px` radius, turned 45°, before every one of Gabay's
+replies. It repeats dozens of times down the reading column, which is exactly
+where the drawing would be illegible and noisy. It is always pine, never
+outlined, never filled with anything else.
 
 Icons are single-path SVG, ~1.7–1.9 stroke width, `stroke-linecap: round`, no
 fills — the send arrow is the main one. One stroke weight throughout.
@@ -550,8 +563,10 @@ access to the fixed pill.
 - **Do** render findings and contact cards as messages inside the thread; the
   composer must stay visible while she reads them. The Case is the one
   exception — it has its own quiet panel (see The Case panel).
-- **Do** use the rotated pine square as the only geometric motif — brand mark and
-  agent speaker mark, always pine.
+- **Do** keep the two marks in their lanes: the hand-and-path drawing beside the
+  wordmark, the rotated pine square before Gabay's replies. Both always pine.
+- **Don't** shrink the brand mark below `~20px` or drop it onto a transparent
+  ground at tab size — use `static/icon.svg` instead.
 - **Do** keep the emergency affordance always on screen and on the zero-model
   path, however quiet it looks — and first in the DOM, reachable by the skip
   link, so assistive-tech users reach it as fast as mouse users do.
