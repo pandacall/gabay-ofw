@@ -528,14 +528,19 @@ and out of the reading column:
   nothing collapses to icons.
 
 ### The Composer (signature component)
-A white pill, `32px` radius, `md` shadow, that never leaves the screen. Two
-**matched circular buttons** flank a borderless auto-growing textarea, optically
-centred against a single line of text: an **add-a-photo** control at the head (an
-image icon; photo capture is a prototype affordance, so the tap is acknowledged
-with a toast, never a silent no-op) and a **send** control at the tail (an
-upward-arrow glyph that takes Gabay's pine once the field has text). No visible
-"Send" label — Enter sends, Shift+Enter inserts a newline. Placeholder is "Tell
-Gabay what is happening" in the detected language, mirrored to `aria-label`.
+A white pill, `32px` radius, `md` shadow, that never leaves the screen. A
+borderless auto-growing textarea with one **circular send control** at the tail
+(an upward-arrow glyph that takes Gabay's pine once the field has text),
+optically centred against a single line of text. No visible "Send" label — Enter
+sends, Shift+Enter inserts a newline. Placeholder is "Tell Gabay what is
+happening" in the detected language, mirrored to `aria-label`.
+
+There is **one control in the composer**, and it sends. The head of the pill
+carries a `1.1rem` inset instead of a second button, so the placeholder starts
+clear of the radius. A prototype add-a-photo control used to sit there; it
+acknowledged a tap it could not honour, and the composer reads calmer with the
+single affordance that actually does something. Anything added back here has to
+earn its place beside send.
 
 ### The Emergency Affordance (signature component)
 A calm white pill fixed to the top-right of every signed-in screen (and repeated,
@@ -560,7 +565,7 @@ access to the fixed pill.
   the rail is fixed and the message thread is the only scroll region (its own
   list is the rail's).
 - **Do** draw every glyph as an authored single-path SVG at one stroke weight —
-  the compose, globe, chevron, sign-out, trash, photo, and send icons. Never a
+  the compose, globe, chevron, sign-out, trash, and send icons. Never a
   `+`, `×`, or other typographic character standing in for an icon.
 - **Do** set headings at weight 400 and create hierarchy with size and negative
   tracking (`-0.01em` to `-0.015em`).
